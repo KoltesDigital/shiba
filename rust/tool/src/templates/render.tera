@@ -1,0 +1,13 @@
+{% if custom_render %}
+{{ custom_render }}
+{% else %}
+#ifdef uniformTime
+uniformTime = time;
+#endif
+
+glUniform1fv(0, FLOAT_UNIFORM_COUNT, floatUniforms);
+shibaCheckGlError();
+
+shibaDrawScreenRect();
+shibaCheckGlError();
+{% endif %}

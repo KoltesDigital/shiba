@@ -1,0 +1,5 @@
+{% if passes | length == 1 %}
+	SHIBA_VARIABLE GLint program;
+{% else %}
+	SHIBA_VARIABLE GLint programs[{{ passes | length }}];
+{% endif %}

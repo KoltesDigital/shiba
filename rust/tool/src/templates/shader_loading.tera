@@ -1,0 +1,157 @@
+{% if passes | length == 1 %}
+
+	{
+		program = glCreateProgram();
+		shibaCheckGlError();
+
+		{% if passes[0].vertex %}
+			const char *vertexShaderSources[] = {
+				{% if shader_prolog_code %}
+					shaderPrologCode,
+				{% endif %}
+				{% if shader_vertex_specific_code %}
+					shaderVertexSpecificCode,
+				{% endif %}
+				{% if shader_common_code %}
+					shaderCommonCode,
+				{% endif %}
+				shaderPassCodes[0],
+			};
+
+			GLint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+			glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
+			shibaCheckGlError();
+			glCompileShader(vertexShader);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(vertexShader);
+			glAttachShader(program, vertexShader);
+			shibaCheckGlError();
+		{% endif %}
+
+		{% if passes[0].fragment %}
+			const char *fragmentShaderSources[] = {
+				{% if shader_prolog_code %}
+					shaderPrologCode,
+				{% endif %}
+				{% if shader_fragment_specific_code %}
+					shaderFragmentSpecificCode,
+				{% endif %}
+				{% if shader_common_code %}
+					shaderCommonCode,
+				{% endif %}
+				shaderPassCodes[1],
+			};
+
+			GLint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+			glShaderSource(fragmentShader, sizeof(fragmentShaderSources) / sizeof(fragmentShaderSources[0]), fragmentShaderSources, 0);
+			shibaCheckGlError();
+			glCompileShader(fragmentShader);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(fragmentShader);
+			glAttachShader(program, fragmentShader);
+			shibaCheckGlError();
+		{% endif %}
+
+		glLinkProgram(program);
+		shibaCheckGlError();
+
+		shibaCheckProgramInfoLog(program);
+
+		{% if development %}
+			std::cout << "Uniform locations:" << std::endl;
+			DEBUG_DISPLAY_UNIFORM_LOATIONS(program);
+			std::cout << std::endl;
+		{% endif %}
+	}
+
+	#ifdef SERVER
+	startServerOptions.programs = &program;
+	#endif
+
+	//glUseProgram(program);
+	//shibaCheckGlError();
+
+{% else %}
+
+	for (auto i = 0; i < {{ passes | length }}; ++i)
+	{
+		programs[i] = glCreateProgram();
+		shibaCheckGlError();
+
+		if (shaderPassCodes[i * 2])
+		{
+			const char *vertexShaderSources[] = {
+				{% if shader_prolog_code %}
+					shaderPrologCode,
+				{% endif %}
+				{% if shader_vertex_specific_code %}
+					shaderVertexSpecificCode,
+				{% endif %}
+				{% if shader_common_code %}
+					shaderCommonCode,
+				{% endif %}
+				shaderPassCodes[i * 2],
+			};
+
+			GLint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+			shibaCheckGlError();
+			glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
+			shibaCheckGlError();
+			glCompileShader(vertexShader);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(vertexShader);
+			glAttachShader(programs[i], vertexShader);
+			shibaCheckGlError();
+
+			{% if development %}
+				debugVertexShaders[i] = vertexShader;
+			{% endif %}
+		}
+
+		if (shaderPassCodes[i * 2 + 1])
+		{
+			const char *fragmentShaderSources[] = {
+				{% if shader_prolog_code %}
+					shaderPrologCode,
+				{% endif %}
+				{% if shader_fragment_specific_code %}
+					shaderFragmentSpecificCode,
+				{% endif %}
+				{% if shader_common_code %}
+					shaderCommonCode,
+				{% endif %}
+				shaderPassCodes[i * 2 + 1],
+			};
+
+			GLint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+			shibaCheckGlError();
+			glShaderSource(fragmentShader, sizeof(fragmentShaderSources) / sizeof(fragmentShaderSources[0]), fragmentShaderSources, 0);
+			shibaCheckGlError();
+			glCompileShader(fragmentShader);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(fragmentShader);
+			glAttachShader(programs[i], fragmentShader);
+			shibaCheckGlError();
+
+			{% if development %}
+				debugFragmentShaders[i] = fragmentShader;
+			{% endif %}
+		}
+
+		glLinkProgram(programs[i]);
+		shibaCheckGlError();
+
+		shibaCheckProgramInfoLog(program);
+
+		{% if development %}
+			std::cout << "Uniform locations in pass " << i << ":" << std::endl;
+			DEBUG_DISPLAY_UNIFORM_LOATIONS(programs[i]);
+			std::cout << std::endl;
+		{% endif %}
+
+		#ifdef SERVER
+		startServerOptions.programs = programs;
+		#endif
+	}
+
+{% endif %}

@@ -1,0 +1,254 @@
+{% if development %}
+
+	#include <iostream>
+	#include <memory>
+	#include <ostream>
+	#include <sstream>
+
+	class _ShibaLogger : public std::ostringstream
+	{
+	public:
+		_ShibaLogger(std::ostream &os)
+			: os{ os }
+		{
+		}
+
+		~_ShibaLogger()
+		{
+			os << str() << std::endl;
+		}
+
+	private:
+		std::ostream &os;
+	};
+
+	#define shibaLog() _ShibaLogger{ std::cout }
+	#define shibaError() _ShibaLogger{ std::cerr }
+
+	static void _shibaCheckWindowsError(const char *filename, int lineNumber)
+	{
+		DWORD dw = GetLastError(); 
+
+		if (dw)
+		{
+			LPTSTR lpMsgBuf;
+
+			FormatMessage(
+				FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+				FORMAT_MESSAGE_FROM_SYSTEM |
+				FORMAT_MESSAGE_IGNORE_INSERTS,
+				NULL,
+				dw,
+				MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+				(LPTSTR) &lpMsgBuf,
+				0, NULL );
+
+			std::cerr << "Windows error at " << filename << "@" << lineNumber << ": " << lpMsgBuf;
+
+			LocalFree(lpMsgBuf);
+		}
+	}
+
+	#define shibaCheckWindowsError() _shibaCheckWindowsError(__FILE__, __LINE__)
+
+	static void _shibaCheckGlError(const char *filename, int lineNumber)
+	{
+		auto err = glGetError();
+		if (err != GL_NO_ERROR)
+		{
+			char *error = nullptr;
+
+	#define _SHIBA_ERROR_CASE(ERR) \
+		case ERR: \
+			error = #ERR; \
+			break;
+
+			switch (err)
+			{
+				_SHIBA_ERROR_CASE(GL_INVALID_ENUM)
+				_SHIBA_ERROR_CASE(GL_INVALID_OPERATION)
+				_SHIBA_ERROR_CASE(GL_INVALID_VALUE)
+				_SHIBA_ERROR_CASE(GL_INVALID_FRAMEBUFFER_OPERATION_EXT)
+				_SHIBA_ERROR_CASE(GL_OUT_OF_MEMORY)
+			}
+
+	#undef _SHIBA_ERROR_CASE
+
+			std::cerr << "OpenGL error at " << filename << "@" << lineNumber << ": ";
+			if (error != nullptr)
+			{
+				std::cerr << error;
+			}
+			else
+			{
+				std::cerr << "0x" << std::hex << err;
+			}
+			std::cerr << std::endl;
+		}
+	}
+
+	#define shibaCheckGlError() _shibaCheckGlError(__FILE__, __LINE__)
+
+	static void shibaCheckShaderInfoLog(GLuint shader)
+	{
+		GLint length;
+		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
+		shibaCheckGlError();
+
+		if (length > 0)
+		{
+			auto buffer = std::make_unique<GLchar[]>(length);
+			
+			glGetShaderInfoLog(shader, length, NULL, buffer.get());
+			shibaCheckGlError();
+
+			shibaError() << buffer;
+		}
+	}
+
+	static void shibaCheckProgramInfoLog(GLuint program)
+	{
+		GLint length;
+		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+		shibaCheckGlError();
+
+		if (length > 0)
+		{
+			auto buffer = std::make_unique<GLchar[]>(length);
+			
+			glGetProgramInfoLog(program, length, NULL, buffer.get());
+			shibaCheckGlError();
+
+			shibaError() << buffer;
+		}
+	}
+
+	#define SHIBA_VARIABLE static thread_local
+
+{% else %}
+
+	#define SHIBA_VARIABLE static
+
+	#define shibaError()
+	#define shibaLog()
+	#define shibaCheckWindowsError()
+	#define shibaCheckGlError()
+	#define shibaCheckShaderInfoLog(shader)
+	#define shibaCheckProgramInfoLog(program)
+
+{% endif %}
+
+{% if blender_api %}
+
+	static const char *_shibaNullVertexCode =
+"#version 150 \
+in vec2 pos; \
+void main() { \
+	gl_Position = vec4(pos, 0., 1.); \
+}";
+
+	SHIBA_VARIABLE GLuint shibaFinalFramebufferId = 0;
+
+	SHIBA_VARIABLE GLuint _shibaScreenRectVAO, _shibaScreenRectVBO;
+	static GLfloat _shibaScreenRectPositionBuffer[] = {
+		-1.f, -1.f,
+		 1.f, -1.f,
+		 1.f,  1.f,
+		-1.f,  1.f,
+	};
+
+	static void _shibaCreateScreenRect()
+	{
+		glCreateVertexArrays(1, &_shibaScreenRectVAO);
+		shibaCheckGlError();
+		glBindVertexArray(_shibaScreenRectVAO);
+		shibaCheckGlError();
+
+		glCreateBuffers(1, &_shibaScreenRectVBO);
+		shibaCheckGlError();
+		glBindBuffer(GL_ARRAY_BUFFER, _shibaScreenRectVBO);
+		shibaCheckGlError();
+
+		glBufferData(GL_ARRAY_BUFFER, sizeof(_shibaScreenRectPositionBuffer), _shibaScreenRectPositionBuffer, GL_STATIC_DRAW);
+		shibaCheckGlError();
+
+		glEnableVertexAttribArray(0);
+		shibaCheckGlError();
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), 0);
+		shibaCheckGlError();
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		shibaCheckGlError();
+
+		glBindVertexArray(0);
+		shibaCheckGlError();
+	}
+
+	static void _shibaDeleteScreenRect()
+	{
+		glDeleteVertexArrays(1, &_shibaScreenRectVAO);
+		shibaCheckGlError();
+
+		glDeleteBuffers(1, &_shibaScreenRectVBO);
+		shibaCheckGlError();
+	}
+
+	static void shibaDrawScreenRect()
+	{
+		glBindVertexArray(_shibaScreenRectVAO);
+		shibaCheckGlError();
+
+		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+		shibaCheckGlError();
+
+		glBindVertexArray(0);
+		shibaCheckGlError();
+	}
+
+	class _ShibaMutexGuard
+	{
+	public:
+		_ShibaMutexGuard(HANDLE mutex)
+			: _mutex{ mutex }
+			, _acquired{ false }
+			{
+				auto dwWaitResult = WaitForSingleObject(_mutex, INFINITE);
+				switch (dwWaitResult) 
+				{
+					case WAIT_OBJECT_0:
+						_acquired = true;
+						break;
+
+					case WAIT_ABANDONED:
+						shibaError() << "Abandoned mutex.";
+						break;
+
+					case WAIT_FAILED:
+						shibaCheckWindowsError();
+						break;
+				}
+			}
+
+		~_ShibaMutexGuard()
+		{
+			if (_acquired)
+			{
+				if (!ReleaseMutex(_mutex)) 
+				{
+					shibaCheckWindowsError();
+				}
+			}
+		}
+
+	private:
+		HANDLE _mutex;
+		bool _acquired;
+	};
+
+{% else %}
+
+	#define _shibaNullVertexCode nullptr
+	#define shibaFinalFramebufferId 0
+	#define shibaDrawScreenRect() glRects(-1, -1, 1, 1)
+
+{% endif %}

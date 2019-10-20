@@ -1,0 +1,294 @@
+#include <windows.h>
+
+#define GLEW_STATIC
+
+#include <cstdlib>
+#include <GL/glew.h>
+#include <GL/gl.h>
+#include <iostream>
+#include <map>
+#include <thread>
+
+{{ api }}
+
+{% if custom_declarations %}
+	{{ custom_declarations }}
+{% endif %}
+
+{{ shader_declarations }}
+
+#define FLOAT_UNIFORM_COUNT 3
+SHIBA_VARIABLE float floatUniforms[FLOAT_UNIFORM_COUNT];
+#define uniformTime floatUniforms[0]
+#define uniformResolutionWidth floatUniforms[1]
+#define uniformResolutionHeight floatUniforms[2]
+
+#define _SHIBA_EXPORT extern "C" __declspec(dllexport)
+
+static void _shibaCommonRender(float time, int32_t width, int32_t height)
+{
+	glViewport(0, 0, width, height);
+	shibaCheckGlError();
+
+	glUseProgram(program);
+	shibaCheckGlError();
+
+	uniformResolutionWidth = width;
+	uniformResolutionHeight = height;
+
+	{{ render }}
+}
+
+static bool _shibaInitializeGlew()
+{
+	auto err = glewInit();
+	if (GLEW_OK != err)
+	{
+		shibaError() << "Failed to initialize GLEW: " << glewGetErrorString(err);
+		return false;
+	}
+
+	return true;
+}
+
+static void _shibaInitializeCommonVariables()
+{
+	_shibaCreateScreenRect();
+
+	static const char *shaderPassCodes[] = {
+		{% for pass in passes %}
+			{{ pass.vertex | string_literal(nullptr="_shibaNullVertexCode") }},
+			{{ pass.fragment | string_literal }},
+		{% endfor %}
+	};
+
+	{{ shader_loading }}
+}
+
+struct _ShibaContextDescriptor
+{
+	HWND window{ nullptr };
+	HGLRC context{ nullptr };
+};
+
+static HANDLE _shibaContextDescriptorsByThreadIdMutex = nullptr;
+static std::map<std::thread::id, std::unique_ptr<_ShibaContextDescriptor>> _shibaContextDescriptorsByThreadId;
+
+SHIBA_VARIABLE bool _shibaIsInitialized = false;
+SHIBA_VARIABLE _ShibaContextDescriptor *_shibaContextDescriptor;
+SHIBA_VARIABLE GLuint _shibaFinalFramebufferId;
+SHIBA_VARIABLE GLuint _shibaFinalFramebufferTextureId;
+
+static void _shibaCommonUpdate(float time, int32_t width, int32_t height)
+{
+}
+
+static bool _shibaCreateContext()
+{
+	PIXELFORMATDESCRIPTOR pfd =
+	{
+		sizeof(PIXELFORMATDESCRIPTOR),
+		1,
+		PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL,
+		PFD_TYPE_RGBA,
+		32,
+		0, 0, 0, 0, 0, 0,
+		0,
+		0,
+		0,
+		0, 0, 0, 0,
+		24,
+		8,
+		0,
+		PFD_MAIN_PLANE,
+		0,
+		0, 0, 0
+	};
+
+	_shibaContextDescriptor->window = CreateWindowA("static", NULL, WS_POPUP, 0, 0, 1, 1, NULL, NULL, NULL, 0);
+	auto dc = GetDC(_shibaContextDescriptor->window);
+
+	auto pixelFormat = ChoosePixelFormat(dc, &pfd);
+	SetPixelFormat(dc, pixelFormat, &pfd);
+	shibaCheckWindowsError();
+
+	_shibaContextDescriptor->context = wglCreateContext(dc);
+	shibaCheckWindowsError();
+
+	if (_shibaContextDescriptor->context == nullptr)
+	{
+		return false;
+	}
+
+	wglMakeCurrent(dc, _shibaContextDescriptor->context);
+	shibaCheckWindowsError();
+
+	shibaLog() << "Created context " << _shibaContextDescriptor->context << ".";
+
+	return true;
+}
+
+_SHIBA_EXPORT void _shibaUpdate(float time, int32_t width, int32_t height)
+{
+	if (!_shibaIsInitialized)
+	{
+		_shibaContextDescriptor = new _ShibaContextDescriptor{};
+
+		{
+			_ShibaMutexGuard guard{ _shibaContextDescriptorsByThreadIdMutex };
+			_shibaContextDescriptorsByThreadId.insert(std::make_pair(std::this_thread::get_id(), std::unique_ptr<_ShibaContextDescriptor>{ _shibaContextDescriptor }));
+		}
+
+		if (!_shibaContextDescriptor->context && !_shibaCreateContext())
+		{
+			return;
+		}
+
+		if (!_shibaInitializeGlew())
+		{
+			return;
+		}
+
+		_shibaInitializeCommonVariables();
+
+		shibaCheckGlError();
+		glGenTextures(1, &_shibaFinalFramebufferTextureId);
+		shibaCheckGlError();
+		glBindTexture(GL_TEXTURE_2D, _shibaFinalFramebufferTextureId);
+		shibaCheckGlError();
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+		shibaCheckGlError();
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		shibaCheckGlError();
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		//shibaCheckGlError();
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		shibaCheckGlError();
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		shibaCheckGlError();
+
+		glGenFramebuffers(1, &_shibaFinalFramebufferId);
+		shibaCheckGlError();
+
+		glBindFramebuffer(GL_FRAMEBUFFER, _shibaFinalFramebufferId);
+		shibaCheckGlError();
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _shibaFinalFramebufferTextureId, 0);
+		shibaCheckGlError();
+		auto status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		shibaCheckGlError();
+		if (status != GL_FRAMEBUFFER_COMPLETE)
+		{
+			shibaError() << "Framebuffer is incomplete!";
+			return;
+		}
+
+		shibaFinalFramebufferId = _shibaFinalFramebufferId;
+
+		_shibaIsInitialized = true;
+	}
+
+	_shibaCommonUpdate(time, width, height);
+}
+
+_SHIBA_EXPORT void _shibaRender(float time, int32_t width, int32_t height, bool isPreview, void *buffer)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, shibaFinalFramebufferId);
+	shibaCheckGlError();
+
+	_shibaCommonRender(time, width, height);
+
+	glReadBuffer(GL_COLOR_ATTACHMENT0);
+	shibaCheckGlError();
+	glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, buffer);
+	shibaCheckGlError();
+}
+
+_SHIBA_EXPORT void _shibaViewportUpdate(float time, int32_t width, int32_t height)
+{
+	if (!_shibaIsInitialized)
+	{
+		if (!_shibaInitializeGlew())
+		{
+			return;
+		}
+
+		_shibaInitializeCommonVariables();
+
+		shibaFinalFramebufferId = 0;
+
+		_shibaIsInitialized = true;
+	}
+
+	_shibaCommonUpdate(time, width, height);
+}
+
+_SHIBA_EXPORT void _shibaViewportRender(float time, int32_t width, int32_t height)
+{
+	_shibaCommonRender(time, width, height);
+}
+
+static void _shibaDeleteContext(const _ShibaContextDescriptor *descriptor)
+{
+	shibaLog() << "Deleting context " << descriptor->context << ".";
+
+	wglDeleteContext(descriptor->context);
+	shibaCheckWindowsError();
+
+	DestroyWindow(descriptor->window);
+	shibaCheckWindowsError();
+}
+
+static void _shibaProcessAttach()
+{
+	_shibaContextDescriptorsByThreadIdMutex = CreateMutex(NULL, FALSE, NULL);
+	shibaCheckWindowsError();
+}
+
+static void _shibaProcessDetach()
+{
+	CloseHandle(_shibaContextDescriptorsByThreadIdMutex);
+	shibaCheckWindowsError();
+
+	for (auto &pair : _shibaContextDescriptorsByThreadId)
+	{
+		_shibaDeleteContext(pair.second.get());
+	}
+}
+
+static void _shibaThreadDetach()
+{
+	_ShibaMutexGuard guard{ _shibaContextDescriptorsByThreadIdMutex };
+	auto it = _shibaContextDescriptorsByThreadId.find(std::this_thread::get_id());
+	if (it != _shibaContextDescriptorsByThreadId.end())
+	{
+		_shibaDeleteContext(it->second.get());
+		_shibaContextDescriptorsByThreadId.erase(it);
+	}
+}
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)
+{
+	switch (fdwReason)
+	{
+		case DLL_PROCESS_ATTACH:
+			shibaLog() << "Attaching DLL to process " << GetCurrentProcessId() << ".";
+			_shibaProcessAttach();
+			break;
+
+		case DLL_PROCESS_DETACH:
+			shibaLog() << "Detaching DLL from process " << GetCurrentProcessId() << ".";
+			_shibaProcessDetach();
+			break;
+
+		case DLL_THREAD_ATTACH:
+			shibaLog() << "Attaching DLL to thread " << std::this_thread::get_id() << ".";
+			break;
+
+		case DLL_THREAD_DETACH:
+			shibaLog() << "Detaching DLL from thread " << std::this_thread::get_id() << ".";
+			_shibaThreadDetach();
+			break;
+	}
+
+	return TRUE;
+}
