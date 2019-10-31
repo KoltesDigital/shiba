@@ -1,5 +1,7 @@
 {% if development %}
 
+	#define SHIBA_DEVELOPMENT
+
 	#include <iostream>
 	#include <memory>
 	#include <ostream>
@@ -125,6 +127,9 @@
 
 	#define SHIBA_VARIABLE static thread_local
 
+	static GLint _shibaFragmentShaders[{{ passes | length }}];
+	static GLint _shibaVertexShaders[{{ passes | length }}];
+
 {% else %}
 
 	#define SHIBA_VARIABLE static
@@ -138,16 +143,18 @@
 
 {% endif %}
 
+#define SHIBA_CONST static const constexpr
+
 {% if blender_api %}
 
-	static const char *_shibaNullVertexCode =
-"#version 150 \
-in vec2 pos; \
-void main() { \
-	gl_Position = vec4(pos, 0., 1.); \
-}";
+	SHIBA_CONST char *_shibaShaderNullVertexCode =
+"#version 150\n\
+in vec2 pos;\n\
+void main()\n{ \
+	gl_Position = vec4(pos, 0., 1.);\n\
+}\n";
 
-	SHIBA_VARIABLE GLuint shibaFinalFramebufferId = 0;
+	SHIBA_VARIABLE GLint shibaFinalFramebufferId = 0;
 
 	SHIBA_VARIABLE GLuint _shibaScreenRectVAO, _shibaScreenRectVBO;
 	static GLfloat _shibaScreenRectPositionBuffer[] = {
@@ -247,7 +254,7 @@ void main() { \
 
 {% else %}
 
-	#define _shibaNullVertexCode nullptr
+	#define _shibaShaderNullVertexCode nullptr
 	#define shibaFinalFramebufferId 0
 	#define shibaDrawScreenRect() glRects(-1, -1, 1, 1)
 

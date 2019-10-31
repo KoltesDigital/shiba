@@ -11,8 +11,8 @@
 #include "../engine/server.hpp"
 #endif
 
-{% if custom_declarations %}
-{{ custom_declarations }}
+{% if custom.declarations %}
+{{ custom.declarations }}
 {% endif %}
 
 #pragma code_seg(".main")
@@ -90,7 +90,7 @@ void main()
 #ifdef HAS_SHADER_COMMON_CODE
 		shaderCommonCode,
 #endif
-		shaderPassCodes[0],
+		_shibaShaderPassCodes[0],
 	};
 
 	GLint vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -111,7 +111,7 @@ void main()
 #ifdef HAS_SHADER_COMMON_CODE
 		shaderCommonCode,
 #endif
-		shaderPassCodes[1],
+		_shibaShaderPassCodes[1],
 	};
 
 	GLint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -145,7 +145,7 @@ void main()
 		programs[i] = glCreateProgram();
 		shibaCheckGlError();
 
-		if (shaderPassCodes[i * 2])
+		if (_shibaShaderPassCodes[i * 2])
 		{
 			const char *vertexShaderSources[] = {
 #ifdef HAS_SHADER_PROLOG_CODE
@@ -157,7 +157,7 @@ void main()
 #ifdef HAS_SHADER_COMMON_CODE
 				shaderCommonCode,
 #endif
-				shaderPassCodes[i * 2],
+				_shibaShaderPassCodes[i * 2],
 			};
 
 			GLint vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -175,7 +175,7 @@ void main()
 #endif
 		}
 
-		if (shaderPassCodes[i * 2 + 1])
+		if (_shibaShaderPassCodes[i * 2 + 1])
 		{
 			const char *fragmentShaderSources[] = {
 #ifdef HAS_SHADER_PROLOG_CODE
@@ -187,7 +187,7 @@ void main()
 #ifdef HAS_SHADER_COMMON_CODE
 				shaderCommonCode,
 #endif
-				shaderPassCodes[i * 2 + 1],
+				_shibaShaderPassCodes[i * 2 + 1],
 			};
 
 			GLint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);

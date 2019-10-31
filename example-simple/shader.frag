@@ -4,7 +4,7 @@ uniform float time;
 uniform float resolutionWidth;
 uniform float resolutionHeight;
 
-#pragma fragment 0
+#pragma shiba fragment 0
 
 // This is the template at https://www.shadertoy.com/new.
 void main() {

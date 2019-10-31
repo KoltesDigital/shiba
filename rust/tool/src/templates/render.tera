@@ -1,13 +1,26 @@
-{% if custom_render %}
-{{ custom_render }}
+{% if custom.rendering %}
+	{{ custom.rendering }}
 {% else %}
-#ifdef uniformTime
-uniformTime = time;
-#endif
+	#ifdef shibaUniformTime
+		shibaUniformTime = shibaTime;
+	#endif
 
-glUniform1fv(0, FLOAT_UNIFORM_COUNT, floatUniforms);
-shibaCheckGlError();
+	#ifdef shibaUniformResolutionWidth
+		shibaUniformResolutionWidth = shibaResolutionWidth;
+	#endif
 
-shibaDrawScreenRect();
-shibaCheckGlError();
+	#ifdef shibaUniformResolutionHeight
+		shibaUniformResolutionHeight = shibaResolutionHeight;
+	#endif
+
+	{% if blender_api %}
+		glUseProgram(shibaProgram);
+		shibaCheckGlError();
+	{% endif %}
+
+	glUniform1fv(0, shibaFloatUniformCount, shibaFloatUniforms);
+	shibaCheckGlError();
+
+	shibaDrawScreenRect();
+	shibaCheckGlError();
 {% endif %}

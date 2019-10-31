@@ -61,6 +61,31 @@ impl TemplateRenderer {
 			_ => Err(tera::Error::from("string_literal expects a string")),
 		});
 
+		tera.register_filter("to_opengl_type", |value, _| match value {
+			Value::String(old) => {
+				let new = match old.as_str() {
+					"bool" => "GLint",
+					"int" => "GLint",
+					"uint" => "GLuint",
+					"float" => "GLfloat",
+					_ => "GLint",
+				};
+				Ok(Value::String(new.to_string()))
+			}
+			_ => Err(tera::Error::from("to_opengl_type expects a string")),
+		});
+
+		tera.register_filter("uppercase_first", |value, _| match value {
+			Value::String(old) => {
+				let mut new = old;
+				if let Some(c) = new.get_mut(0..1) {
+					c.make_ascii_uppercase();
+				}
+				Ok(Value::String(new))
+			}
+			_ => Err(tera::Error::from("uppercase_first expects a string")),
+		});
+
 		Ok(TemplateRenderer { tera })
 	}
 

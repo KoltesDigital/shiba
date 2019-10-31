@@ -11,30 +11,18 @@
 
 {{ api }}
 
-{% if custom_declarations %}
-	{{ custom_declarations }}
+{% if custom.declaration %}
+	{{ custom.declaration }}
 {% endif %}
 
 {{ shader_declarations }}
 
-#define FLOAT_UNIFORM_COUNT 3
-SHIBA_VARIABLE float floatUniforms[FLOAT_UNIFORM_COUNT];
-#define uniformTime floatUniforms[0]
-#define uniformResolutionWidth floatUniforms[1]
-#define uniformResolutionHeight floatUniforms[2]
-
 #define _SHIBA_EXPORT extern "C" __declspec(dllexport)
 
-static void _shibaCommonRender(float time, int32_t width, int32_t height)
+static void _shibaCommonRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
-	glViewport(0, 0, width, height);
+	glViewport(0, 0, shibaResolutionWidth, shibaResolutionHeight);
 	shibaCheckGlError();
-
-	glUseProgram(program);
-	shibaCheckGlError();
-
-	uniformResolutionWidth = width;
-	uniformResolutionHeight = height;
 
 	{{ render }}
 }
@@ -51,18 +39,15 @@ static bool _shibaInitializeGlew()
 	return true;
 }
 
-static void _shibaInitializeCommonVariables()
+static void _shibaCommonInitialize(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
 	_shibaCreateScreenRect();
 
-	static const char *shaderPassCodes[] = {
-		{% for pass in passes %}
-			{{ pass.vertex | string_literal(nullptr="_shibaNullVertexCode") }},
-			{{ pass.fragment | string_literal }},
-		{% endfor %}
-	};
-
 	{{ shader_loading }}
+
+	{% if custom.initialization %}
+		{{ custom.initialization }}
+	{% endif %}
 }
 
 struct _ShibaContextDescriptor
@@ -79,7 +64,7 @@ SHIBA_VARIABLE _ShibaContextDescriptor *_shibaContextDescriptor;
 SHIBA_VARIABLE GLuint _shibaFinalFramebufferId;
 SHIBA_VARIABLE GLuint _shibaFinalFramebufferTextureId;
 
-static void _shibaCommonUpdate(float time, int32_t width, int32_t height)
+static void _shibaCommonUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
 }
 
@@ -128,7 +113,7 @@ static bool _shibaCreateContext()
 	return true;
 }
 
-_SHIBA_EXPORT void _shibaUpdate(float time, int32_t width, int32_t height)
+_SHIBA_EXPORT void _shibaUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
 	if (!_shibaIsInitialized)
 	{
@@ -149,14 +134,14 @@ _SHIBA_EXPORT void _shibaUpdate(float time, int32_t width, int32_t height)
 			return;
 		}
 
-		_shibaInitializeCommonVariables();
+		_shibaCommonInitialize(shibaResolutionWidth, shibaResolutionHeight);
 
 		shibaCheckGlError();
 		glGenTextures(1, &_shibaFinalFramebufferTextureId);
 		shibaCheckGlError();
 		glBindTexture(GL_TEXTURE_2D, _shibaFinalFramebufferTextureId);
 		shibaCheckGlError();
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, shibaResolutionWidth, shibaResolutionHeight, 0, GL_RGBA, GL_FLOAT, NULL);
 		shibaCheckGlError();
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		shibaCheckGlError();
@@ -178,8 +163,12 @@ _SHIBA_EXPORT void _shibaUpdate(float time, int32_t width, int32_t height)
 		shibaCheckGlError();
 		if (status != GL_FRAMEBUFFER_COMPLETE)
 		{
-			shibaError() << "Framebuffer is incomplete!";
+			shibaError() << "Final framebuffer is incomplete!";
 			return;
+		}
+		else
+		{
+			shibaLog() << "Final framebuffer is complete.";
 		}
 
 		shibaFinalFramebufferId = _shibaFinalFramebufferId;
@@ -187,23 +176,23 @@ _SHIBA_EXPORT void _shibaUpdate(float time, int32_t width, int32_t height)
 		_shibaIsInitialized = true;
 	}
 
-	_shibaCommonUpdate(time, width, height);
+	_shibaCommonUpdate(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
 }
 
-_SHIBA_EXPORT void _shibaRender(float time, int32_t width, int32_t height, bool isPreview, void *buffer)
+_SHIBA_EXPORT void _shibaRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, shibaFinalFramebufferId);
 	shibaCheckGlError();
 
-	_shibaCommonRender(time, width, height);
+	_shibaCommonRender(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
 
 	glReadBuffer(GL_COLOR_ATTACHMENT0);
 	shibaCheckGlError();
-	glReadPixels(0, 0, width, height, GL_RGBA, GL_FLOAT, buffer);
+	glReadPixels(0, 0, shibaResolutionWidth, shibaResolutionHeight, GL_RGBA, GL_FLOAT, buffer);
 	shibaCheckGlError();
 }
 
-_SHIBA_EXPORT void _shibaViewportUpdate(float time, int32_t width, int32_t height)
+_SHIBA_EXPORT void _shibaViewportUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
 	if (!_shibaIsInitialized)
 	{
@@ -212,19 +201,24 @@ _SHIBA_EXPORT void _shibaViewportUpdate(float time, int32_t width, int32_t heigh
 			return;
 		}
 
-		_shibaInitializeCommonVariables();
+		_shibaCommonInitialize(shibaResolutionWidth, shibaResolutionHeight);
 
-		shibaFinalFramebufferId = 0;
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING, &shibaFinalFramebufferId);
+		shibaCheckGlError();
 
 		_shibaIsInitialized = true;
 	}
 
-	_shibaCommonUpdate(time, width, height);
+	_shibaCommonUpdate(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
 }
 
-_SHIBA_EXPORT void _shibaViewportRender(float time, int32_t width, int32_t height)
+_SHIBA_EXPORT void _shibaViewportRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
-	_shibaCommonRender(time, width, height);
+	// Viewport sets a different default clear color.
+	glClearColor(0.f, 0.f, 0.f, 0.f);
+	shibaCheckGlError();
+
+	_shibaCommonRender(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
 }
 
 static void _shibaDeleteContext(const _ShibaContextDescriptor *descriptor)

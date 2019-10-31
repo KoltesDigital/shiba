@@ -1,5 +1,39 @@
 {% if passes | length == 1 %}
-	SHIBA_VARIABLE GLint program;
+	SHIBA_VARIABLE GLint shibaProgram;
 {% else %}
-	SHIBA_VARIABLE GLint programs[{{ passes | length }}];
+	SHIBA_VARIABLE GLint shibaPrograms[{{ passes | length }}];
 {% endif %}
+
+SHIBA_CONST char *_shibaShaderPassCodes[] = {
+	{% for pass in passes %}
+		{{ pass.vertex | string_literal }},
+		{{ pass.fragment | string_literal }},
+	{% endfor %}
+};
+
+{% if common_codes.after_stage_variables %}
+	SHIBA_CONST char *_shibaShaderAfterStageVariablesCode = {{ common_codes.after_stage_variables | string_literal }};
+{% endif %}
+
+{% if common_codes.before_stage_variables %}
+	SHIBA_CONST char *_shibaShaderBeforeStageVariablesCode = {{ common_codes.before_stage_variables | string_literal }};
+{% endif %}
+
+{% if common_codes.fragment_specific %}
+	SHIBA_CONST char *_shibaShaderFragmentSpecificCode = {{ common_codes.fragment_specific | string_literal }};
+{% endif %}
+
+{% if common_codes.vertex_specific %}
+	SHIBA_CONST char *_shibaShaderVertexSpecificCode = {{ common_codes.vertex_specific | string_literal }};
+{% endif %}
+
+{% for element in uniform_arrays %}
+	SHIBA_CONST int shiba{{ element.type_name | uppercase_first }}UniformLocationIndex = {{ loop.index - 1 }};
+	SHIBA_CONST int shiba{{ element.type_name | uppercase_first }}UniformCount = {{ element.uniform_array.variables | length }};
+	SHIBA_VARIABLE {{ element.type_name | to_opengl_type }} shiba{{ element.type_name | uppercase_first }}Uniforms[{{ element.uniform_array.variables | length }}];
+	{% for variable in element.uniform_array.variables %}
+		#define shibaUniform{{ variable.name | uppercase_first }} shiba{{ element.type_name | uppercase_first }}Uniforms[{{ loop.index - 1 }}]
+	{% endfor %}
+{% endfor %}
+
+SHIBA_VARIABLE int shibaUniformLocations[{{ passes | length }}][{{ uniform_arrays | length }}];
