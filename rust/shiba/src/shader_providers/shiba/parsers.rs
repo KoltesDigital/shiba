@@ -1,5 +1,5 @@
 use super::*;
-use crate::nom_ext::*;
+use crate::parsers::*;
 use crate::types::{Variable, VariableKind};
 use nom::{
 	branch::*, bytes::complete::*, character::complete::*, combinator::*, error::ErrorKind,
