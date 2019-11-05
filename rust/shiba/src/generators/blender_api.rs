@@ -1,5 +1,5 @@
 use crate::config_provider::ConfigProvider;
-use crate::directories;
+use crate::paths;
 use crate::template::{Template, TemplateRenderer};
 use crate::types::{Pass, ProjectDescriptor, ShaderDescriptor, UniformArray, VariableKind};
 use regex::Regex;
@@ -103,6 +103,7 @@ struct ShaderLoadingContext<'a> {
 #[derive(Debug)]
 pub struct BlenderAPIGenerator {
 	config: Config,
+	msvc_path: PathBuf,
 }
 
 impl BlenderAPIGenerator {
@@ -113,7 +114,8 @@ impl BlenderAPIGenerator {
 			},
 			paths: DefaultPathsConfig {},
 		})?;
-		Ok(BlenderAPIGenerator { config })
+		let msvc_path = paths::msvc(paths::MSVCPlatform::X64)?;
+		Ok(BlenderAPIGenerator { config, msvc_path })
 	}
 
 	pub fn generate(
@@ -121,7 +123,7 @@ impl BlenderAPIGenerator {
 		template_renderer: &TemplateRenderer,
 		project_descriptor: &ProjectDescriptor,
 		shader_descriptor: &ShaderDescriptor,
-	) -> Result<(), String> {
+	) -> Result<String, String> {
 		let passes = &shader_descriptor.passes;
 
 		let uniform_arrays = shader_descriptor
@@ -294,59 +296,68 @@ impl BlenderAPIGenerator {
 			template_renderer.render_context(Template::BlenderAPI, &blender_empty_context)?;
 
 		fs::write(
-			(*directories::TMP).join("blender_api.cpp"),
+			(*paths::TEMP_DIR).join("blender_api.cpp"),
 			blender_api_contents.as_bytes(),
 		)
 		.map_err(|_| "Failed to write to file.")?;
 
-		let obj = "blender_api.obj";
-		let cl = Command::new("cl.exe")
-			.current_dir(&*directories::TMP)
+		let compilation = Command::new("cmd.exe")
+			.arg("/c")
+			.arg("call")
+			.arg(format!(
+				r#"{}\VC\Auxiliary\Build\vcvars64.bat"#,
+				self.msvc_path.to_string_lossy(),
+			))
+			.arg("&&")
+			.arg("cl")
 			.arg("/c")
 			.arg("/EHsc")
 			.arg("/FA")
-			.arg(format!("/Fa{}.asm", obj))
-			.arg(format!("/Fo{}", obj))
+			.arg("/Fablender_api.asm")
+			.arg("/Foblender_api.obj")
 			.arg(format!(
 				"/I{}",
 				PathBuf::from(&self.config.paths.glew)
 					.join("include")
-					.to_string_lossy()
+					.to_string_lossy(),
 			))
-			.args(&["blender_api.cpp"])
-			.output()
-			.map_err(|_| "Failed to execute cl.")?;
-		println!(
-			"{}",
-			str::from_utf8(&cl.stdout).map_err(|_| "Failed to convert UTF8.")?
-		);
-
-		if !cl.status.success() {
-			return Err("Failed to compile".to_string());
-		}
-
-		let link = Command::new("link.exe")
-			.current_dir(&*directories::TMP)
+			.arg("blender_api.cpp")
+			.arg("&&")
+			.arg("link")
 			.arg("/DLL")
 			.arg("/OUT:blender_api.dll")
 			.args(&self.config.link.args)
-			.arg(format!(
-				"{}",
+			.arg(
 				PathBuf::from(&self.config.paths.glew)
 					.join("lib")
 					.join("Release")
 					.join("x64")
 					.join("glew32s.lib")
 					.to_string_lossy()
-			))
+					.to_string(),
+			)
 			.arg("blender_api.obj")
+			.current_dir(&*paths::TEMP_DIR)
 			.output()
-			.map_err(|_| "Failed to execute link.")?;
+			.map_err(|err| err.to_string())?;
+
 		println!(
-			"{}",
-			str::from_utf8(&link.stdout).map_err(|_| "Failed to convert UTF8.")?
+			"stdout: {}",
+			str::from_utf8(&compilation.stdout).map_err(|_| "Failed to convert UTF8.")?
 		);
 
-		Ok(())
+		println!(
+			"stderr: {}",
+			str::from_utf8(&compilation.stderr).map_err(|_| "Failed to convert UTF8.")?
+		);
+
+		if !compilation.status.success() {
+			return Err("Failed to compile".to_string());
+		}
+
+		Ok((*paths::TEMP_DIR)
+			.join("blender_api.dll")
+			.to_string_lossy()
+			.to_string())
 	}
 }

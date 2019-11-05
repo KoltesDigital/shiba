@@ -115,6 +115,11 @@ static bool _shibaCreateContext()
 
 _SHIBA_EXPORT void _shibaUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
+	_shibaCommonUpdate(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
+}
+
+_SHIBA_EXPORT void _shibaRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
+{
 	if (!_shibaIsInitialized)
 	{
 		_shibaContextDescriptor = new _ShibaContextDescriptor{};
@@ -175,14 +180,11 @@ _SHIBA_EXPORT void _shibaUpdate(float shibaTime, int32_t shibaResolutionWidth, i
 
 		_shibaIsInitialized = true;
 	}
-
-	_shibaCommonUpdate(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
-}
-
-_SHIBA_EXPORT void _shibaRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
-{
-	glBindFramebuffer(GL_FRAMEBUFFER, shibaFinalFramebufferId);
-	shibaCheckGlError();
+	else
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, shibaFinalFramebufferId);
+		shibaCheckGlError();
+	}
 
 	_shibaCommonRender(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
 
@@ -194,6 +196,11 @@ _SHIBA_EXPORT void _shibaRender(float shibaTime, int32_t shibaResolutionWidth, i
 
 _SHIBA_EXPORT void _shibaViewportUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
+	_shibaCommonUpdate(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
+}
+
+_SHIBA_EXPORT void _shibaViewportRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+{
 	if (!_shibaIsInitialized)
 	{
 		if (!_shibaInitializeGlew())
@@ -201,19 +208,14 @@ _SHIBA_EXPORT void _shibaViewportUpdate(float shibaTime, int32_t shibaResolution
 			return;
 		}
 
-		_shibaCommonInitialize(shibaResolutionWidth, shibaResolutionHeight);
-
 		glGetIntegerv(GL_FRAMEBUFFER_BINDING, &shibaFinalFramebufferId);
 		shibaCheckGlError();
+
+		_shibaCommonInitialize(shibaResolutionWidth, shibaResolutionHeight);
 
 		_shibaIsInitialized = true;
 	}
 
-	_shibaCommonUpdate(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
-}
-
-_SHIBA_EXPORT void _shibaViewportRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
-{
 	// Viewport sets a different default clear color.
 	glClearColor(0.f, 0.f, 0.f, 0.f);
 	shibaCheckGlError();

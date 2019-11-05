@@ -1,4 +1,4 @@
-use crate::directories;
+use crate::paths;
 use std::fs;
 use std::path::PathBuf;
 
@@ -32,7 +32,7 @@ impl ConfigProvider {
 		let mut config = serde_yaml::Value::Mapping(serde_yaml::Mapping::default());
 
 		let paths = vec![
-			(*directories::USER_SETTINGS).join("config.yml"),
+			(*paths::USER_SETTINGS).join("config.yml"),
 			PathBuf::from("config.yml"),
 		];
 

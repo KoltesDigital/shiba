@@ -1,125 +1,101 @@
 import _ctypes
-import bpy
 import ctypes
 import os
-import shutil
+from shiba.locked_file import LockedFile
 import struct
-import tempfile
 import threading
 
 
 class API:
-    def __init__(self):
-        self.__handle = None
-        self.__dll = None
+    def __init__(self, on_loaded):
+        self.__library = None
 
-        # Development path.
-        addons_to_load = os.environ.get('ADDONS_TO_LOAD')
-        if addons_to_load is not None:
-            script_dir = os.path.join(tempfile.gettempdir(), "shiba")
-        else:
-            script_dir = os.path.dirname(__file__)
+        self.__on_loaded = on_loaded
 
-        # make sure indirect DLL dependencies are found
-        if os.environ["PATH"].find(script_dir) == -1:
-            os.environ["PATH"] += ";" + script_dir
-
-        self.__dll_name = os.path.join(script_dir, "blender_api.dll")
-        self.__loaded_dll_name = os.path.join(
-            bpy.app.tempdir, "shiba.loaded.dll")
-
+        self.__locked_file = LockedFile(self.__run_process, self.__end_process)
         self.__lock = threading.Lock()
 
-    def _load_library(self):
-        if not self.__dll:
-            # copy the dll, to allow hot reload after rebuild
-            shutil.copy(self.__dll_name, self.__loaded_dll_name)
+    def __run_process(self, path):
+        self.__library = ctypes.CDLL(path)
+        self.__on_loaded()
+        print("API loaded.")
 
-            # loading pattern from
-            # http://stackoverflow.com/questions/21770419/free-the-opened-ctypes-library-in-python
-            self.__dll = ctypes.CDLL(self.__loaded_dll_name)
+    def __end_process(self):
+        _ctypes.FreeLibrary(self.__library._handle)
+        del self.__library
+        print("API unloaded.")
 
-    def _unload_library(self):
-        if self.__dll:
-            _ctypes.FreeLibrary(self.__dll._handle)
-            del self.__dll
+    def set_path(self, path):
+        parent_path = os.path.dirname(path)
 
-            # remove the temp dll
-            os.remove(self.__loaded_dll_name)
+        # Make sure indirect DLL dependencies are found.
+        if os.environ["PATH"].find(parent_path) == -1:
+            os.environ["PATH"] += ";" + parent_path
+
+        with self.__lock:
+            self.__locked_file.set_path(path)
 
     def load(self):
-        try:
-            self.__lock.acquire()
-            self._load_library()
-        finally:
-            self.__lock.release()
+        with self.__lock:
+            self.__locked_file.open()
 
     def unload(self):
-        try:
-            self.__lock.acquire()
-            self._unload_library()
-        finally:
-            self.__lock.release()
-
-    def reload(self):
-        try:
-            self.__lock.acquire()
-            self._unload_library()
-            self._load_library()
-        finally:
-            self.__lock.release()
+        with self.__lock:
+            self.__locked_file.close()
 
     def update(self, time, width, height, is_preview):
-        try:
-            self.__lock.acquire()
-            self.__dll._shibaUpdate(
+        with self.__lock:
+            if not self.__locked_file.opened:
+                return
+
+            self.__library._shibaUpdate(
                 ctypes.c_float(time),
                 ctypes.c_int32(width),
                 ctypes.c_int32(height),
                 ctypes.c_bool(is_preview),
             )
-        finally:
-            self.__lock.release()
 
     def render(self, time, width, height, is_preview):
-        pixel_count = width * height
-        buffer = bytearray(pixel_count * 16)
-        Buffer = ctypes.c_char * len(buffer)
-        try:
-            self.__lock.acquire()
-            self.__dll._shibaRender(
+        with self.__lock:
+            if not self.__locked_file.opened:
+                return
+
+            pixel_count = width * height
+            buffer = bytearray(pixel_count * 16)
+            Buffer = ctypes.c_char * len(buffer)
+
+            self.__library._shibaRender(
                 ctypes.c_float(time),
                 ctypes.c_int32(width),
                 ctypes.c_int32(height),
                 ctypes.c_bool(is_preview),
                 Buffer.from_buffer(buffer),
             )
-        finally:
-            self.__lock.release()
-        frame = [None] * pixel_count
-        it = struct.iter_unpack('ffff', buffer)
-        for i in range(pixel_count):
-            frame[i] = next(it)
-        return frame
+
+            frame = [None] * pixel_count
+            it = struct.iter_unpack('ffff', buffer)
+            for i in range(pixel_count):
+                frame[i] = next(it)
+            return frame
 
     def viewport_update(self, time, width, height):
-        try:
-            self.__lock.acquire()
-            self.__dll._shibaViewportUpdate(
+        with self.__lock:
+            if not self.__locked_file.opened:
+                return
+
+            self.__library._shibaViewportUpdate(
                 ctypes.c_float(time),
                 ctypes.c_int32(width),
                 ctypes.c_int32(height),
             )
-        finally:
-            self.__lock.release()
 
     def viewport_render(self, time, width, height):
-        try:
-            self.__lock.acquire()
-            self.__dll._shibaViewportRender(
+        with self.__lock:
+            if not self.__locked_file.opened:
+                return
+
+            self.__library._shibaViewportRender(
                 ctypes.c_float(time),
                 ctypes.c_int32(width),
                 ctypes.c_int32(height),
             )
-        finally:
-            self.__lock.release()

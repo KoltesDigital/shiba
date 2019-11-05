@@ -14,8 +14,8 @@ SHIBA_CONST int indiceParticleCount = particleCount * 4 * 6;
 
 SHIBA_VARIABLE GLfloat vertices[vertexCount];
 SHIBA_VARIABLE GLfloat verticesParticles[particleCount * 6 * 4];
-SHIBA_VARIABLE int indices[indiceCount];
-SHIBA_VARIABLE int indicesParticles[indiceParticleCount];
+SHIBA_VARIABLE unsigned int indices[indiceCount];
+SHIBA_VARIABLE unsigned int indicesParticles[indiceParticleCount];
 
 SHIBA_VARIABLE GLuint firstPassTextureId;
 

@@ -17,12 +17,12 @@ if (!checked)
 	shibaCheckGlError();
 	if (status != GL_FRAMEBUFFER_COMPLETE)
 	{
-		shibaError() << "FBO is incomplete!";
+		shibaError() << "Framebuffer is incomplete!";
 		return;
 	}
 	else
 	{
-		shibaLog() << "FBO is complete.";
+		shibaLog() << "Framebuffer is complete.";
 	}
 }
 #endif

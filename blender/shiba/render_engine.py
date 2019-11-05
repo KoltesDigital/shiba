@@ -1,7 +1,7 @@
 import bpy
-from shiba.api import API
+from shiba.tool import Tool
 
-api = None
+_tools = []
 
 
 class RenderEngine(bpy.types.RenderEngine):
@@ -11,17 +11,17 @@ class RenderEngine(bpy.types.RenderEngine):
     bl_use_preview = True
 
     def __init__(self):
-        global api
-        if not api:
-            api = API()
-            api.load()
+        self.__tool = Tool(self.__reload_viewport)
+        self.__tool.update_path()
+        self.__tool.start()
+        self.__tool.build()
+        _tools.append(self.__tool)
 
     @staticmethod
     def _get_time(depsgraph):
         scene = depsgraph.scene
         actual_fps = scene.render.fps / scene.render.fps_base
         time = scene.frame_current / actual_fps
-
         return time
 
     @staticmethod
@@ -29,7 +29,6 @@ class RenderEngine(bpy.types.RenderEngine):
         region = context.region
         width = region.width
         height = region.height
-
         return width, height
 
     def update(self, data, depsgraph):
@@ -38,7 +37,7 @@ class RenderEngine(bpy.types.RenderEngine):
 
         time = RenderEngine._get_time(depsgraph)
 
-        api.update(
+        self.__tool.api.update(
             time,
             self.resolution_x,
             self.resolution_y,
@@ -48,7 +47,7 @@ class RenderEngine(bpy.types.RenderEngine):
     def render(self, depsgraph):
         time = RenderEngine._get_time(depsgraph)
 
-        frame = api.render(
+        frame = self.__tool.api.render(
             time,
             self.resolution_x,
             self.resolution_y,
@@ -62,15 +61,19 @@ class RenderEngine(bpy.types.RenderEngine):
             layer.rect = frame
             self.end_result(result)
 
+    def __reload_viewport(self):
+        self.tag_update()
+        self.tag_redraw()
+
     def view_update(self, context, depsgraph):
         time = RenderEngine._get_time(depsgraph)
         width, height = RenderEngine._get_view_resolution(context)
-        api.viewport_update(time, width, height)
+        self.__tool.api.viewport_update(time, width, height)
 
     def view_draw(self, context, depsgraph):
         time = RenderEngine._get_time(depsgraph)
         width, height = RenderEngine._get_view_resolution(context)
-        api.viewport_render(time, width, height)
+        self.__tool.api.viewport_render(time, width, height)
 
 
 def get_panels():
@@ -95,10 +98,8 @@ def register():
 
 
 def unregister():
-    global api
-    if api:
-        api.unload()
-        api = None
+    for tool in _tools:
+        tool.stop()
 
     for panel in get_panels():
         if RenderEngine.bl_idname in panel.COMPAT_ENGINES:
