@@ -30,13 +30,15 @@ class Tool:
 
     def __run_process_thread(self):
         while True:
-            line = self.__process.stdout.readline()
-            if self.__process.poll() is not None:
-                break
-            print('Shiba: %s' % line.decode().rstrip())
-        rc = self.__process.poll()
+            try:
+                line = self.__process.stdout.readline()
+                print('Shiba: %s' % line.decode().rstrip())
+            except ValueError:
+                if self.__process.poll() is not None:
+                    break
 
-        print('Shiba exited with code %d' % rc)
+        rc = self.__process.poll()
+        print('Shiba exited with code %d.' % rc)
 
     def __run_socket_thread(self):
         buffer = bytearray()
@@ -86,7 +88,16 @@ class Tool:
         print("Shiba started.")
 
     def __end_process(self):
+        print("Exiting Shiba.")
         self.__process.terminate()
+
+        try:
+            self.__process.communicate(timeout=15)
+        except subprocess.TimeoutExpired:
+            print("Forcing Shiba to exit.")
+            self.__process.kill()
+            self.__process.communicate()
+
         self.__process_thread.join()
         self.__process_thread = None
         self.__process = None

@@ -62,7 +62,7 @@ pub fn subcommand() -> Result<(), String> {
 									},
 									Err(_) => send(&Event::InvalidCommand),
 								},
-								Err(_) => println!("Error while reading line."),
+								Err(err) => println!("Error while reading line: {}", err),
 							}
 						}
 					} else {
@@ -70,7 +70,7 @@ pub fn subcommand() -> Result<(), String> {
 					}
 				});
 			}
-			Err(_) => println!("Error while listening."),
+			Err(err) => println!("Error while listening: {}", err),
 		}
 	}
 

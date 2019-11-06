@@ -1,7 +1,6 @@
 import bpy
+from shiba import tools
 from shiba.tool import Tool
-
-_tools = []
 
 
 class RenderEngine(bpy.types.RenderEngine):
@@ -15,7 +14,7 @@ class RenderEngine(bpy.types.RenderEngine):
         self.__tool.update_path()
         self.__tool.start()
         self.__tool.build()
-        _tools.append(self.__tool)
+        tools.append(self.__tool)
 
     @staticmethod
     def _get_time(depsgraph):
@@ -98,9 +97,6 @@ def register():
 
 
 def unregister():
-    for tool in _tools:
-        tool.stop()
-
     for panel in get_panels():
         if RenderEngine.bl_idname in panel.COMPAT_ENGINES:
             panel.COMPAT_ENGINES.remove(RenderEngine.bl_idname)
