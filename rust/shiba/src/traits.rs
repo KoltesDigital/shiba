@@ -1,8 +1,6 @@
-use crate::types::{ProjectDescriptor, ShaderDescriptor};
+use crate::types::ShaderDescriptor;
+use std::hash::Hash;
 
-pub trait ShaderProvider {
-	fn provide_shader(
-		&self,
-		project_descriptor: &ProjectDescriptor,
-	) -> Result<ShaderDescriptor, String>;
+pub trait ShaderProvider: Hash {
+	fn provide(&self) -> Result<ShaderDescriptor, String>;
 }

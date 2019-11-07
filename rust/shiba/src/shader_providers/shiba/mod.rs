@@ -1,51 +1,34 @@
 mod parsers;
+mod settings;
 mod types;
 
+pub use self::settings::Settings;
 use self::types::*;
-use crate::config_provider::ConfigProvider;
 use crate::traits;
-use crate::types::{Pass, ProjectDescriptor, ShaderDescriptor, UniformArray, VariableKind};
+use crate::types::{Pass, ShaderDescriptor, UniformArray, VariableKind};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 use std::fs;
+use std::hash::Hash;
+use std::path::Path;
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct ShaderProviderConfig {
-	pub filename: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct Config {
-	pub shader_provider: ShaderProviderConfig,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "kebab-case")]
-struct DefaultShaderProviderConfig {
-	pub filename: &'static str,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "kebab-case")]
-struct DefaultConfig {
-	pub shader_provider: DefaultShaderProviderConfig,
-}
-
+#[derive(Hash)]
 pub struct ShaderProvider {
-	config: Config,
+	shader_contents: String,
 }
 
 impl ShaderProvider {
-	pub fn new(config_provider: &mut ConfigProvider) -> Result<Self, String> {
-		let config = config_provider.get_default(DefaultConfig {
-			shader_provider: DefaultShaderProviderConfig {
-				filename: "shader.frag",
-			},
+	pub fn new(project_directory: &Path, settings: &Settings) -> Result<Self, String> {
+		let path = project_directory.join(&settings.filename);
+		let shader_contents = fs::read_to_string(&path).map_err(|err| {
+			format!(
+				"Failed to read shader at {}: {}",
+				path.to_string_lossy(),
+				err
+			)
 		})?;
-		Ok(ShaderProvider { config })
+
+		Ok(ShaderProvider { shader_contents })
 	}
 }
 
@@ -126,18 +109,8 @@ fn parse(code: &str) -> Result<ShaderDescriptor, String> {
 }
 
 impl traits::ShaderProvider for ShaderProvider {
-	fn provide_shader(
-		&self,
-		project_descriptor: &ProjectDescriptor,
-	) -> Result<ShaderDescriptor, String> {
-		let shader_contents = fs::read_to_string(
-			project_descriptor
-				.directory
-				.join(&self.config.shader_provider.filename),
-		)
-		.map_err(|err| err.to_string())?;
-
-		let mut shader_descriptor = parse(&shader_contents)?;
+	fn provide(&self) -> Result<ShaderDescriptor, String> {
+		let mut shader_descriptor = parse(&self.shader_contents)?;
 
 		if shader_descriptor.passes.is_empty() {
 			return Err("Shader should define at least one pass.".to_string());

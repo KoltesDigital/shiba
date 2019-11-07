@@ -1,51 +1,18 @@
-use crate::config_provider::ConfigProvider;
-use crate::paths;
+mod settings;
+
+pub use self::settings::Settings;
+use crate::configuration::Configuration;
+use crate::paths::{self, TEMP_DIRECTORY};
 use crate::template::{Template, TemplateRenderer};
-use crate::types::{Pass, ProjectDescriptor, ShaderDescriptor, UniformArray, VariableKind};
+use crate::types::{Pass, ShaderDescriptor, UniformArray, VariableKind};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct LinkConfig {
-	pub args: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct PathsConfig {
-	pub glew: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct Config {
-	pub link: LinkConfig,
-	pub paths: PathsConfig,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "kebab-case")]
-struct DefaultLinkConfig {
-	pub args: Vec<&'static str>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "kebab-case")]
-struct DefaultPathsConfig {}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "kebab-case")]
-struct DefaultConfig {
-	pub link: DefaultLinkConfig,
-	pub paths: DefaultPathsConfig,
-}
 
 #[derive(Debug, Default, Serialize)]
 struct CommonCodes {
@@ -101,29 +68,33 @@ struct ShaderLoadingContext<'a> {
 }
 
 #[derive(Debug)]
-pub struct BlenderAPIGenerator {
-	config: Config,
+pub struct BlenderAPIGenerator<'a> {
+	settings: &'a Settings,
+	glew_path: PathBuf,
 	msvc_path: PathBuf,
 }
 
-impl BlenderAPIGenerator {
-	pub fn new(config_provider: &ConfigProvider) -> Result<Self, String> {
-		let config = config_provider.get_default(DefaultConfig {
-			link: DefaultLinkConfig {
-				args: vec!["/MACHINE:X64", "gdi32.lib", "opengl32.lib", "user32.lib"],
-			},
-			paths: DefaultPathsConfig {},
-		})?;
+impl<'a> BlenderAPIGenerator<'a> {
+	pub fn new(settings: &'a Settings, configuration: &'a Configuration) -> Result<Self, String> {
+		let glew_path = configuration
+			.paths
+			.glew
+			.clone()
+			.ok_or("Please set configuration key paths.glew.")?;
 		let msvc_path = paths::msvc(paths::MSVCPlatform::X64)?;
-		Ok(BlenderAPIGenerator { config, msvc_path })
+		Ok(BlenderAPIGenerator {
+			settings,
+			glew_path,
+			msvc_path,
+		})
 	}
 
 	pub fn generate(
 		&self,
+		project_directory: &Path,
 		template_renderer: &TemplateRenderer,
-		project_descriptor: &ProjectDescriptor,
 		shader_descriptor: &ShaderDescriptor,
-	) -> Result<String, String> {
+	) -> Result<(), String> {
 		let passes = &shader_descriptor.passes;
 
 		let uniform_arrays = shader_descriptor
@@ -135,7 +106,7 @@ impl BlenderAPIGenerator {
 			})
 			.collect::<Vec<UniformArrayElement>>();
 
-		let custom = fs::read_dir(&project_descriptor.directory)
+		let custom = fs::read_dir(&project_directory)
 			.map_err(|_| "Failed to read directory.")?
 			.filter_map(|entry| {
 				let entry = entry.unwrap();
@@ -296,7 +267,7 @@ impl BlenderAPIGenerator {
 			template_renderer.render_context(Template::BlenderAPI, &blender_empty_context)?;
 
 		fs::write(
-			(*paths::TEMP_DIR).join("blender_api.cpp"),
+			TEMP_DIRECTORY.join("blender_api.cpp"),
 			blender_api_contents.as_bytes(),
 		)
 		.map_err(|_| "Failed to write to file.")?;
@@ -317,7 +288,7 @@ impl BlenderAPIGenerator {
 			.arg("/Foblender_api.obj")
 			.arg(format!(
 				"/I{}",
-				PathBuf::from(&self.config.paths.glew)
+				PathBuf::from(&self.glew_path)
 					.join("include")
 					.to_string_lossy(),
 			))
@@ -326,9 +297,9 @@ impl BlenderAPIGenerator {
 			.arg("link")
 			.arg("/DLL")
 			.arg("/OUT:blender_api.dll")
-			.args(&self.config.link.args)
+			.args(&self.settings.link.args)
 			.arg(
-				PathBuf::from(&self.config.paths.glew)
+				PathBuf::from(&self.glew_path)
 					.join("lib")
 					.join("Release")
 					.join("x64")
@@ -337,7 +308,7 @@ impl BlenderAPIGenerator {
 					.to_string(),
 			)
 			.arg("blender_api.obj")
-			.current_dir(&*paths::TEMP_DIR)
+			.current_dir(&*paths::TEMP_DIRECTORY)
 			.output()
 			.map_err(|err| err.to_string())?;
 
@@ -355,9 +326,10 @@ impl BlenderAPIGenerator {
 			return Err("Failed to compile".to_string());
 		}
 
-		Ok((*paths::TEMP_DIR)
-			.join("blender_api.dll")
-			.to_string_lossy()
-			.to_string())
+		Ok(())
+	}
+
+	pub fn get_path() -> PathBuf {
+		TEMP_DIRECTORY.join("blender_api.dll")
 	}
 }

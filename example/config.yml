@@ -1,4 +1,0 @@
-# Use this file to customize your demo.
-# Write computer specific settings in config.local.yml, which won't be versioned.
-demo:
-  name: Write Your Demo Title Here

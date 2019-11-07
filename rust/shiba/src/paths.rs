@@ -6,12 +6,22 @@ use std::process::Command;
 use std::str;
 
 lazy_static! {
-	pub static ref TEMP_DIR: PathBuf = {
+	pub static ref DATA_DIRECTORY: PathBuf = {
+		let p = dirs::data_dir().unwrap().join("shiba");
+		fs::create_dir_all(&p).unwrap();
+		p
+	};
+	pub static ref LOCAL_DATA_DIRECTORY: PathBuf = {
+		let p = dirs::data_local_dir().unwrap().join("shiba");
+		fs::create_dir_all(&p).unwrap();
+		p
+	};
+	pub static ref TEMP_DIRECTORY: PathBuf = {
 		let p = std::env::temp_dir().join("shiba");
 		fs::create_dir_all(&p).unwrap();
 		p
 	};
-	pub static ref USER_SETTINGS: PathBuf = {
+	pub static ref USER_SETTINGS_DIRECTORY: PathBuf = {
 		let p = dirs::home_dir().unwrap().join(".shiba");
 		fs::create_dir_all(&p).unwrap();
 		p

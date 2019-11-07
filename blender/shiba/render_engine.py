@@ -13,6 +13,7 @@ class RenderEngine(bpy.types.RenderEngine):
         self.__tool = Tool(self.__reload_viewport)
         self.__tool.update_path()
         self.__tool.start()
+        self.__tool.set_project_directory('../example')
         self.__tool.build()
         tools.append(self.__tool)
 

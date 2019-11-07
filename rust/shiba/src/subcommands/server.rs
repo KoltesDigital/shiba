@@ -2,18 +2,21 @@ use crate::subcommands;
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpListener};
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::{Arc, RwLock};
 use std::thread::spawn;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "command")]
 enum Command {
 	Build,
+	SetProjectDirectory { path: String },
 }
 
 #[derive(Serialize)]
 struct BlenderApiAvailableEvent<'a> {
-	pub path: &'a String,
+	pub path: &'a Path,
 }
 
 #[derive(Serialize)]
@@ -29,15 +32,18 @@ enum Event<'a> {
 	InvalidCommand,
 }
 
-pub fn subcommand() -> Result<(), String> {
+pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 	let addr = SocketAddr::from_str("127.0.0.1:5184").map_err(|_| "Invalid socket address.")?;
 	let listener = TcpListener::bind(addr).map_err(|_| "Failed to start server.")?;
+	let clients = Arc::new(RwLock::new(Vec::new()));
 
 	for stream in listener.incoming() {
 		match stream {
-			Ok(mut stream) => {
-				spawn(move || {
-					if let Ok(stream_clone) = stream.try_clone() {
+			Ok(stream) => {
+				let mut project_directory = project_directory.to_path_buf();
+				if let Ok(stream_clone) = stream.try_clone() {
+					let thread = spawn(move || {
+						let mut stream = stream_clone.try_clone().expect("Failed to clone stream.");
 						let mut send = |event: &Event| {
 							let json = serde_json::to_string(event).unwrap();
 							stream
@@ -51,27 +57,39 @@ pub fn subcommand() -> Result<(), String> {
 							match &line {
 								Ok(line) => match serde_json::from_str::<Command>(line.as_str()) {
 									Ok(command) => match command {
-										Command::Build => match subcommands::build::subcommand() {
-											Ok(path) => send(&Event::BlenderApiAvailable(
-												BlenderApiAvailableEvent { path: &path },
-											)),
-											Err(err) => send(&Event::Error(ErrorEvent {
-												message: &err.to_string(),
-											})),
-										},
+										Command::Build => {
+											match subcommands::build::subcommand(&project_directory)
+											{
+												Ok(path) => send(&Event::BlenderApiAvailable(
+													BlenderApiAvailableEvent { path: &path },
+												)),
+												Err(err) => send(&Event::Error(ErrorEvent {
+													message: &err.to_string(),
+												})),
+											}
+										}
+										Command::SetProjectDirectory { path } => {
+											project_directory = PathBuf::from(path);
+										}
 									},
 									Err(_) => send(&Event::InvalidCommand),
 								},
 								Err(err) => println!("Error while reading line: {}", err),
 							}
 						}
-					} else {
-						println!("Failed to clone stream.");
-					}
-				});
+					});
+					let stream_clone = stream.try_clone().expect("Failed to clone stream.");
+					clients.write().unwrap().push((thread, stream_clone));
+				} else {
+					println!("Failed to clone stream.");
+				}
 			}
 			Err(err) => println!("Error while listening: {}", err),
 		}
+	}
+
+	for (thread, _) in clients.write().unwrap().drain(..) {
+		thread.join().unwrap();
 	}
 
 	Ok(())

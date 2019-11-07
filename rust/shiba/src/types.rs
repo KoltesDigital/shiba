@@ -1,14 +1,16 @@
+use crate::settings::{self, Settings};
 use serde::Serialize;
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::collections::BTreeMap;
+use std::hash::Hash;
+use std::path::Path;
 
-#[derive(Debug, Default, PartialEq, Serialize)]
+#[derive(Debug, Default, Hash, PartialEq, Serialize)]
 pub struct Pass {
 	pub fragment: Option<String>,
 	pub vertex: Option<String>,
 }
 
-#[derive(Debug, Default, PartialEq, Serialize)]
+#[derive(Debug, Default, Hash, PartialEq, Serialize)]
 pub struct Sections {
 	pub attributes: Option<String>,
 	pub common: Option<String>,
@@ -16,14 +18,14 @@ pub struct Sections {
 	pub varyings: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
 pub enum VariableKind {
 	Const(String),
 	Regular,
 	Uniform,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
 pub struct Variable {
 	pub kind: VariableKind,
 
@@ -33,24 +35,31 @@ pub struct Variable {
 	pub type_name: String,
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, Hash, PartialEq, Serialize)]
 pub struct UniformArray {
 	pub name: String,
 	pub minified_name: Option<String>,
 	pub variables: Vec<Variable>,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, Hash, PartialEq)]
 pub struct ShaderDescriptor {
 	pub glsl_version: Option<String>,
 	pub sections: Sections,
 	pub passes: Vec<Pass>,
 
-	pub uniform_arrays: HashMap<String, UniformArray>,
+	pub uniform_arrays: BTreeMap<String, UniformArray>,
 	pub variables: Vec<Variable>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct ProjectDescriptor {
-	pub directory: PathBuf,
+	pub settings: Settings,
+}
+
+impl ProjectDescriptor {
+	pub fn load(project_directory: &Path) -> Result<Self, String> {
+		let settings = settings::load(project_directory)?;
+		Ok(ProjectDescriptor { settings })
+	}
 }

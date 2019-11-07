@@ -127,3 +127,14 @@ class Tool:
         with self.__lock:
             if self.__socket:
                 self.__socket.send(b'{"command":"build"}\n')
+
+    def set_project_directory(self, path):
+        with self.__lock:
+            if self.__socket:
+                message = {
+                    "command": "set-project-directory",
+                    "path": path,
+                }
+                message_as_bytes = str.encode(json.dumps(message))
+                self.__socket.send(message_as_bytes)
+                self.__socket.send(b'\n')
