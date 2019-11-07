@@ -12,6 +12,7 @@ mod shader_providers {
 	pub mod shiba;
 }
 mod settings;
+mod stored_hash;
 mod subcommands {
 	pub mod build;
 	pub mod server;

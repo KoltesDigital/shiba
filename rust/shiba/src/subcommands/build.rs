@@ -4,39 +4,18 @@ use crate::generators;
 use crate::paths::LOCAL_DATA_DIRECTORY;
 use crate::settings;
 use crate::shader_providers;
+use crate::stored_hash::StoredHash;
 use crate::template::TemplateRenderer;
 use crate::traits::ShaderProvider;
 use crate::types::ProjectDescriptor;
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use std::collections::hash_map::DefaultHasher;
-use std::fs;
-use std::hash::{Hash, Hasher};
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-
-lazy_static! {
-	pub static ref HASH_PATH: PathBuf = { LOCAL_DATA_DIRECTORY.join("build-hash") };
-}
-
-fn load_hash() -> Result<u64, String> {
-	let bytes = fs::read(&*HASH_PATH).map_err(|_| "Failed to read file.")?;
-	let mut cursor = Cursor::new(bytes);
-	let hash = cursor.read_u64::<BigEndian>().unwrap();
-	Ok(hash)
-}
-
-fn store_hash(hash: u64) -> Result<(), String> {
-	let mut bytes = vec![];
-	bytes.write_u64::<BigEndian>(hash).unwrap();
-	fs::write(&*HASH_PATH, bytes).map_err(|_| "Failed to write to file.")?;
-	Ok(())
-}
 
 pub fn subcommand(project_directory: &Path) -> Result<PathBuf, String> {
 	let start = Instant::now();
 
-	let previous_hash = load_hash().ok();
+	let build_hash_path = LOCAL_DATA_DIRECTORY.join("build.hash");
+	let mut build_hash = StoredHash::new(&build_hash_path);
 
 	let configuration = configuration::load()?;
 
@@ -50,17 +29,16 @@ pub fn subcommand(project_directory: &Path) -> Result<PathBuf, String> {
 
 	let custom_codes = custom_codes::load(project_directory)?;
 
-	let mut hasher = DefaultHasher::new();
-	project_descriptor.hash(&mut hasher);
-	shader_provider.hash(&mut hasher);
-	custom_codes.hash(&mut hasher);
-	let hash = hasher.finish();
-
-	store_hash(hash)?;
+	{
+		let mut updater = build_hash.get_updater();
+		updater.add(&project_descriptor);
+		updater.add(&shader_provider);
+		updater.add(&custom_codes);
+	}
 
 	let path = generators::blender_api::BlenderAPIGenerator::get_path();
 
-	if Some(hash) != previous_hash || !path.exists() {
+	if build_hash.has_changed() || !path.exists() {
 		let generator = generators::blender_api::BlenderAPIGenerator::new(
 			&project_descriptor.settings.blender_api,
 			&configuration,
