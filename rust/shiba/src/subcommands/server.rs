@@ -15,21 +15,11 @@ enum Command {
 }
 
 #[derive(Serialize)]
-struct BlenderApiAvailableEvent<'a> {
-	pub path: &'a Path,
-}
-
-#[derive(Serialize)]
-struct ErrorEvent<'a> {
-	pub message: &'a String,
-}
-
-#[derive(Serialize)]
 #[serde(rename_all = "kebab-case", tag = "event")]
 enum Event<'a> {
-	BlenderApiAvailable(BlenderApiAvailableEvent<'a>),
-	Error(ErrorEvent<'a>),
-	InvalidCommand,
+	BlenderApiAvailable{ path: &'a Path, },
+	Error{ message: &'a str },
+	ShadersAvailable(&'a subcommands::build::ShadersAvailableDescriptor),
 }
 
 pub fn subcommand(project_directory: &Path) -> Result<(), String> {
@@ -58,21 +48,27 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 								Ok(line) => match serde_json::from_str::<Command>(line.as_str()) {
 									Ok(command) => match command {
 										Command::Build => {
-											match subcommands::build::subcommand(&project_directory)
-											{
-												Ok(path) => send(&Event::BlenderApiAvailable(
-													BlenderApiAvailableEvent { path: &path },
-												)),
-												Err(err) => send(&Event::Error(ErrorEvent {
+											match subcommands::build::subcommand(
+												&subcommands::build::Options {
+													may_build_shaders_only: false,
+													project_directory: &project_directory,
+												},
+											) {
+												Ok(result) => match result { 
+													subcommands::build::ResultKind::BlenderAPIAvailable(path) => send(&Event::BlenderApiAvailable{ path: &path },
+												),
+													subcommands::build::ResultKind::ShadersAvailable(descriptor) => send(&Event::ShadersAvailable(&descriptor)),
+											},
+												Err(err) => send(&Event::Error{
 													message: &err.to_string(),
-												})),
+												}),
 											}
 										}
 										Command::SetProjectDirectory { path } => {
 											project_directory = PathBuf::from(path);
 										}
 									},
-									Err(_) => send(&Event::InvalidCommand),
+									Err(_) => println!("Failed to parse command: {}", line),
 								},
 								Err(err) => println!("Error while reading line: {}", err),
 							}

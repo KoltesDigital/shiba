@@ -11,20 +11,20 @@ SHIBA_CONST char *_shibaShaderPassCodes[] = {
 	{% endfor %}
 };
 
-{% if common_codes.after_stage_variables %}
-	SHIBA_CONST char *_shibaShaderAfterStageVariablesCode = {{ common_codes.after_stage_variables | string_literal }};
+{% if shader_codes.after_stage_variables %}
+	SHIBA_CONST char *_shibaShaderAfterStageVariablesCode = {{ shader_codes.after_stage_variables | string_literal }};
 {% endif %}
 
-{% if common_codes.before_stage_variables %}
-	SHIBA_CONST char *_shibaShaderBeforeStageVariablesCode = {{ common_codes.before_stage_variables | string_literal }};
+{% if shader_codes.before_stage_variables %}
+	SHIBA_CONST char *_shibaShaderBeforeStageVariablesCode = {{ shader_codes.before_stage_variables | string_literal }};
 {% endif %}
 
-{% if common_codes.fragment_specific %}
-	SHIBA_CONST char *_shibaShaderFragmentSpecificCode = {{ common_codes.fragment_specific | string_literal }};
+{% if shader_codes.fragment_specific %}
+	SHIBA_CONST char *_shibaShaderFragmentSpecificCode = {{ shader_codes.fragment_specific | string_literal }};
 {% endif %}
 
-{% if common_codes.vertex_specific %}
-	SHIBA_CONST char *_shibaShaderVertexSpecificCode = {{ common_codes.vertex_specific | string_literal }};
+{% if shader_codes.vertex_specific %}
+	SHIBA_CONST char *_shibaShaderVertexSpecificCode = {{ shader_codes.vertex_specific | string_literal }};
 {% endif %}
 
 {% for element in uniform_arrays %}

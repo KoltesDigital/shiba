@@ -28,14 +28,16 @@ impl<'a> StoredHash<'a> {
 		Ok(old_hash)
 	}
 
-	fn store(&self) -> Result<()> {
-		match self.new_hash {
-			Some(hash) => {
-				let mut bytes = vec![];
-				bytes.write_u64::<BigEndian>(hash)?;
-				fs::write(self.path, bytes)?;
+	pub fn store(&self) -> Result<()> {
+		if self.new_hash != self.old_hash {
+			match self.new_hash {
+				Some(hash) => {
+					let mut bytes = vec![];
+					bytes.write_u64::<BigEndian>(hash)?;
+					fs::write(self.path, bytes)?;
+				}
+				None => fs::remove_file(self.path)?,
 			}
-			None => fs::remove_file(self.path)?,
 		}
 		Ok(())
 	}
@@ -49,12 +51,6 @@ impl<'a> StoredHash<'a> {
 
 	pub fn has_changed(&self) -> bool {
 		self.new_hash != self.old_hash
-	}
-}
-
-impl Drop for StoredHash<'_> {
-	fn drop(&mut self) {
-		self.store().ok();
 	}
 }
 

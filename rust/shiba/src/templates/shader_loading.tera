@@ -6,13 +6,13 @@
 
 		const char *vertexShaderSources[] = {
 			{% if passes[0].vertex %}
-				{% if common_codes.before_stage_variables %}
+				{% if shader_codes.before_stage_variables %}
 					_shibaShaderBeforeStageVariablesCode,
 				{% endif %}
-				{% if common_codes.vertex_specific %}
+				{% if shader_codes.vertex_specific %}
 					_shibaShaderVertexSpecificCode,
 				{% endif %}
-				{% if common_codes.after_stage_variables %}
+				{% if shader_codes.after_stage_variables %}
 					_shibaShaderAfterStageVariablesCode,
 				{% endif %}
 				_shibaShaderPassCodes[0],
@@ -36,13 +36,13 @@
 
 		{% if passes[0].fragment %}
 			const char *fragmentShaderSources[] = {
-				{% if common_codes.before_stage_variables %}
+				{% if shader_codes.before_stage_variables %}
 					_shibaShaderBeforeStageVariablesCode,
 				{% endif %}
-				{% if common_codes.fragment_specific %}
+				{% if shader_codes.fragment_specific %}
 					_shibaShaderFragmentSpecificCode,
 				{% endif %}
-				{% if common_codes.after_stage_variables %}
+				{% if shader_codes.after_stage_variables %}
 					_shibaShaderAfterStageVariablesCode,
 				{% endif %}
 				_shibaShaderPassCodes[1],
@@ -98,13 +98,13 @@
 		)
 		{
 			const char *vertexShaderSources[] = {
-				{% if common_codes.before_stage_variables %}
+				{% if shader_codes.before_stage_variables %}
 					_shibaShaderBeforeStageVariablesCode,
 				{% endif %}
-				{% if common_codes.vertex_specific %}
+				{% if shader_codes.vertex_specific %}
 					_shibaShaderVertexSpecificCode,
 				{% endif %}
-				{% if common_codes.after_stage_variables %}
+				{% if shader_codes.after_stage_variables %}
 					_shibaShaderAfterStageVariablesCode,
 				{% endif %}
 				_shibaShaderPassCodes[i * 2],
@@ -139,13 +139,13 @@
 		if (_shibaShaderPassCodes[i * 2 + 1])
 		{
 			const char *fragmentShaderSources[] = {
-				{% if common_codes.before_stage_variables %}
+				{% if shader_codes.before_stage_variables %}
 					_shibaShaderBeforeStageVariablesCode,
 				{% endif %}
-				{% if common_codes.fragment_specific %}
+				{% if shader_codes.fragment_specific %}
 					_shibaShaderFragmentSpecificCode,
 				{% endif %}
-				{% if common_codes.after_stage_variables %}
+				{% if shader_codes.after_stage_variables %}
 					_shibaShaderAfterStageVariablesCode,
 				{% endif %}
 				_shibaShaderPassCodes[i * 2 + 1],

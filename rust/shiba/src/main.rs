@@ -8,10 +8,11 @@ mod generators {
 }
 mod parsers;
 mod paths;
+mod settings;
 mod shader_providers {
 	pub mod shiba;
 }
-mod settings;
+mod shader_codes;
 mod stored_hash;
 mod subcommands {
 	pub mod build;
@@ -45,12 +46,13 @@ struct Args {
 fn main() -> Result<(), String> {
 	let args = Args::from_args();
 
-	if let Some(command) = &args.command {
-		match command {
-			Command::Build => subcommands::build::subcommand(&args.project_directory).map(|_| ()),
-			Command::Server => subcommands::server::subcommand(&args.project_directory),
-		}
-	} else {
-		subcommands::build::subcommand(&args.project_directory).map(|_| ())
+	let command = args.command.unwrap_or(Command::Build);
+	match command {
+		Command::Build => subcommands::build::subcommand(&subcommands::build::Options {
+			may_build_shaders_only: false,
+			project_directory: &args.project_directory,
+		})
+		.map(|_| ()),
+		Command::Server => subcommands::server::subcommand(&args.project_directory),
 	}
 }

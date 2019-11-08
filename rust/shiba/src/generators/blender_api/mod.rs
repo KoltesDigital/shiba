@@ -3,9 +3,9 @@ mod settings;
 pub use self::settings::Settings;
 use crate::configuration::Configuration;
 use crate::paths::{self, TEMP_DIRECTORY};
+use crate::shader_codes::ShaderCodes;
 use crate::template::{Template, TemplateRenderer};
-use crate::types::{Pass, ShaderDescriptor, UniformArray, VariableKind};
-use regex::Regex;
+use crate::types::{Pass, ShaderDescriptor, UniformArray};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -13,14 +13,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
-
-#[derive(Debug, Default, Serialize)]
-struct CommonCodes {
-	pub after_stage_variables: String,
-	pub before_stage_variables: String,
-	pub fragment_specific: String,
-	pub vertex_specific: String,
-}
 
 #[derive(Debug, Serialize)]
 struct UniformArrayElement<'a> {
@@ -53,7 +45,7 @@ struct RenderContext<'a> {
 
 #[derive(Debug, Serialize)]
 struct ShaderDeclarationContext<'a> {
-	pub common_codes: &'a CommonCodes,
+	pub shader_codes: &'a ShaderCodes,
 	pub passes: &'a [Pass],
 	pub uniform_arrays: &'a [UniformArrayElement<'a>],
 }
@@ -61,7 +53,7 @@ struct ShaderDeclarationContext<'a> {
 #[derive(Debug, Serialize)]
 struct ShaderLoadingContext<'a> {
 	pub blender_api: bool,
-	pub common_codes: &'a CommonCodes,
+	pub shader_codes: &'a ShaderCodes,
 	pub development: bool,
 	pub passes: &'a [Pass],
 	pub uniform_arrays: &'a [UniformArrayElement<'a>],
@@ -130,98 +122,7 @@ impl<'a> BlenderAPIGenerator<'a> {
 			})
 			.collect::<HashMap<String, String>>();
 
-		let mut common_codes = CommonCodes::default();
-		let mut vertex_location_index = 0;
-
-		lazy_static! {
-			static ref STAGE_VARIABLE_RE: Regex = Regex::new(r"\w+ [\w,]+;").expect("Bad regex.");
-		}
-
-		if let Some(code) = &shader_descriptor.sections.attributes {
-			for mat in STAGE_VARIABLE_RE.find_iter(code.as_str()) {
-				common_codes.vertex_specific += format!(
-					"layout(location={})in {}",
-					vertex_location_index,
-					mat.as_str()
-				)
-				.as_str();
-				vertex_location_index += 1;
-			}
-		}
-
-		if let Some(code) = &shader_descriptor.sections.varyings {
-			for mat in STAGE_VARIABLE_RE.find_iter(code.as_str()) {
-				common_codes.vertex_specific += format!("out {}", mat.as_str()).as_str();
-				common_codes.fragment_specific += format!("in {}", mat.as_str()).as_str();
-			}
-		}
-
-		if let Some(code) = &shader_descriptor.sections.outputs {
-			for mat in STAGE_VARIABLE_RE.find_iter(code.as_str()) {
-				common_codes.fragment_specific += format!("out {}", mat.as_str()).as_str();
-			}
-		}
-
-		if let Some(version) = &shader_descriptor.glsl_version {
-			common_codes.before_stage_variables = format!("#version {}\n", version);
-		}
-
-		let mut globals_by_type = HashMap::new();
-		for variable in &shader_descriptor.variables {
-			if !variable.active {
-				continue;
-			}
-
-			match variable.kind {
-				VariableKind::Uniform => {}
-				_ => {
-					if !globals_by_type.contains_key(&variable.type_name) {
-						let _ = globals_by_type.insert(variable.type_name.clone(), Vec::new());
-					}
-
-					let mut name = variable
-						.minified_name
-						.as_ref()
-						.unwrap_or(&variable.name)
-						.clone();
-					if let VariableKind::Const(value) = &variable.kind {
-						name += format!(" = {}", value).as_str();
-					}
-					globals_by_type
-						.get_mut(&variable.type_name)
-						.unwrap()
-						.push(name);
-				}
-			}
-		}
-
-		for pair in &shader_descriptor.uniform_arrays {
-			common_codes.after_stage_variables += format!(
-				"uniform {} {}[{}];",
-				pair.0,
-				pair.1.minified_name.as_ref().unwrap_or(&pair.1.name),
-				pair.1.variables.len()
-			)
-			.as_str();
-		}
-
-		for pair in &globals_by_type {
-			common_codes.after_stage_variables +=
-				format!("{} {};", pair.0, pair.1.join("-")).as_str();
-		}
-
-		if let Some(code) = &shader_descriptor.sections.common {
-			common_codes.after_stage_variables += code.as_str();
-		}
-
-		if !common_codes.before_stage_variables.is_empty()
-			&& common_codes.vertex_specific.is_empty()
-			&& common_codes.fragment_specific.is_empty()
-		{
-			common_codes.after_stage_variables =
-				common_codes.before_stage_variables + common_codes.after_stage_variables.as_str();
-			common_codes.before_stage_variables = String::new();
-		}
+		let shader_codes = ShaderCodes::load(shader_descriptor);
 
 		let api_context = APIContext {
 			blender_api: true,
@@ -238,7 +139,7 @@ impl<'a> BlenderAPIGenerator<'a> {
 			template_renderer.render_context(Template::Render, &render_context)?;
 
 		let shader_declarations_context = ShaderDeclarationContext {
-			common_codes: &common_codes,
+			shader_codes: &shader_codes,
 			passes,
 			uniform_arrays: &uniform_arrays,
 		};
@@ -247,7 +148,7 @@ impl<'a> BlenderAPIGenerator<'a> {
 
 		let shader_loading_context = ShaderLoadingContext {
 			blender_api: true,
-			common_codes: &common_codes,
+			shader_codes: &shader_codes,
 			development: true,
 			passes,
 			uniform_arrays: &uniform_arrays,
