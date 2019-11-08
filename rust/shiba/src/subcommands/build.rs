@@ -19,6 +19,7 @@ pub struct Options<'a> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ShadersAvailableDescriptor {
 	pub passes: Vec<Pass>,
 	pub shader_codes: ShaderCodes,
@@ -65,6 +66,7 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 
 			let shader_codes = ShaderCodes::load(&shader_descriptor);
 
+			let _ = cpp_hash.clear();
 			let _ = glsl_hash.store();
 
 			Ok(ResultKind::ShadersAvailable(ShadersAvailableDescriptor {
