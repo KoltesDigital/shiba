@@ -1,4 +1,5 @@
 use crate::subcommands;
+use crate::types::Pass;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
@@ -9,7 +10,11 @@ use std::sync::{mpsc::channel, Arc, RwLock};
 use std::thread::spawn;
 use std::time::Duration;
 
-fn default_command_build_may_build_shaders_only() -> bool {
+fn default_command_build_diff() -> bool {
+	false
+}
+
+fn default_command_build_force() -> bool {
 	false
 }
 
@@ -17,9 +22,12 @@ fn default_command_build_may_build_shaders_only() -> bool {
 #[serde(rename_all = "kebab-case", tag = "command")]
 enum Command {
 	Build {
-		#[serde(default = "default_command_build_may_build_shaders_only")]
-		may_build_shaders_only: bool,
+		#[serde(default = "default_command_build_diff")]
+		diff: bool,
+		#[serde(default = "default_command_build_force")]
+		force: bool,
 	},
+	GetBlenderApiPath,
 	SetProjectDirectory {
 		path: String,
 	},
@@ -28,9 +36,10 @@ enum Command {
 #[derive(Serialize)]
 #[serde(rename_all = "kebab-case", tag = "event")]
 enum Event<'a> {
-	BlenderApiAvailable { path: &'a Path },
+	BlenderApiAvailable,
+	BlenderApiPath { path: &'a Path },
 	Error { message: &'a str },
-	ShadersAvailable(&'a subcommands::build::ShadersAvailableDescriptor),
+	ShaderPassesAvailable { passes: &'a [Pass] },
 }
 
 #[derive(Default)]
@@ -71,24 +80,25 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 		loop {
 			match rx_command.recv() {
 				Ok(command) => match command {
-					Command::Build {
-						may_build_shaders_only,
-					} => {
+					Command::Build { diff, force } => {
 						match subcommands::build::subcommand(&subcommands::build::Options {
-							may_build_shaders_only,
+							diff,
+							force,
 							project_directory: &command_project_directory,
 						}) {
-							Ok(result) => {
-								let mut state = command_state.write().unwrap();
-								match result {
-									subcommands::build::ResultKind::BlenderAPIAvailable(path) => {
-										state.broadcast(&Event::BlenderApiAvailable { path: &path })
-									}
-									subcommands::build::ResultKind::ShadersAvailable(
-										descriptor,
-									) => state.broadcast(&Event::ShadersAvailable(&descriptor)),
+							Ok(result) => match result {
+								subcommands::build::ResultKind::BlenderAPIAvailable => {
+									let mut state = command_state.write().unwrap();
+									state.broadcast(&Event::BlenderApiAvailable)
 								}
-							}
+								subcommands::build::ResultKind::Nothing => {}
+								subcommands::build::ResultKind::ShaderPassesAvailable(passes) => {
+									let mut state = command_state.write().unwrap();
+									state.broadcast(&Event::ShaderPassesAvailable {
+										passes: &passes,
+									});
+								}
+							},
 							Err(err) => {
 								let mut state = command_state.write().unwrap();
 								state.broadcast(&Event::Error {
@@ -96,6 +106,11 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 								})
 							}
 						}
+					}
+					Command::GetBlenderApiPath => {
+						let path = subcommands::build::get_blender_api_path();
+						let mut state = command_state.write().unwrap();
+						state.broadcast(&Event::BlenderApiPath { path: &path })
 					}
 					Command::SetProjectDirectory { path } => {
 						watcher
@@ -123,12 +138,16 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 				| DebouncedEvent::Write(_) => {
 					println!("Rebuild");
 					let _ = watcher_tx_command.send(Command::Build {
-						may_build_shaders_only: true,
+						diff: true,
+						force: false,
 					});
 				}
 				_ => {} //event => println!("event {:?}", event),
 			},
-			Err(err) => println!("Error while watching: {}", err),
+			Err(err) => {
+				println!("Error while watching: {}", err);
+				panic!();
+			}
 		};
 	});
 

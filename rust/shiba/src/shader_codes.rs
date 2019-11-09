@@ -1,4 +1,4 @@
-use crate::types::{ShaderDescriptor, VariableKind};
+use crate::types::{Pass, ShaderDescriptor, VariableKind};
 use regex::Regex;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -108,4 +108,29 @@ impl ShaderCodes {
 
 		shader_codes
 	}
+}
+
+pub fn to_standalone_passes(shader_descriptor: &ShaderDescriptor) -> Vec<Pass> {
+	let shader_codes = ShaderCodes::load(shader_descriptor);
+	let vertex_prefix = shader_codes.before_stage_variables.clone()
+		+ shader_codes.vertex_specific.as_str()
+		+ shader_codes.after_stage_variables.as_str();
+	let fragment_prefix = shader_codes.before_stage_variables
+		+ shader_codes.fragment_specific.as_str()
+		+ shader_codes.after_stage_variables.as_str();
+	shader_descriptor
+		.passes
+		.iter()
+		.map(|pass| {
+			let vertex = pass
+				.vertex
+				.as_ref()
+				.map(|code| vertex_prefix.clone() + code.as_str());
+			let fragment = pass
+				.fragment
+				.as_ref()
+				.map(|code| fragment_prefix.clone() + code.as_str());
+			Pass { vertex, fragment }
+		})
+		.collect()
 }

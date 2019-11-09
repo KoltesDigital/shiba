@@ -28,9 +28,18 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 enum Command {
 	/// Builds the project (default)
-	Build,
+	Build {
+		#[structopt(short, long)]
+		force: bool,
+	},
 	/// Starts a server.
 	Server,
+}
+
+impl Default for Command {
+	fn default() -> Self {
+		Command::Build { force: false }
+	}
 }
 
 #[derive(Debug, StructOpt)]
@@ -46,10 +55,11 @@ struct Args {
 fn main() -> Result<(), String> {
 	let args = Args::from_args();
 
-	let command = args.command.unwrap_or(Command::Build);
+	let command = args.command.unwrap_or_else(Command::default);
 	match command {
-		Command::Build => subcommands::build::subcommand(&subcommands::build::Options {
-			may_build_shaders_only: false,
+		Command::Build { force } => subcommands::build::subcommand(&subcommands::build::Options {
+			diff: false,
+			force,
 			project_directory: &args.project_directory,
 		})
 		.map(|_| ()),

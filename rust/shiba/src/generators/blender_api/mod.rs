@@ -35,6 +35,7 @@ struct BlenderAPIContext<'a> {
 	pub render: &'a String,
 	pub shader_declarations: &'a String,
 	pub shader_loading: &'a String,
+	pub uniform_arrays: &'a [UniformArrayElement<'a>],
 }
 
 #[derive(Debug, Serialize)]
@@ -163,6 +164,7 @@ impl<'a> BlenderAPIGenerator<'a> {
 			render: &render_contents,
 			shader_declarations: &shader_declarations_contents,
 			shader_loading: &shader_loading_contents,
+			uniform_arrays: &uniform_arrays,
 		};
 		let blender_api_contents =
 			template_renderer.render_context(Template::BlenderAPI, &blender_empty_context)?;

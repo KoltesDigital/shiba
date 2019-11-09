@@ -34,6 +34,9 @@ class LockedFile:
         if self.__opened or not self.__path:
             return False
 
+        self.__opened_path = os.path.join(
+            _temp_dir, "locked." + os.path.basename(self.__path))
+
         if not self.__copied:
             shutil.copy(self.__path, self.__opened_path)
             self.__copied = True
@@ -57,20 +60,15 @@ class LockedFile:
         return True
 
     def set_path(self, path):
-        if path == self.__path:
-            return True
+        self.__path = path
+        self.reload()
 
+    def reload(self):
         must_reload = self.__should_open
 
         if must_reload:
             self._close()
-
-        self.__path = path
-        self.__opened_path = os.path.join(
-            _temp_dir, "locked." + os.path.basename(path)) if path else None
-
-        if must_reload:
-            return self.open()
+            return self._open()
         else:
             return True
 

@@ -42,10 +42,6 @@ impl<'a> StoredHash<'a> {
 		Ok(())
 	}
 
-	pub fn clear(&self) -> Result<()> {
-		fs::remove_file(self.path)
-	}
-
 	pub fn get_updater<'b>(&'b mut self) -> Updater<'b, 'a>
 	where
 		'a: 'b,

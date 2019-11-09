@@ -8,14 +8,14 @@ import threading
 
 
 class Tool:
-    def __init__(self, on_api_loaded):
+    def __init__(self, on_api_changed):
         self.__process = None
         self.__process_thread = None
 
         self.__socket = None
         self.__socket_thread = None
 
-        self.__api = API(on_api_loaded)
+        self.__api = API(on_api_changed)
 
         self.__locked_file = LockedFile(self.__run_process, self.__end_process)
         self.__lock = threading.Lock()
@@ -58,9 +58,13 @@ class Tool:
                 obj = json.loads(line)
                 event = obj['event']
                 if event == "blender-api-available":
+                    self.__api.reload()
+                if event == "blender-api-path":
                     self.__api.set_path(obj['path'])
                 if event == 'error':
                     print('Error: %s' % obj['message'])
+                if event == 'shader-passes-available':
+                    self.__api.set_shader_passes(obj['passes'])
 
                 buffer = buffer[index + 1:]
                 index = buffer.find(b'\n')
@@ -84,6 +88,8 @@ class Tool:
             target=self.__run_socket_thread
         )
         self.__socket_thread.start()
+
+        self.__socket.send(b'{"command":"get-blender-api-path"}\n')
 
         print("Shiba started.")
 

@@ -3,31 +3,31 @@ use crate::custom_codes;
 use crate::generators;
 use crate::paths::LOCAL_DATA_DIRECTORY;
 use crate::settings;
-use crate::shader_codes::ShaderCodes;
+use crate::shader_codes::to_standalone_passes;
 use crate::shader_providers;
 use crate::stored_hash::StoredHash;
 use crate::template::TemplateRenderer;
 use crate::traits::ShaderProvider;
 use crate::types::{Pass, ProjectDescriptor};
-use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 pub struct Options<'a> {
-	pub may_build_shaders_only: bool,
+	pub diff: bool,
+	pub force: bool,
 	pub project_directory: &'a Path,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct ShadersAvailableDescriptor {
-	pub passes: Vec<Pass>,
-	pub shader_codes: ShaderCodes,
+pub enum ResultKind {
+	BlenderAPIAvailable,
+	Nothing,
+	ShaderPassesAvailable(Vec<Pass>),
 }
 
-pub enum ResultKind {
-	BlenderAPIAvailable(PathBuf),
-	ShadersAvailable(ShadersAvailableDescriptor),
+enum WhatToBuild {
+	BlenderAPI,
+	Nothing,
+	ShaderPasses,
 }
 
 pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
@@ -45,6 +45,9 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 
 	let custom_codes = custom_codes::load(options.project_directory)?;
 
+	let build_hash_path = LOCAL_DATA_DIRECTORY.join("build.hash");
+	let mut build_hash = StoredHash::new(&build_hash_path);
+
 	let cpp_hash_path = LOCAL_DATA_DIRECTORY.join("cpp.hash");
 	let mut cpp_hash = StoredHash::new(&cpp_hash_path);
 
@@ -52,6 +55,11 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 	let mut glsl_hash = StoredHash::new(&glsl_hash_path);
 
 	{
+		let mut updater = build_hash.get_updater();
+		updater.add(&project_descriptor);
+		updater.add(&custom_codes);
+		updater.add(&shader_provider);
+
 		let mut updater = cpp_hash.get_updater();
 		updater.add(&project_descriptor);
 		updater.add(&custom_codes);
@@ -60,47 +68,65 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 		updater.add(&shader_provider);
 	}
 
-	let result =
-		if options.may_build_shaders_only && glsl_hash.has_changed() && !cpp_hash.has_changed() {
+	let what_to_build = if options.force {
+		WhatToBuild::BlenderAPI
+	} else {
+		if options.diff && !cpp_hash.has_changed() {
+			if glsl_hash.has_changed() {
+				WhatToBuild::ShaderPasses
+			} else {
+				WhatToBuild::Nothing
+			}
+		} else {
+			if build_hash.has_changed() {
+				WhatToBuild::BlenderAPI
+			} else {
+				WhatToBuild::Nothing
+			}
+		}
+	};
+
+	let result = match what_to_build {
+		WhatToBuild::BlenderAPI => {
+			let generator = generators::blender_api::BlenderAPIGenerator::new(
+				&project_descriptor.settings.blender_api,
+				&configuration,
+			)?;
+
 			let shader_descriptor = shader_provider.provide()?;
 
-			let shader_codes = ShaderCodes::load(&shader_descriptor);
+			let template_renderer = TemplateRenderer::new()?;
 
-			let _ = cpp_hash.clear();
+			generator.generate(
+				options.project_directory,
+				&template_renderer,
+				&shader_descriptor,
+			)?;
+
+			let _ = build_hash.store();
+			let _ = cpp_hash.store();
 			let _ = glsl_hash.store();
 
-			Ok(ResultKind::ShadersAvailable(ShadersAvailableDescriptor {
-				passes: shader_descriptor.passes,
-				shader_codes,
-			}))
-		} else {
-			let path = generators::blender_api::BlenderAPIGenerator::get_path();
+			ResultKind::BlenderAPIAvailable
+		}
+		WhatToBuild::Nothing => ResultKind::Nothing,
+		WhatToBuild::ShaderPasses => {
+			let shader_descriptor = shader_provider.provide()?;
 
-			if glsl_hash.has_changed() || cpp_hash.has_changed() || !path.exists() {
-				let generator = generators::blender_api::BlenderAPIGenerator::new(
-					&project_descriptor.settings.blender_api,
-					&configuration,
-				)?;
+			let shader_passes = to_standalone_passes(&shader_descriptor);
 
-				let shader_descriptor = shader_provider.provide()?;
+			let _ = glsl_hash.store();
 
-				let template_renderer = TemplateRenderer::new()?;
-
-				generator.generate(
-					options.project_directory,
-					&template_renderer,
-					&shader_descriptor,
-				)?;
-
-				let _ = cpp_hash.store();
-				let _ = glsl_hash.store();
-			}
-
-			Ok(ResultKind::BlenderAPIAvailable(path))
-		};
+			ResultKind::ShaderPassesAvailable(shader_passes)
+		}
+	};
 
 	let duration = start.elapsed();
 	println!("Build duration: {:?}", duration);
 
-	result
+	Ok(result)
+}
+
+pub fn get_blender_api_path() -> PathBuf {
+	generators::blender_api::BlenderAPIGenerator::get_path()
 }

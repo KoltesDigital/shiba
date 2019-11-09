@@ -223,6 +223,69 @@ _SHIBA_EXPORT void _shibaViewportRender(float shibaTime, int32_t shibaResolution
 	_shibaCommonRender(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
 }
 
+struct _ShibaShaderPasses
+{
+	const char *vertex;
+	const char *fragment;
+};
+
+_SHIBA_EXPORT void _shibaReloadShaderPasses(int count, _ShibaShaderPasses *passes)
+{
+	if (count != {{ passes | length }})
+	{
+		return;
+	}
+
+	glUseProgram(0);
+	shibaCheckGlError();
+
+	for (int i = 0; i < {{ passes | length }}; ++i)
+	{
+		auto &pass = passes[i];
+
+		if (pass.vertex != nullptr && i != {{ passes | length - 1 }})
+		{
+			glShaderSource(_shibaVertexShaders[i], 1, &pass.vertex, 0);
+			shibaCheckGlError();
+			glCompileShader(_shibaVertexShaders[i]);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(_shibaVertexShaders[i]);
+		}
+
+		if (pass.fragment != nullptr)
+		{
+			glShaderSource(_shibaFragmentShaders[i], 1, &pass.fragment, 0);
+			shibaCheckGlError();
+			glCompileShader(_shibaFragmentShaders[i]);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(_shibaFragmentShaders[i]);
+		}
+
+		auto program =
+			{% if passes | length == 1 %}
+				shibaProgram
+			{% else %}
+				shibaPrograms[i]
+			{% endif %}
+		;
+
+		glLinkProgram(program);
+		shibaCheckGlError();
+
+		shibaCheckProgramInfoLog(program);
+
+		{% for element in uniform_arrays %}
+			shibaUniformLocations[i][{{ loop.index - 1 }}] = glGetUniformLocation(program, "{% if element.uniform_array.minified_name %}{{ element.uniform_array.minified_name }}{% else %}{{ element.uniform_array.name }}{% endif %}");
+		{% endfor %}
+
+		shibaLog() << "Uniform locations in pass " << i << ":";
+		{% for element in uniform_arrays %}
+			shibaLog() << "{{ element.type_name }}: " << shibaUniformLocations[i][{{ loop.index - 1 }}];
+		{% endfor %}
+		shibaLog();
+	}
+}
+
 static void _shibaDeleteContext(const _ShibaContextDescriptor *descriptor)
 {
 	shibaLog() << "Deleting context " << descriptor->context << ".";

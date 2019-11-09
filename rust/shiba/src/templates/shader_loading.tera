@@ -60,6 +60,10 @@
 			{% if development %}
 				_shibaFragmentShaders[0] = fragmentShader;
 			{% endif %}
+		{% else %}
+			{% if development %}
+				_shibaFragmentShaders[0] = 0;
+			{% endif %}
 		{% endif %}
 
 		glLinkProgram(shibaProgram);
@@ -135,6 +139,12 @@
 				_shibaVertexShaders[i] = vertexShader;
 			{% endif %}
 		}
+		{% if development %}
+			else
+			{
+				_shibaVertexShaders[i] = 0;
+			}
+		{% endif %}
 
 		if (_shibaShaderPassCodes[i * 2 + 1])
 		{
@@ -165,6 +175,12 @@
 				_shibaFragmentShaders[i] = fragmentShader;
 			{% endif %}
 		}
+		{% if development %}
+			else
+			{
+				_shibaFragmentShaders[i] = 0;
+			}
+		{% endif %}
 
 		glLinkProgram(shibaPrograms[i]);
 		shibaCheckGlError();
