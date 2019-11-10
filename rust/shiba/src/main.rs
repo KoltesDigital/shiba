@@ -9,6 +9,9 @@ mod generators {
 mod parsers;
 mod paths;
 mod settings;
+mod shader_minifiers {
+	pub mod shader_minifier;
+}
 mod shader_providers {
 	pub mod shiba;
 }

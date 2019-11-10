@@ -15,7 +15,13 @@ pub struct Resolution {
 }
 
 #[derive(Debug, Deserialize, Hash)]
-#[serde(rename_all = "kebab-case", tag = "type")]
+#[serde(rename_all = "kebab-case", tag = "tool")]
+pub enum ShaderMinifier {
+	ShaderMinifier,
+}
+
+#[derive(Debug, Deserialize, Hash)]
+#[serde(rename_all = "kebab-case", tag = "tool")]
 pub enum ShaderProvider {
 	Shiba(shader_providers::shiba::Settings),
 }
@@ -33,6 +39,8 @@ pub struct Settings {
 	pub blender_api: generators::blender_api::Settings,
 	pub name: String,
 	pub resolution: Option<Resolution>,
+	#[serde(default)]
+	pub shader_minifier: Option<ShaderMinifier>,
 	#[serde(default)]
 	pub shader_provider: ShaderProvider,
 	pub shiba: Option<String>,

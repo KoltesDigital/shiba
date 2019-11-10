@@ -1,3 +1,5 @@
+pub mod glsl;
+
 use nom::{
 	error::{ErrorKind, ParseError},
 	Err, IResult, InputIter, InputLength, Offset, Slice,

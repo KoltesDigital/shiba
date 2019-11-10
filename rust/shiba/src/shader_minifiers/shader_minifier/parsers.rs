@@ -1,9 +1,6 @@
 use super::types::*;
 use crate::parsers::{glsl::*, *};
-use nom::{
-	branch::*, bytes::complete::*, character::complete::*, combinator::*, multi::*, sequence::*,
-	IResult,
-};
+use nom::{branch::*, bytes::complete::*, combinator::*, multi::*, IResult};
 
 fn section(input: &str) -> IResult<&str, Section> {
 	directive(alt((
@@ -11,6 +8,8 @@ fn section(input: &str) -> IResult<&str, Section> {
 		value(Section::Common, tag("common")),
 		map(fragment_directive, Section::Fragment),
 		value(Section::Outputs, tag("outputs")),
+		value(Section::UniformArrays, tag("uniform_arrays")),
+		value(Section::Variables, tag("variables")),
 		value(Section::Varyings, tag("varyings")),
 		map(vertex_directive, Section::Vertex),
 	)))(input)
@@ -20,19 +19,8 @@ fn sections(input: &str) -> IResult<&str, Vec<(&str, Section)>> {
 	many0(take_unless(map(section, Some)))(input)
 }
 
-fn version(input: &str) -> IResult<&str, &str> {
-	let (input, _) = once()(input)?;
-	let (input, _) = tag("#version")(input)?;
-	let (input, _) = space1(input)?;
-	let (input, version) = not_line_ending(input)?;
-	let (input, _) = line_ending(input)?;
-	Ok((input, version))
-}
-
-pub type Contents<'a> = (Option<&'a str>, Vec<(&'a str, Section)>);
-
-pub fn contents(input: &str) -> IResult<&str, Contents> {
-	tuple((opt(version), sections))(input)
+pub fn contents(input: &str) -> IResult<&str, Vec<(&str, Section)>> {
+	sections(input)
 }
 
 #[cfg(test)]
@@ -56,13 +44,13 @@ vertex code
 			contents,
 			Ok((
 				"vertex code\n",
-				(
-					Some("450"),
-					vec![
-						("#define foo bar\nprolog code\n", Section::Common),
-						("common code\n", Section::Vertex(42)),
-					]
-				)
+				vec![
+					(
+						"#version 450\n#define foo bar\nprolog code\n",
+						Section::Common
+					),
+					("common code\n", Section::Vertex(42)),
+				]
 			))
 		);
 	}

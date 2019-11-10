@@ -1,6 +1,5 @@
 use crate::settings::{self, Settings};
 use serde::Serialize;
-use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::path::Path;
 
@@ -30,25 +29,27 @@ pub struct Variable {
 	pub kind: VariableKind,
 
 	pub active: bool,
+	pub length: Option<usize>,
 	pub minified_name: Option<String>,
 	pub name: String,
 	pub type_name: String,
 }
 
-#[derive(Debug, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
 pub struct UniformArray {
 	pub name: String,
 	pub minified_name: Option<String>,
 	pub variables: Vec<Variable>,
+	pub type_name: String,
 }
 
-#[derive(Debug, Default, Hash, PartialEq)]
+#[derive(Debug, Default, Hash, PartialEq, Serialize)]
 pub struct ShaderDescriptor {
 	pub glsl_version: Option<String>,
 	pub sections: Sections,
 	pub passes: Vec<Pass>,
 
-	pub uniform_arrays: BTreeMap<String, UniformArray>,
+	pub uniform_arrays: Vec<UniformArray>,
 	pub variables: Vec<Variable>,
 }
 

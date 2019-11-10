@@ -4,6 +4,7 @@ mod types;
 
 pub use self::settings::Settings;
 use self::types::*;
+use crate::parsers::glsl;
 use crate::traits;
 use crate::types::{Pass, ShaderDescriptor, UniformArray, VariableKind};
 use regex::Regex;
@@ -64,8 +65,8 @@ fn parse(code: &str) -> Result<ShaderDescriptor, String> {
 		let code = IFDEF_RE.replace_all(code, "$1");
 		let code = IFNDEF_RE.replace_all(&code, "$1");
 		let code = MAIN_RE.replace_all(&code, "void main()");
-
-		if !code.trim().is_empty() {
+		let code = code.trim();
+		if !code.is_empty() {
 			let code = Some(code.to_string());
 
 			match next_section.get() {
@@ -101,7 +102,7 @@ fn parse(code: &str) -> Result<ShaderDescriptor, String> {
 
 	if let Some(prolog_code) = &prolog_code {
 		let (_, variables) =
-			parsers::variables(prolog_code).map_err(|_| "Parsing error.".to_string())?;
+			glsl::variables(prolog_code).map_err(|_| "Parsing error.".to_string())?;
 		shader_descriptor.variables = variables;
 	}
 
@@ -184,34 +185,31 @@ impl traits::ShaderProvider for ShaderProvider {
 			}
 
 			if let VariableKind::Uniform = variable.kind {
-				if !shader_descriptor
+				let uniform_array = match shader_descriptor
 					.uniform_arrays
-					.contains_key(&variable.type_name)
+					.iter_mut()
+					.find(|uniform_array| uniform_array.type_name == variable.type_name)
 				{
-					let _ = shader_descriptor.uniform_arrays.insert(
-						variable.type_name.clone(),
-						UniformArray {
+					Some(uniform_array) => uniform_array,
+					None => {
+						shader_descriptor.uniform_arrays.push(UniformArray {
 							name: format!("_shiba_{}_uniforms", variable.type_name),
 							minified_name: None,
 							variables: Vec::new(),
-						},
-					);
-				}
-
-				let variables = &mut shader_descriptor
-					.uniform_arrays
-					.get_mut(&variable.type_name)
-					.unwrap()
-					.variables;
-				variables.push(variable.clone());
+							type_name: variable.type_name.clone(),
+						});
+						shader_descriptor.uniform_arrays.last_mut().unwrap()
+					}
+				};
+				uniform_array.variables.push(variable.clone());
 			}
 		}
 
 		for uniform_array in &shader_descriptor.uniform_arrays {
-			for variable in uniform_array.1.variables.iter().enumerate() {
+			for variable in uniform_array.variables.iter().enumerate() {
 				let usage_re =
 					Regex::new(format!(r"\b{}\b", variable.1.name).as_str()).expect("Bad regex.");
-				let replacement = format!("{}[{}]", uniform_array.1.name, variable.0);
+				let replacement = format!("{}[{}]", uniform_array.name, variable.0);
 
 				let replace = |code: &String| {
 					Some(
@@ -244,11 +242,12 @@ mod tests {
 	fn test_parse() {
 		let shader_descriptor = parse(
 			r#"#version 450
-float regularVar;
+float regularVar0;
+float regularVar1[1];
 #define foo bar
 const float constVar = 42.;
 uniform float uniformVar0;
-uniform float uniformVar1;
+uniform float uniformVar1[4];
 uniform vec2 uniformVar2;
 #pragma shiba common
 common code
@@ -265,24 +264,34 @@ fragment code
 			ShaderDescriptor {
 				glsl_version: Some("450".to_string()),
 				passes: vec![Pass {
-					vertex: Some("vertex code\n".to_string()),
-					fragment: Some("fragment code\n".to_string()),
+					vertex: Some("vertex code".to_string()),
+					fragment: Some("fragment code".to_string()),
 				}],
 				sections: Sections {
-					common: Some("common code\n".to_string()),
+					common: Some("common code".to_string()),
 					..Default::default()
 				},
 				variables: vec![
 					Variable {
 						active: true,
 						kind: VariableKind::Regular,
+						length: None,
 						minified_name: None,
-						name: "regularVar".to_string(),
+						name: "regularVar0".to_string(),
+						type_name: "float".to_string(),
+					},
+					Variable {
+						active: true,
+						kind: VariableKind::Regular,
+						length: Some(1),
+						minified_name: None,
+						name: "regularVar1".to_string(),
 						type_name: "float".to_string(),
 					},
 					Variable {
 						active: true,
 						kind: VariableKind::Const("42.".to_string()),
+						length: None,
 						minified_name: None,
 						name: "constVar".to_string(),
 						type_name: "float".to_string(),
@@ -290,6 +299,7 @@ fragment code
 					Variable {
 						active: true,
 						kind: VariableKind::Uniform,
+						length: None,
 						minified_name: None,
 						name: "uniformVar0".to_string(),
 						type_name: "float".to_string(),
@@ -297,6 +307,7 @@ fragment code
 					Variable {
 						active: true,
 						kind: VariableKind::Uniform,
+						length: Some(4),
 						minified_name: None,
 						name: "uniformVar1".to_string(),
 						type_name: "float".to_string(),
@@ -304,6 +315,7 @@ fragment code
 					Variable {
 						active: true,
 						kind: VariableKind::Uniform,
+						length: None,
 						minified_name: None,
 						name: "uniformVar2".to_string(),
 						type_name: "vec2".to_string(),

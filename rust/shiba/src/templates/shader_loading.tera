@@ -71,14 +71,14 @@
 
 		shibaCheckProgramInfoLog(shibaProgram);
 
-		{% for element in uniform_arrays %}
-			shibaUniformLocations[0][{{ loop.index - 1 }}] = glGetUniformLocation(shibaProgram, "{% if element.uniform_array.minified_name %}{{ element.uniform_array.minified_name }}{% else %}{{ element.uniform_array.name }}{% endif %}");
+		{% for uniform_array in uniform_arrays %}
+			shibaUniformLocations[0][{{ loop.index - 1 }}] = glGetUniformLocation(shibaProgram, "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
 		{% endfor %}
 
 		{% if development %}
 			shibaLog() << "Uniform locations in pass " << 0 << ":";
-			{% for element in uniform_arrays %}
-				shibaLog() << "{{ element.type_name }}: " << shibaUniformLocations[0][{{ loop.index - 1 }}];
+			{% for uniform_array in uniform_arrays %}
+				shibaLog() << "{{ uniform_array.type_name }}: " << shibaUniformLocations[0][{{ loop.index - 1 }}];
 			{% endfor %}
 			shibaLog();
 		{% endif %}
@@ -187,14 +187,14 @@
 
 		shibaCheckProgramInfoLog(shibaPrograms[i]);
 
-		{% for element in uniform_arrays %}
-			shibaUniformLocations[i][{{ loop.index - 1 }}] = glGetUniformLocation(shibaPrograms[i], "{% if element.uniform_array.minified_name %}{{ element.uniform_array.minified_name }}{% else %}{{ element.uniform_array.name }}{% endif %}");
+		{% for uniform_array in uniform_arrays %}
+			shibaUniformLocations[i][{{ loop.index - 1 }}] = glGetUniformLocation(shibaPrograms[i], "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
 		{% endfor %}
 
 		{% if development %}
 			shibaLog() << "Uniform locations in pass " << i << ":";
-			{% for element in uniform_arrays %}
-				shibaLog() << "{{ element.type_name }}: " << shibaUniformLocations[i][{{ loop.index - 1 }}];
+			{% for uniform_array in uniform_arrays %}
+				shibaLog() << "{{ uniform_array.type_name }}: " << shibaUniformLocations[i][{{ loop.index - 1 }}];
 			{% endfor %}
 			shibaLog();
 		{% endif %}

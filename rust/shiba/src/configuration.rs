@@ -7,6 +7,7 @@ use std::path::PathBuf;
 #[serde(rename_all = "kebab-case")]
 pub struct Paths {
 	pub glew: Option<PathBuf>,
+	pub shader_minifier: Option<PathBuf>,
 }
 
 #[derive(Debug, Default, Deserialize)]

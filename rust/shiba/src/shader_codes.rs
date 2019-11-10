@@ -78,19 +78,22 @@ impl ShaderCodes {
 			}
 		}
 
-		for pair in &shader_descriptor.uniform_arrays {
+		for uniform_array in &shader_descriptor.uniform_arrays {
 			shader_codes.after_stage_variables += format!(
 				"uniform {} {}[{}];",
-				pair.0,
-				pair.1.minified_name.as_ref().unwrap_or(&pair.1.name),
-				pair.1.variables.len()
+				uniform_array.type_name,
+				uniform_array
+					.minified_name
+					.as_ref()
+					.unwrap_or(&uniform_array.name),
+				uniform_array.variables.len()
 			)
 			.as_str();
 		}
 
 		for pair in &globals_by_type {
 			shader_codes.after_stage_variables +=
-				format!("{} {};", pair.0, pair.1.join("-")).as_str();
+				format!("{} {};", pair.0, pair.1.join(",")).as_str();
 		}
 
 		if let Some(code) = &shader_descriptor.sections.common {

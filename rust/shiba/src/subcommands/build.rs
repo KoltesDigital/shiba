@@ -4,10 +4,11 @@ use crate::generators;
 use crate::paths::LOCAL_DATA_DIRECTORY;
 use crate::settings;
 use crate::shader_codes::to_standalone_passes;
+use crate::shader_minifiers;
 use crate::shader_providers;
 use crate::stored_hash::StoredHash;
 use crate::template::TemplateRenderer;
-use crate::traits::ShaderProvider;
+use crate::traits::{ShaderMinifier, ShaderProvider};
 use crate::types::{Pass, ProjectDescriptor};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -36,6 +37,17 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 	let configuration = configuration::load()?;
 
 	let project_descriptor = ProjectDescriptor::load(options.project_directory)?;
+
+	let shader_minifier = project_descriptor
+		.settings
+		.shader_minifier
+		.as_ref()
+		.map(|shader_minifier| match shader_minifier {
+			settings::ShaderMinifier::ShaderMinifier => {
+				shader_minifiers::shader_minifier::ShaderMinifier::new(&configuration)
+			}
+		})
+		.transpose()?;
 
 	let shader_provider = match &project_descriptor.settings.shader_provider {
 		settings::ShaderProvider::Shiba(settings) => {
@@ -68,7 +80,7 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 		updater.add(&shader_provider);
 	}
 
-	let what_to_build = if options.force {
+	let what_to_build = if options.force || !get_blender_api_path().exists() {
 		WhatToBuild::BlenderAPI
 	} else {
 		if options.diff && !cpp_hash.has_changed() {
@@ -93,7 +105,11 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 				&configuration,
 			)?;
 
-			let shader_descriptor = shader_provider.provide()?;
+			let mut shader_descriptor = shader_provider.provide()?;
+
+			if let Some(shader_minifier) = shader_minifier {
+				shader_descriptor = shader_minifier.minify(&shader_descriptor)?;
+			}
 
 			let template_renderer = TemplateRenderer::new()?;
 
@@ -111,7 +127,11 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 		}
 		WhatToBuild::Nothing => ResultKind::Nothing,
 		WhatToBuild::ShaderPasses => {
-			let shader_descriptor = shader_provider.provide()?;
+			let mut shader_descriptor = shader_provider.provide()?;
+
+			if let Some(shader_minifier) = shader_minifier {
+				shader_descriptor = shader_minifier.minify(&shader_descriptor)?;
+			}
 
 			let shader_passes = to_standalone_passes(&shader_descriptor);
 

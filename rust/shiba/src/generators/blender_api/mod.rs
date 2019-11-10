@@ -15,12 +15,6 @@ use std::process::Command;
 use std::str;
 
 #[derive(Debug, Serialize)]
-struct UniformArrayElement<'a> {
-	pub type_name: &'a String,
-	pub uniform_array: &'a UniformArray,
-}
-
-#[derive(Debug, Serialize)]
 struct APIContext<'a> {
 	pub blender_api: bool,
 	pub development: bool,
@@ -35,7 +29,7 @@ struct BlenderAPIContext<'a> {
 	pub render: &'a String,
 	pub shader_declarations: &'a String,
 	pub shader_loading: &'a String,
-	pub uniform_arrays: &'a [UniformArrayElement<'a>],
+	pub uniform_arrays: &'a [UniformArray],
 }
 
 #[derive(Debug, Serialize)]
@@ -48,7 +42,7 @@ struct RenderContext<'a> {
 struct ShaderDeclarationContext<'a> {
 	pub shader_codes: &'a ShaderCodes,
 	pub passes: &'a [Pass],
-	pub uniform_arrays: &'a [UniformArrayElement<'a>],
+	pub uniform_arrays: &'a [UniformArray],
 }
 
 #[derive(Debug, Serialize)]
@@ -57,7 +51,7 @@ struct ShaderLoadingContext<'a> {
 	pub shader_codes: &'a ShaderCodes,
 	pub development: bool,
 	pub passes: &'a [Pass],
-	pub uniform_arrays: &'a [UniformArrayElement<'a>],
+	pub uniform_arrays: &'a [UniformArray],
 }
 
 #[derive(Debug)]
@@ -72,8 +66,9 @@ impl<'a> BlenderAPIGenerator<'a> {
 		let glew_path = configuration
 			.paths
 			.glew
-			.clone()
-			.ok_or("Please set configuration key paths.glew.")?;
+			.as_ref()
+			.ok_or("Please set configuration key paths.glew.")?
+			.clone();
 		let msvc_path = paths::msvc(paths::MSVCPlatform::X64)?;
 		Ok(BlenderAPIGenerator {
 			settings,
@@ -89,15 +84,7 @@ impl<'a> BlenderAPIGenerator<'a> {
 		shader_descriptor: &ShaderDescriptor,
 	) -> Result<(), String> {
 		let passes = &shader_descriptor.passes;
-
-		let uniform_arrays = shader_descriptor
-			.uniform_arrays
-			.iter()
-			.map(|e| UniformArrayElement {
-				type_name: e.0,
-				uniform_array: e.1,
-			})
-			.collect::<Vec<UniformArrayElement>>();
+		let uniform_arrays = &shader_descriptor.uniform_arrays;
 
 		let custom = fs::read_dir(&project_directory)
 			.map_err(|_| "Failed to read directory.")?
@@ -142,7 +129,7 @@ impl<'a> BlenderAPIGenerator<'a> {
 		let shader_declarations_context = ShaderDeclarationContext {
 			shader_codes: &shader_codes,
 			passes,
-			uniform_arrays: &uniform_arrays,
+			uniform_arrays,
 		};
 		let shader_declarations_contents = template_renderer
 			.render_context(Template::ShaderDeclarations, &shader_declarations_context)?;
@@ -152,7 +139,7 @@ impl<'a> BlenderAPIGenerator<'a> {
 			shader_codes: &shader_codes,
 			development: true,
 			passes,
-			uniform_arrays: &uniform_arrays,
+			uniform_arrays,
 		};
 		let shader_loading_contents =
 			template_renderer.render_context(Template::ShaderLoading, &shader_loading_context)?;
@@ -164,7 +151,7 @@ impl<'a> BlenderAPIGenerator<'a> {
 			render: &render_contents,
 			shader_declarations: &shader_declarations_contents,
 			shader_loading: &shader_loading_contents,
-			uniform_arrays: &uniform_arrays,
+			uniform_arrays,
 		};
 		let blender_api_contents =
 			template_renderer.render_context(Template::BlenderAPI, &blender_empty_context)?;
@@ -211,7 +198,7 @@ impl<'a> BlenderAPIGenerator<'a> {
 					.to_string(),
 			)
 			.arg("blender_api.obj")
-			.current_dir(&*paths::TEMP_DIRECTORY)
+			.current_dir(&*TEMP_DIRECTORY)
 			.output()
 			.map_err(|err| err.to_string())?;
 

@@ -1,1 +1,3 @@
 name: project
+shader-minifier:
+  tool: shader-minifier

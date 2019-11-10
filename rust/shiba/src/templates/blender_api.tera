@@ -274,13 +274,13 @@ _SHIBA_EXPORT void _shibaReloadShaderPasses(int count, _ShibaShaderPasses *passe
 
 		shibaCheckProgramInfoLog(program);
 
-		{% for element in uniform_arrays %}
-			shibaUniformLocations[i][{{ loop.index - 1 }}] = glGetUniformLocation(program, "{% if element.uniform_array.minified_name %}{{ element.uniform_array.minified_name }}{% else %}{{ element.uniform_array.name }}{% endif %}");
+		{% for uniform_array in uniform_arrays %}
+			shibaUniformLocations[i][{{ loop.index - 1 }}] = glGetUniformLocation(program, "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
 		{% endfor %}
 
 		shibaLog() << "Uniform locations in pass " << i << ":";
-		{% for element in uniform_arrays %}
-			shibaLog() << "{{ element.type_name }}: " << shibaUniformLocations[i][{{ loop.index - 1 }}];
+		{% for uniform_array in uniform_arrays %}
+			shibaLog() << "{{ uniform_array.type_name }}: " << shibaUniformLocations[i][{{ loop.index - 1 }}];
 		{% endfor %}
 		shibaLog();
 	}

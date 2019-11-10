@@ -27,12 +27,12 @@ SHIBA_CONST char *_shibaShaderPassCodes[] = {
 	SHIBA_CONST char *_shibaShaderVertexSpecificCode = {{ shader_codes.vertex_specific | string_literal }};
 {% endif %}
 
-{% for element in uniform_arrays %}
-	SHIBA_CONST int shiba{{ element.type_name | uppercase_first }}UniformLocationIndex = {{ loop.index - 1 }};
-	SHIBA_CONST int shiba{{ element.type_name | uppercase_first }}UniformCount = {{ element.uniform_array.variables | length }};
-	SHIBA_VARIABLE {{ element.type_name | to_opengl_type }} shiba{{ element.type_name | uppercase_first }}Uniforms[{{ element.uniform_array.variables | length }}];
-	{% for variable in element.uniform_array.variables %}
-		#define shibaUniform{{ variable.name | uppercase_first }} shiba{{ element.type_name | uppercase_first }}Uniforms[{{ loop.index - 1 }}]
+{% for uniform_array in uniform_arrays %}
+	SHIBA_CONST int shiba{{ uniform_array.type_name | uppercase_first }}UniformLocationIndex = {{ loop.index - 1 }};
+	SHIBA_CONST int shiba{{ uniform_array.type_name | uppercase_first }}UniformCount = {{ uniform_array.variables | length }};
+	SHIBA_VARIABLE {{ uniform_array.type_name | to_opengl_type }} shiba{{ uniform_array.type_name | uppercase_first }}Uniforms[{{ uniform_array.variables | length }}];
+	{% for variable in uniform_array.variables %}
+		#define shibaUniform{{ variable.name | uppercase_first }} shiba{{ uniform_array.type_name | uppercase_first }}Uniforms[{{ loop.index - 1 }}]
 	{% endfor %}
 {% endfor %}
 
