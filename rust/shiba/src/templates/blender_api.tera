@@ -5,9 +5,6 @@
 #include <cstdlib>
 #include <GL/glew.h>
 #include <GL/gl.h>
-#include <iostream>
-#include <map>
-#include <thread>
 
 {{ api }}
 
@@ -32,10 +29,11 @@ static bool _shibaInitializeGlew()
 	auto err = glewInit();
 	if (GLEW_OK != err)
 	{
-		shibaError() << "Failed to initialize GLEW: " << glewGetErrorString(err);
+		shibaError() << "Failed to initialize GLEW: " << glewGetErrorString(err) << ".";
 		return false;
 	}
 
+	SetLastError(0);
 	return true;
 }
 
@@ -50,67 +48,12 @@ static void _shibaCommonInitialize(int32_t shibaResolutionWidth, int32_t shibaRe
 	{% endif %}
 }
 
-struct _ShibaContextDescriptor
-{
-	HWND window{ nullptr };
-	HGLRC context{ nullptr };
-};
-
-static HANDLE _shibaContextDescriptorsByThreadIdMutex = nullptr;
-static std::map<std::thread::id, std::unique_ptr<_ShibaContextDescriptor>> _shibaContextDescriptorsByThreadId;
-
 SHIBA_VARIABLE bool _shibaIsInitialized = false;
-SHIBA_VARIABLE _ShibaContextDescriptor *_shibaContextDescriptor;
 SHIBA_VARIABLE GLuint _shibaFinalFramebufferId;
 SHIBA_VARIABLE GLuint _shibaFinalFramebufferTextureId;
 
 static void _shibaCommonUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
-}
-
-static bool _shibaCreateContext()
-{
-	PIXELFORMATDESCRIPTOR pfd =
-	{
-		sizeof(PIXELFORMATDESCRIPTOR),
-		1,
-		PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL,
-		PFD_TYPE_RGBA,
-		32,
-		0, 0, 0, 0, 0, 0,
-		0,
-		0,
-		0,
-		0, 0, 0, 0,
-		24,
-		8,
-		0,
-		PFD_MAIN_PLANE,
-		0,
-		0, 0, 0
-	};
-
-	_shibaContextDescriptor->window = CreateWindowA("static", NULL, WS_POPUP, 0, 0, 1, 1, NULL, NULL, NULL, 0);
-	auto dc = GetDC(_shibaContextDescriptor->window);
-
-	auto pixelFormat = ChoosePixelFormat(dc, &pfd);
-	SetPixelFormat(dc, pixelFormat, &pfd);
-	shibaCheckWindowsError();
-
-	_shibaContextDescriptor->context = wglCreateContext(dc);
-	shibaCheckWindowsError();
-
-	if (_shibaContextDescriptor->context == nullptr)
-	{
-		return false;
-	}
-
-	wglMakeCurrent(dc, _shibaContextDescriptor->context);
-	shibaCheckWindowsError();
-
-	shibaLog() << "Created context " << _shibaContextDescriptor->context << ".";
-
-	return true;
 }
 
 _SHIBA_EXPORT void _shibaUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
@@ -120,20 +63,10 @@ _SHIBA_EXPORT void _shibaUpdate(float shibaTime, int32_t shibaResolutionWidth, i
 
 _SHIBA_EXPORT void _shibaRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
 {
+	_shibaStandaloneContext.use();
+
 	if (!_shibaIsInitialized)
 	{
-		_shibaContextDescriptor = new _ShibaContextDescriptor{};
-
-		{
-			_ShibaMutexGuard guard{ _shibaContextDescriptorsByThreadIdMutex };
-			_shibaContextDescriptorsByThreadId.insert(std::make_pair(std::this_thread::get_id(), std::unique_ptr<_ShibaContextDescriptor>{ _shibaContextDescriptor }));
-		}
-
-		if (!_shibaContextDescriptor->context && !_shibaCreateContext())
-		{
-			return;
-		}
-
 		if (!_shibaInitializeGlew())
 		{
 			return;
@@ -286,68 +219,7 @@ _SHIBA_EXPORT void _shibaReloadShaderPasses(int count, _ShibaShaderPasses *passe
 	}
 }
 
-static void _shibaDeleteContext(const _ShibaContextDescriptor *descriptor)
-{
-	shibaLog() << "Deleting context " << descriptor->context << ".";
-
-	wglDeleteContext(descriptor->context);
-	shibaCheckWindowsError();
-
-	DestroyWindow(descriptor->window);
-	shibaCheckWindowsError();
-}
-
-static void _shibaProcessAttach()
-{
-	_shibaContextDescriptorsByThreadIdMutex = CreateMutex(NULL, FALSE, NULL);
-	shibaCheckWindowsError();
-}
-
-static void _shibaProcessDetach()
-{
-	CloseHandle(_shibaContextDescriptorsByThreadIdMutex);
-	shibaCheckWindowsError();
-
-	for (auto &pair : _shibaContextDescriptorsByThreadId)
-	{
-		_shibaDeleteContext(pair.second.get());
-	}
-}
-
-static void _shibaThreadDetach()
-{
-	_ShibaMutexGuard guard{ _shibaContextDescriptorsByThreadIdMutex };
-	auto it = _shibaContextDescriptorsByThreadId.find(std::this_thread::get_id());
-	if (it != _shibaContextDescriptorsByThreadId.end())
-	{
-		_shibaDeleteContext(it->second.get());
-		_shibaContextDescriptorsByThreadId.erase(it);
-	}
-}
-
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)
 {
-	switch (fdwReason)
-	{
-		case DLL_PROCESS_ATTACH:
-			shibaLog() << "Attaching DLL to process " << GetCurrentProcessId() << ".";
-			_shibaProcessAttach();
-			break;
-
-		case DLL_PROCESS_DETACH:
-			shibaLog() << "Detaching DLL from process " << GetCurrentProcessId() << ".";
-			_shibaProcessDetach();
-			break;
-
-		case DLL_THREAD_ATTACH:
-			shibaLog() << "Attaching DLL to thread " << std::this_thread::get_id() << ".";
-			break;
-
-		case DLL_THREAD_DETACH:
-			shibaLog() << "Detaching DLL from thread " << std::this_thread::get_id() << ".";
-			_shibaThreadDetach();
-			break;
-	}
-
 	return TRUE;
 }

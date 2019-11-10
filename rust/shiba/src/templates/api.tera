@@ -212,45 +212,120 @@ void main()\n{ \
 		shibaCheckGlError();
 	}
 
-	class _ShibaMutexGuard
+	class _ShibaContext
 	{
 	public:
-		_ShibaMutexGuard(HANDLE mutex)
-			: _mutex{ mutex }
-			, _acquired{ false }
-			{
-				auto dwWaitResult = WaitForSingleObject(_mutex, INFINITE);
-				switch (dwWaitResult) 
-				{
-					case WAIT_OBJECT_0:
-						_acquired = true;
-						break;
-
-					case WAIT_ABANDONED:
-						shibaError() << "Abandoned mutex.";
-						break;
-
-					case WAIT_FAILED:
-						shibaCheckWindowsError();
-						break;
-				}
-			}
-
-		~_ShibaMutexGuard()
+		void tryToDelete()
 		{
-			if (_acquired)
+			if (created)
 			{
-				if (!ReleaseMutex(_mutex)) 
+				wglMakeCurrent(nullptr, nullptr);
+				shibaCheckWindowsError();
+
+				if (context != nullptr)
 				{
+					shibaLog() << "Deleting OpenGL rendering context.";
+
+					wglDeleteContext(context);
 					shibaCheckWindowsError();
 				}
+
+				if (dc != nullptr)
+				{
+					shibaLog() << "Deleting device context.";
+
+					ReleaseDC(window, dc);
+					shibaCheckWindowsError();
+				}
+
+				if (window != nullptr)
+				{
+					shibaLog() << "Deleting invisible window.";
+
+					DestroyWindow(window);
+					shibaCheckWindowsError();
+				}
+
+				created = false;
 			}
 		}
 
+		bool use()
+		{
+			if (!created)
+			{
+				window = CreateWindowA("static", NULL, WS_POPUP, 0, 0, 1, 1, NULL, NULL, NULL, 0);
+				shibaCheckWindowsError();
+
+				if (window == nullptr)
+				{
+					return false;
+				}
+
+				shibaLog() << "Invisible window created.";
+
+				dc = GetDC(window);
+				shibaCheckWindowsError();
+
+				if (dc == nullptr)
+				{
+					return false;
+				}
+
+				PIXELFORMATDESCRIPTOR pfd =
+				{
+					sizeof(PIXELFORMATDESCRIPTOR),
+					1,
+					PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL,
+					PFD_TYPE_RGBA,
+					32,
+					0, 0, 0, 0, 0, 0,
+					0,
+					0,
+					0,
+					0, 0, 0, 0,
+					24,
+					8,
+					0,
+					PFD_MAIN_PLANE,
+					0,
+					0, 0, 0
+				};
+
+				auto pixelFormat = ChoosePixelFormat(dc, &pfd);
+				shibaCheckWindowsError();
+				SetPixelFormat(dc, pixelFormat, &pfd);
+				shibaCheckWindowsError();
+
+				shibaLog() << "Device context obtained.";
+
+				context = wglCreateContext(dc);
+				shibaCheckWindowsError();
+
+				if (context == nullptr)
+				{
+					return false;
+				}
+
+				shibaLog() << "OpenGL rendering context created.";
+
+				created = true;
+			}
+
+			wglMakeCurrent(dc, context);
+			shibaCheckWindowsError();
+
+			return true;
+		}
+
 	private:
-		HANDLE _mutex;
-		bool _acquired;
+		bool created{ false };
+		HWND window{ nullptr };
+		HDC dc{ nullptr };
+		HGLRC context{ nullptr };
 	};
+
+	SHIBA_VARIABLE _ShibaContext _shibaStandaloneContext;
 
 {% else %}
 

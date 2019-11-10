@@ -1,6 +1,5 @@
 import bpy
-from shiba import tools
-from shiba.tool import Tool
+from shiba import tool
 
 
 class RenderEngine(bpy.types.RenderEngine):
@@ -10,12 +9,12 @@ class RenderEngine(bpy.types.RenderEngine):
     bl_use_preview = True
 
     def __init__(self):
-        self.__tool = Tool(self.__reload_viewport)
-        self.__tool.update_path()
-        self.__tool.start()
-        self.__tool.set_project_directory('../example')
-        self.__tool.build()
-        tools.append(self.__tool)
+        tool.register_api_changed(self.__reload_viewport)
+        self.__tool = tool.instance()
+
+    def __del__(self):
+        if tool.is_active():
+            tool.unregister_api_changed(self.__reload_viewport)
 
     @staticmethod
     def _get_time(depsgraph):

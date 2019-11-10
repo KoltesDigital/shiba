@@ -38,7 +38,10 @@ class LockedFile:
             _temp_dir, "locked." + os.path.basename(self.__path))
 
         if not self.__copied:
-            shutil.copy(self.__path, self.__opened_path)
+            try:
+                shutil.copy(self.__path, self.__opened_path)
+            except FileNotFoundError:
+                return False
             self.__copied = True
 
         self.__on_opened(self.__opened_path)

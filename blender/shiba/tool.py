@@ -4,10 +4,11 @@ from shiba.api import API
 from shiba.locked_file import LockedFile
 import socket
 import subprocess
-import threading
+from threading import Lock, Thread, main_thread
+import time
 
 
-class Tool:
+class _Tool:
     def __init__(self, on_api_changed):
         self.__process = None
         self.__process_thread = None
@@ -18,7 +19,7 @@ class Tool:
         self.__api = API(on_api_changed)
 
         self.__locked_file = LockedFile(self.__run_process, self.__end_process)
-        self.__lock = threading.Lock()
+        self.__lock = Lock()
 
     @property
     def api(self):
@@ -77,14 +78,14 @@ class Tool:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-        self.__process_thread = threading.Thread(
+        self.__process_thread = Thread(
             target=self.__run_process_thread
         )
         self.__process_thread.start()
 
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__socket.connect(('127.0.0.1', 5184))
-        self.__socket_thread = threading.Thread(
+        self.__socket_thread = Thread(
             target=self.__run_socket_thread
         )
         self.__socket_thread.start()
@@ -144,3 +145,66 @@ class Tool:
                 message_as_bytes = str.encode(json.dumps(message))
                 self.__socket.send(message_as_bytes)
                 self.__socket.send(b'\n')
+
+
+def _on_api_changed():
+    for on_api_changed in _on_api_changed_list:
+        on_api_changed()
+
+
+def register_api_changed(on_api_changed):
+    _on_api_changed_list.append(on_api_changed)
+
+
+def unregister_api_changed(on_api_changed):
+    try:
+        _on_api_changed_list.remove(on_api_changed)
+    except ValueError:
+        pass
+
+
+def is_active():
+    return _instance is not None
+
+
+def instance():
+    global _instance
+    if _instance is None:
+        _instance = _Tool(_on_api_changed)
+        _instance.update_path()
+        _instance.start()
+        _instance.set_project_directory('../example')
+        _instance.build()
+    return _instance
+
+
+def _stop():
+    global _instance
+    if _instance is not None:
+        instance = _instance
+        _instance = None
+        _on_api_changed_list.clear()
+        instance.stop()
+
+
+def _run_thread():
+    while True:
+        if not main_thread().is_alive():
+            break
+        time.sleep(1)
+
+    _stop()
+
+
+def unregister():
+    _stop()
+
+
+_on_api_changed_list = []
+_instance = None
+
+
+_thread = Thread(
+    target=_run_thread
+)
+_thread.start()

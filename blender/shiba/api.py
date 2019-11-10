@@ -3,7 +3,7 @@ import ctypes
 import os
 from shiba.locked_file import LockedFile
 import struct
-import threading
+from threading import Lock
 
 
 class _ToUpdate:
@@ -28,7 +28,7 @@ class API:
         self.__on_changed = on_changed
 
         self.__locked_file = LockedFile(self.__run_process, self.__end_process)
-        self.__lock = threading.Lock()
+        self.__lock = Lock()
 
     def __run_process(self, path):
         self.__library = ctypes.CDLL(path)
