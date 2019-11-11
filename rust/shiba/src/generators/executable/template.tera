@@ -107,9 +107,9 @@ void main()
 		{{ custom_codes.initialization }}
 	{% endif %}
 
-#if !defined(CAPTURE) && defined(HAS_HOOK_AUDIO_START)
-	REPLACE_HOOK_AUDIO_START
-#endif
+	{% if custom_codes.audio_start %}
+		{{ custom_codes.audio_start }}
+	{% endif %}
 
 	do
 	{
@@ -117,33 +117,29 @@ void main()
 		PeekMessage(NULL, NULL, 0, 0, PM_REMOVE);
 		shibaClearWindowsError();
 
-#ifdef HAS_HOOK_TIME
-		REPLACE_HOOK_TIME
-#elif defined(HAS_HOOK_CAPTURE_TIME)
-		REPLACE_HOOK_CAPTURE_TIME
-#elif defined(HAS_HOOK_AUDIO_TIME)
-		REPLACE_HOOK_AUDIO_TIME
-#endif
-
-		const float shibaTime = 0.;
+		{% if custom_codes.audio_time %}
+			{{ custom_codes.audio_time }}
+		{% else %}
+			const float shibaTime = 0.;
+		{% endif %}
 
 		{{ render }}
 
 		wglSwapLayerBuffers(_shibaDC, WGL_SWAP_MAIN_PLANE);
 		shibaCheckWindowsError();
 	} while (
-#if defined(CLOSE_WHEN_FINISHED)
-#ifdef DURATION
-		time <= DURATION
-#elif defined(HAS_HOOK_CAPTURE_IS_PLAYING)
-		REPLACE_HOOK_CAPTURE_IS_PLAYING
-#elif defined(HAS_HOOK_AUDIO_IS_PLAYING)
-		REPLACE_HOOK_AUDIO_IS_PLAYING
-#else
-#error
-#endif
-		&&
-#endif
+		{% if close_when_finished %}
+			{% if duration %}
+				time < {{ duration }}
+			{% elif custom_codes.audio_duration %}
+				time < {{ custom_codes.audio_duration }}
+			{% elif custom_codes.audio_is_playing %}
+				{{ custom_codes.audio_is_playing }}
+			{% else %}
+				true
+			{% endif %}
+			&&
+		{% endif %}
 		!GetAsyncKeyState(VK_ESCAPE));
 
 	ExitProcess(0);

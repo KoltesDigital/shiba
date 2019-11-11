@@ -1,0 +1,1 @@
+std::numeric_limits<float>::infinity()

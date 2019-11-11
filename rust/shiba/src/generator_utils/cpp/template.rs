@@ -1,36 +1,12 @@
 use crate::configuration::Configuration;
+use crate::custom_codes::CustomCodes;
 use crate::shader_codes::ShaderCodes;
 use crate::types::{Pass, ShaderDescriptor, UniformArray};
 use regex::Regex;
 use serde::Serialize;
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 use tera::{Tera, Value};
-
-macro_rules! template_enum {
-	(
-		$($variant:ident: $filename:expr),*,
-	) => {
-		enum Template {
-			$($variant),*
-		}
-
-		impl Template {
-			fn as_array() -> Vec<(&'static str, &'static str)> {
-				vec![
-					$((stringify!($variant), include_str!(concat!("templates/", $filename, ".tera")))),*
-				]
-			}
-
-			fn name(&self) -> &'static str {
-				match self {
-					$(Template::$variant => stringify!($variant)),*
-				}
-			}
-		}
-	};
-}
 
 template_enum! {
 	API: "api",
@@ -77,7 +53,7 @@ struct OpenGLLoadingContext<'a> {
 
 #[derive(Serialize)]
 struct RenderContext<'a> {
-	custom_codes: &'a BTreeMap<String, String>,
+	custom_codes: &'a CustomCodes,
 	target: &'a str,
 }
 
@@ -167,7 +143,7 @@ impl TemplateRenderer {
 
 	pub fn render(
 		&self,
-		custom_codes: &BTreeMap<String, String>,
+		custom_codes: &CustomCodes,
 		shader_descriptor: &ShaderDescriptor,
 		development: bool,
 		target: &str,

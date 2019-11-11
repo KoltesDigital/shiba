@@ -2,12 +2,12 @@ mod settings;
 
 pub use self::settings::Settings;
 use crate::configuration::Configuration;
+use crate::custom_codes::CustomCodes;
 use crate::generator_utils::cpp;
 use crate::paths::TEMP_DIRECTORY;
 use crate::traits;
 use crate::types::{Pass, ShaderDescriptor, UniformArray};
 use serde::Serialize;
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 use tera::Tera;
@@ -15,7 +15,7 @@ use tera::Tera;
 #[derive(Serialize)]
 struct Context<'a> {
 	api: &'a String,
-	custom_codes: &'a BTreeMap<String, String>,
+	custom_codes: &'a CustomCodes,
 	development: bool,
 	opengl_declarations: &'a String,
 	opengl_loading: &'a String,
@@ -62,7 +62,7 @@ impl<'a> Generator<'a> {
 impl<'a> traits::Generator for Generator<'a> {
 	fn generate(
 		&self,
-		custom_codes: &BTreeMap<String, String>,
+		custom_codes: &CustomCodes,
 		shader_descriptor: &ShaderDescriptor,
 	) -> Result<(), String> {
 		let contents = self.cpp_template_renderer.render(

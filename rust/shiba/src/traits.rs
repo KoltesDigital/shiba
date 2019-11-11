@@ -1,12 +1,16 @@
+use crate::custom_codes::CustomCodes;
 use crate::types::ShaderDescriptor;
-use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::path::PathBuf;
+
+pub trait AudioSynthesizer {
+	fn integrate(&self, custom_codes: &mut CustomCodes) -> Result<(), String>;
+}
 
 pub trait Generator {
 	fn generate(
 		&self,
-		custom_codes: &BTreeMap<String, String>,
+		custom_codes: &CustomCodes,
 		shader_descriptor: &ShaderDescriptor,
 	) -> Result<(), String>;
 

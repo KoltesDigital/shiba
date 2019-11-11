@@ -1,0 +1,5 @@
+SHIBA_VARIABLE LARGE_INTEGER frequency;
+SHIBA_VARIABLE LARGE_INTEGER startCounter;
+
+QueryPerformanceFrequency(&frequency);
+QueryPerformanceCounter(&startCounter);

@@ -1,6 +1,36 @@
 #[macro_use]
 extern crate lazy_static;
 
+macro_rules! template_enum {
+	(
+		$($variant:ident: $filename:expr),*,
+	) => {
+		#[allow(dead_code, non_camel_case_types)]
+		enum Template {
+			$($variant),*
+		}
+
+		impl Template {
+			#[allow(dead_code)]
+			fn as_array() -> Vec<(&'static str, &'static str)> {
+				vec![
+					$((stringify!($variant), include_str!(concat!("templates/", $filename, ".tera")))),*
+				]
+			}
+
+			#[allow(dead_code)]
+			fn name(&self) -> &'static str {
+				match self {
+					$(Template::$variant => stringify!($variant)),*
+				}
+			}
+		}
+	};
+}
+
+mod audio_synthesizers {
+	pub mod none;
+}
 mod configuration;
 mod custom_codes;
 mod generators {

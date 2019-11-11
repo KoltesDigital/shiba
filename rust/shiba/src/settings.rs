@@ -1,3 +1,4 @@
+use crate::audio_synthesizers;
 use crate::generators;
 use crate::shader_providers;
 use serde::Deserialize;
@@ -7,13 +8,25 @@ use std::path::Path;
 
 #[derive(Debug, Deserialize, Hash)]
 #[serde(rename_all = "kebab-case", tag = "tool")]
+pub enum AudioSynthesizer {
+	None(audio_synthesizers::none::Settings),
+}
+
+impl Default for AudioSynthesizer {
+	fn default() -> Self {
+		AudioSynthesizer::None(audio_synthesizers::none::Settings::default())
+	}
+}
+
+#[derive(Debug, Deserialize, Hash)]
+#[serde(rename_all = "kebab-case", tag = "tool")]
 pub enum Generator {
 	Executable(generators::executable::Settings),
 	Crinkler(generators::crinkler::Settings),
 }
 
 impl Default for Generator {
-	fn default() -> Generator {
+	fn default() -> Self {
 		Generator::Executable(generators::executable::Settings::default())
 	}
 }
@@ -31,7 +44,7 @@ pub enum ShaderProvider {
 }
 
 impl Default for ShaderProvider {
-	fn default() -> ShaderProvider {
+	fn default() -> Self {
 		ShaderProvider::Shiba(shader_providers::shiba::Settings::default())
 	}
 }
@@ -39,6 +52,8 @@ impl Default for ShaderProvider {
 #[derive(Debug, Default, Deserialize, Hash)]
 #[serde(rename_all = "kebab-case")]
 pub struct Settings {
+	#[serde(default)]
+	pub audio_synthesizer: AudioSynthesizer,
 	#[serde(default)]
 	pub blender_api: generators::blender_api::Settings,
 	#[serde(default)]

@@ -1,4 +1,5 @@
 use crate::generator_utils::cpp;
+use ordered_float::OrderedFloat;
 use serde::Deserialize;
 use std::hash::Hash;
 
@@ -27,6 +28,10 @@ impl Default for Link {
 #[derive(Debug, Default, Deserialize, Hash)]
 #[serde(rename_all = "kebab-case")]
 pub struct Settings {
+	#[serde(default)]
+	pub close_when_finished: bool,
+	#[serde(default)]
+	pub duration: Option<OrderedFloat<f32>>,
 	#[serde(default)]
 	pub link: Link,
 	#[serde(default)]

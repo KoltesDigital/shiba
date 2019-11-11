@@ -1,0 +1,8 @@
+LARGE_INTEGER counter;
+QueryPerformanceCounter(&counter);
+
+const float shibaTime = (float)(counter.QuadPart - startCounter.QuadPart) / frequency.QuadPart
+{% if speed %}
+	* {{ speed }}
+{% endif %}
+;

@@ -3,7 +3,9 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 
-pub fn load(project_directory: &Path) -> Result<BTreeMap<String, String>, String> {
+pub type CustomCodes = BTreeMap<String, String>;
+
+pub fn load(project_directory: &Path) -> Result<CustomCodes, String> {
 	let map = fs::read_dir(&project_directory)
 		.map_err(|_| "Failed to read directory.")?
 		.filter_map(|entry| {
@@ -26,6 +28,6 @@ pub fn load(project_directory: &Path) -> Result<BTreeMap<String, String>, String
 				None
 			}
 		})
-		.collect::<BTreeMap<String, String>>();
+		.collect();
 	Ok(map)
 }

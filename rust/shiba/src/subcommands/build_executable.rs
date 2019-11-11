@@ -1,3 +1,4 @@
+use crate::audio_synthesizers;
 use crate::configuration;
 use crate::custom_codes;
 use crate::generators;
@@ -6,7 +7,7 @@ use crate::settings;
 use crate::shader_minifiers;
 use crate::shader_providers;
 use crate::stored_hash::StoredHash;
-use crate::traits::{Generator, ShaderMinifier, ShaderProvider};
+use crate::traits::{AudioSynthesizer, Generator, ShaderMinifier, ShaderProvider};
 use crate::types::ProjectDescriptor;
 use std::path::Path;
 use std::time::Instant;
@@ -27,6 +28,12 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 	let configuration = configuration::load()?;
 
 	let project_descriptor = ProjectDescriptor::load(options.project_directory)?;
+
+	let audio_synthesizer = match &project_descriptor.settings.audio_synthesizer {
+		settings::AudioSynthesizer::None(settings) => {
+			audio_synthesizers::none::AudioSynthesizer::new(settings)
+		}
+	}?;
 
 	let shader_minifier = project_descriptor
 		.settings
@@ -55,7 +62,7 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 		),
 	};
 
-	let custom_codes = custom_codes::load(options.project_directory)?;
+	let mut custom_codes = custom_codes::load(options.project_directory)?;
 
 	let build_hash_path = LOCAL_DATA_DIRECTORY.join("build.hash");
 	let mut build_hash = StoredHash::new(&build_hash_path);
@@ -82,6 +89,8 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 
 	let must_build = options.force || build_hash.has_changed() || !generator.get_path().exists();
 	let result = if must_build {
+		audio_synthesizer.integrate(&mut custom_codes)?;
+
 		let mut shader_descriptor = shader_provider.provide()?;
 
 		if let Some(shader_minifier) = shader_minifier {
