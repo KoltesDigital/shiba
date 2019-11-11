@@ -1,6 +1,6 @@
-use crate::generator_utils::cpp;
+use crate::generator_utils::settings::Resolution;
 use ordered_float::OrderedFloat;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 fn default_link_args() -> Vec<String> {
@@ -10,7 +10,7 @@ fn default_link_args() -> Vec<String> {
 		.collect()
 }
 
-#[derive(Debug, Deserialize, Hash)]
+#[derive(Debug, Deserialize, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Link {
 	#[serde(default = "default_link_args")]
@@ -25,7 +25,7 @@ impl Default for Link {
 	}
 }
 
-#[derive(Debug, Default, Deserialize, Hash)]
+#[derive(Debug, Default, Deserialize, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Settings {
 	#[serde(default)]
@@ -35,5 +35,7 @@ pub struct Settings {
 	#[serde(default)]
 	pub link: Link,
 	#[serde(default)]
-	pub resolution: cpp::Resolution,
+	pub loading_black_screen: bool,
+	#[serde(default)]
+	pub resolution: Resolution,
 }

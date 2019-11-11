@@ -40,6 +40,7 @@ mod generators {
 }
 mod generator_utils {
 	pub mod cpp;
+	pub mod settings;
 }
 mod parsers;
 mod paths;

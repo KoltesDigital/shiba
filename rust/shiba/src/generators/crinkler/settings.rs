@@ -1,13 +1,16 @@
-use serde::Deserialize;
+use crate::generator_utils::settings::Resolution;
+use ordered_float::OrderedFloat;
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 fn default_cl_args() -> Vec<String> {
 	vec![
+		"/GR-",
+		"/GS-",
 		"/O1",
 		"/Oi",
 		"/Oy",
-		"/GR-",
-		"/GS-",
+		"/QIfist",
 		"/fp:fast",
 		"/arch:IA32",
 	]
@@ -16,7 +19,7 @@ fn default_cl_args() -> Vec<String> {
 	.collect()
 }
 
-#[derive(Debug, Deserialize, Hash)]
+#[derive(Debug, Deserialize, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Cl {
 	#[serde(default = "default_cl_args")]
@@ -50,7 +53,7 @@ fn default_crinkler_args() -> Vec<String> {
 	.collect()
 }
 
-#[derive(Debug, Deserialize, Hash)]
+#[derive(Debug, Deserialize, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Crinkler {
 	#[serde(default = "default_crinkler_args")]
@@ -65,11 +68,19 @@ impl Default for Crinkler {
 	}
 }
 
-#[derive(Debug, Default, Deserialize, Hash)]
+#[derive(Debug, Default, Deserialize, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Settings {
+	#[serde(default)]
+	pub close_when_finished: bool,
+	#[serde(default)]
+	pub duration: Option<OrderedFloat<f32>>,
 	#[serde(default)]
 	pub cl: Cl,
 	#[serde(default)]
 	pub crinkler: Crinkler,
+	#[serde(default)]
+	pub loading_black_screen: bool,
+	#[serde(default)]
+	pub resolution: Resolution,
 }

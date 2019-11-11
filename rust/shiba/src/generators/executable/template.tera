@@ -55,24 +55,24 @@ static const PIXELFORMATDESCRIPTOR _shibaPixelFormatDescriptor = {
 void main()
 {
 	int shibaResolutionWidth =
-		{% if resolution.width %}
-			{{ resolution.width }}
+		{% if settings.resolution.width %}
+			{{ settings.resolution.width }}
 		{% else %}
 			GetSystemMetrics(SM_CXSCREEN)
 		{% endif %}
-		{% if resolution.scale %}
-			* {{ resolution.scale }}
+		{% if settings.resolution.scale %}
+			* {{ settings.resolution.scale }}
 		{% endif %}
 	;
 
 	int shibaResolutionHeight =
-		{% if resolution.height %}
-			{{ resolution.height }}
+		{% if settings.resolution.height %}
+			{{ settings.resolution.height }}
 		{% else %}
 			GetSystemMetrics(SM_CYSCREEN)
 		{% endif %}
-		{% if resolution.scale %}
-			* {{ resolution.scale }}
+		{% if settings.resolution.scale %}
+			* {{ settings.resolution.scale }}
 		{% endif %}
 	;
 
@@ -87,7 +87,7 @@ void main()
 	ShowCursor(false);
 	shibaCheckWindowsError();
 
-	{% if loading_black_screen %}
+	{% if settings.loading_black_screen %}
 		wglSwapLayerBuffers(_shibaDC, WGL_SWAP_MAIN_PLANE);
 		shibaCheckWindowsError();
 	{% endif %}
@@ -128,9 +128,9 @@ void main()
 		wglSwapLayerBuffers(_shibaDC, WGL_SWAP_MAIN_PLANE);
 		shibaCheckWindowsError();
 	} while (
-		{% if close_when_finished %}
-			{% if duration %}
-				time < {{ duration }}
+		{% if settings.close_when_finished %}
+			{% if settings.duration %}
+				time < {{ settings.duration }}
 			{% elif custom_codes.audio_duration %}
 				time < {{ custom_codes.audio_duration }}
 			{% elif custom_codes.audio_is_playing %}
