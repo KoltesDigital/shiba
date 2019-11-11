@@ -1,3 +1,23 @@
+class _ShibaNoLogger
+{
+public:
+	_ShibaNoLogger& operator<< (bool) { return *this; }
+	_ShibaNoLogger& operator<< (short) { return *this; }
+	_ShibaNoLogger& operator<< (unsigned short) { return *this; }
+	_ShibaNoLogger& operator<< (int) { return *this; }
+	_ShibaNoLogger& operator<< (unsigned int) { return *this; }
+	_ShibaNoLogger& operator<< (long) { return *this; }
+	_ShibaNoLogger& operator<< (unsigned long) { return *this; }
+	_ShibaNoLogger& operator<< (long long) { return *this; }
+	_ShibaNoLogger& operator<< (unsigned long long) { return *this; }
+	_ShibaNoLogger& operator<< (float) { return *this; }
+	_ShibaNoLogger& operator<< (double) { return *this; }
+	_ShibaNoLogger& operator<< (long double) { return *this; }
+	_ShibaNoLogger& operator<< (void*) { return *this; }
+};
+
+#define SHIBA_CONST static const constexpr
+
 {% if development %}
 
 	#define SHIBA_DEVELOPMENT
@@ -52,6 +72,7 @@
 	}
 
 	#define shibaCheckWindowsError() _shibaCheckWindowsError(__FILE__, __LINE__)
+	#define shibaClearWindowsError() SetLastError(0)
 
 	static void _shibaCheckGlError(const char *filename, int lineNumber)
 	{
@@ -134,18 +155,17 @@
 
 	#define SHIBA_VARIABLE static
 
-	#define shibaError()
-	#define shibaLog()
+	#define shibaError() _ShibaNoLogger{}
+	#define shibaLog() _ShibaNoLogger{}
 	#define shibaCheckWindowsError()
+	#define shibaClearWindowsError()
 	#define shibaCheckGlError()
 	#define shibaCheckShaderInfoLog(shader)
 	#define shibaCheckProgramInfoLog(program)
 
 {% endif %}
 
-#define SHIBA_CONST static const constexpr
-
-{% if blender_api %}
+{% if target == "blender_api" %}
 
 	SHIBA_CONST char *_shibaShaderNullVertexCode =
 "#version 150\n\

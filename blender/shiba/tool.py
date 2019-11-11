@@ -133,7 +133,7 @@ class _Tool:
     def build(self):
         with self.__lock:
             if self.__socket:
-                self.__socket.send(b'{"command":"build"}\n')
+                self.__socket.send(b'{"command":"build-blender-api"}\n')
 
     def set_project_directory(self, path):
         with self.__lock:

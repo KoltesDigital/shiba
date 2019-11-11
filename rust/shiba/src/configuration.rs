@@ -1,19 +1,13 @@
 use crate::paths::USER_SETTINGS_DIRECTORY;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct Paths {
-	pub glew: Option<PathBuf>,
-	pub shader_minifier: Option<PathBuf>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "kebab-case")]
 pub struct Configuration {
-	pub paths: Paths,
+	pub paths: HashMap<String, PathBuf>,
 }
 
 pub fn load() -> Result<Configuration, String> {

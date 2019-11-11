@@ -1,5 +1,3 @@
-#pragma data_seg(".var")
-
 SHIBA_VARIABLE GLuint vbo, vao, vboParticles, vaoParticles;
 
 SHIBA_CONST int count = 1;

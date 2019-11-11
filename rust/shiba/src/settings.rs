@@ -1,17 +1,21 @@
 use crate::generators;
 use crate::shader_providers;
-use ordered_float::OrderedFloat;
 use serde::Deserialize;
 use std::fs;
 use std::hash::Hash;
 use std::path::Path;
 
-#[derive(Debug, Default, Deserialize, Hash)]
-#[serde(rename_all = "kebab-case")]
-pub struct Resolution {
-	pub width: Option<i32>,
-	pub height: Option<i32>,
-	pub scale: Option<OrderedFloat<f32>>,
+#[derive(Debug, Deserialize, Hash)]
+#[serde(rename_all = "kebab-case", tag = "tool")]
+pub enum Generator {
+	Executable(generators::executable::Settings),
+	Crinkler(generators::crinkler::Settings),
+}
+
+impl Default for Generator {
+	fn default() -> Generator {
+		Generator::Executable(generators::executable::Settings::default())
+	}
 }
 
 #[derive(Debug, Deserialize, Hash)]
@@ -37,8 +41,9 @@ impl Default for ShaderProvider {
 pub struct Settings {
 	#[serde(default)]
 	pub blender_api: generators::blender_api::Settings,
+	#[serde(default)]
+	pub generator: Generator,
 	pub name: String,
-	pub resolution: Option<Resolution>,
 	#[serde(default)]
 	pub shader_minifier: Option<ShaderMinifier>,
 	#[serde(default)]

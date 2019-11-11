@@ -42,10 +42,11 @@ fn ensure_passes_has_index(shader_descriptor: &mut ShaderDescriptor, index: usiz
 }
 
 fn parse(code: &str) -> Result<ShaderDescriptor, String> {
-	let (input, contents) = parsers::contents(code).map_err(|_| "Parsing error.".to_string())?;
+	let (input, (glsl_version, sections)) =
+		parsers::contents(code).map_err(|_| "Parsing error.".to_string())?;
 
 	let mut shader_descriptor = ShaderDescriptor {
-		glsl_version: contents.0.map(|s| s.to_owned()),
+		glsl_version: glsl_version.map(|s| s.to_owned()),
 		..Default::default()
 	};
 
@@ -93,7 +94,7 @@ fn parse(code: &str) -> Result<ShaderDescriptor, String> {
 		}
 	};
 
-	for (code, section) in contents.1 {
+	for (code, section) in sections {
 		process_code(code);
 		next_section.set(section);
 	}
@@ -206,10 +207,10 @@ impl traits::ShaderProvider for ShaderProvider {
 		}
 
 		for uniform_array in &shader_descriptor.uniform_arrays {
-			for variable in uniform_array.variables.iter().enumerate() {
+			for (index, variable) in uniform_array.variables.iter().enumerate() {
 				let usage_re =
-					Regex::new(format!(r"\b{}\b", variable.1.name).as_str()).expect("Bad regex.");
-				let replacement = format!("{}[{}]", uniform_array.name, variable.0);
+					Regex::new(format!(r"\b{}\b", variable.name).as_str()).expect("Bad regex.");
+				let replacement = format!("{}[{}]", uniform_array.name, index);
 
 				let replace = |code: &String| {
 					Some(

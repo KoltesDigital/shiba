@@ -96,7 +96,7 @@
 		shibaCheckGlError();
 
 		if (_shibaShaderPassCodes[i * 2]
-			{% if blender_api %}
+			{% if target == "blender_api" %}
 				|| i == {{ passes | length - 1 }}
 			{% endif %}
 		)
@@ -116,14 +116,14 @@
 
 			GLint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 			shibaCheckGlError();
-			{% if blender_api %}
+			{% if target == "blender_api" %}
 				if (i == {{ passes | length - 1 }})
 				{
-					glShaderSource(vertexShader, 1, &_shibaShaderNullVertexCode, 0);				
+					glShaderSource(vertexShader, 1, &_shibaShaderNullVertexCode, 0);
 				}
 				else
 				{
-					glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);				
+					glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
 				}
 			{% else %}
 				glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);

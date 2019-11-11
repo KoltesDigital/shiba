@@ -1,0 +1,150 @@
+#define WIN32_LEAN_AND_MEAN
+#define WIN32_EXTRA_LEAN
+#include <windows.h>
+
+{% if development %}
+	#define GLEW_STATIC
+	#include <GL/glew.h>
+{% endif %}
+
+#include <GL/gl.h>
+
+{{ api }}
+
+#pragma data_seg(".var")
+
+{{ opengl_declarations }}
+
+{{ shader_declarations }}
+
+static const PIXELFORMATDESCRIPTOR _shibaPixelFormatDescriptor = {
+	sizeof(PIXELFORMATDESCRIPTOR),
+	1,
+	PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+	PFD_TYPE_RGBA,
+	32,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	8,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	32,
+	0,
+	0,
+	PFD_MAIN_PLANE,
+	0,
+	0,
+	0,
+	0,
+};
+
+{% if custom_codes.declaration %}
+	{{ custom_codes.declaration }}
+{% endif %}
+
+#pragma code_seg(".main")
+
+void main()
+{
+	int shibaResolutionWidth =
+		{% if resolution.width %}
+			{{ resolution.width }}
+		{% else %}
+			GetSystemMetrics(SM_CXSCREEN)
+		{% endif %}
+		{% if resolution.scale %}
+			* {{ resolution.scale }}
+		{% endif %}
+	;
+
+	int shibaResolutionHeight =
+		{% if resolution.height %}
+			{{ resolution.height }}
+		{% else %}
+			GetSystemMetrics(SM_CYSCREEN)
+		{% endif %}
+		{% if resolution.scale %}
+			* {{ resolution.scale }}
+		{% endif %}
+	;
+
+	const auto _shibaWindow = CreateWindowA("static", NULL, WS_POPUP | WS_VISIBLE, 0, 0, shibaResolutionWidth, shibaResolutionHeight, NULL, NULL, NULL, 0);
+	shibaCheckWindowsError();
+	const auto _shibaDC = GetDC(_shibaWindow);
+	shibaCheckWindowsError();
+	SetPixelFormat(_shibaDC, ChoosePixelFormat(_shibaDC, &_shibaPixelFormatDescriptor), &_shibaPixelFormatDescriptor);
+	shibaCheckWindowsError();
+	wglMakeCurrent(_shibaDC, wglCreateContext(_shibaDC));
+	shibaCheckWindowsError();
+	ShowCursor(false);
+	shibaCheckWindowsError();
+
+	{% if loading_black_screen %}
+		wglSwapLayerBuffers(_shibaDC, WGL_SWAP_MAIN_PLANE);
+		shibaCheckWindowsError();
+	{% endif %}
+
+	{{ opengl_loading }}
+
+	{% if development %}
+		// Display Opengl info in console.
+		shibaLog() << "OpenGL version: " << glGetString(GL_VERSION);
+		// shibaLog() << "OpenGL extensions: " << glGetString(GL_EXTENSIONS);
+		shibaLog() << std::endl;
+	{% endif %}
+
+	{{ shader_loading }}
+
+	{% if custom_codes.initialization %}
+		{{ custom_codes.initialization }}
+	{% endif %}
+
+#if !defined(CAPTURE) && defined(HAS_HOOK_AUDIO_START)
+	REPLACE_HOOK_AUDIO_START
+#endif
+
+	do
+	{
+		// Avoid 'not responding' system messages.
+		PeekMessage(NULL, NULL, 0, 0, PM_REMOVE);
+		shibaClearWindowsError();
+
+#ifdef HAS_HOOK_TIME
+		REPLACE_HOOK_TIME
+#elif defined(HAS_HOOK_CAPTURE_TIME)
+		REPLACE_HOOK_CAPTURE_TIME
+#elif defined(HAS_HOOK_AUDIO_TIME)
+		REPLACE_HOOK_AUDIO_TIME
+#endif
+
+		const float shibaTime = 0.;
+
+		{{ render }}
+
+		wglSwapLayerBuffers(_shibaDC, WGL_SWAP_MAIN_PLANE);
+		shibaCheckWindowsError();
+	} while (
+#if defined(CLOSE_WHEN_FINISHED)
+#ifdef DURATION
+		time <= DURATION
+#elif defined(HAS_HOOK_CAPTURE_IS_PLAYING)
+		REPLACE_HOOK_CAPTURE_IS_PLAYING
+#elif defined(HAS_HOOK_AUDIO_IS_PLAYING)
+		REPLACE_HOOK_AUDIO_IS_PLAYING
+#else
+#error
+#endif
+		&&
+#endif
+		!GetAsyncKeyState(VK_ESCAPE));
+
+	ExitProcess(0);
+}

@@ -91,9 +91,9 @@ impl ShaderCodes {
 			.as_str();
 		}
 
-		for pair in &globals_by_type {
+		for (type_name, variables) in &globals_by_type {
 			shader_codes.after_stage_variables +=
-				format!("{} {};", pair.0, pair.1.join(",")).as_str();
+				format!("{} {};", type_name, variables.join(",")).as_str();
 		}
 
 		if let Some(code) = &shader_descriptor.sections.common {

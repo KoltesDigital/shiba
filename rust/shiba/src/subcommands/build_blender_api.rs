@@ -7,10 +7,9 @@ use crate::shader_codes::to_standalone_passes;
 use crate::shader_minifiers;
 use crate::shader_providers;
 use crate::stored_hash::StoredHash;
-use crate::template::TemplateRenderer;
-use crate::traits::{ShaderMinifier, ShaderProvider};
+use crate::traits::{Generator, ShaderMinifier, ShaderProvider};
 use crate::types::{Pass, ProjectDescriptor};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
 pub struct Options<'a> {
@@ -68,19 +67,20 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 
 	{
 		let mut updater = build_hash.get_updater();
-		updater.add(&project_descriptor);
 		updater.add(&custom_codes);
+		updater.add(&project_descriptor);
 		updater.add(&shader_provider);
 
 		let mut updater = cpp_hash.get_updater();
-		updater.add(&project_descriptor);
 		updater.add(&custom_codes);
+		updater.add(&project_descriptor);
 
 		let mut updater = glsl_hash.get_updater();
 		updater.add(&shader_provider);
 	}
 
-	let what_to_build = if options.force || !get_blender_api_path().exists() {
+	let what_to_build = if options.force || !generators::blender_api::Generator::get_path().exists()
+	{
 		WhatToBuild::BlenderAPI
 	} else {
 		if options.diff && !cpp_hash.has_changed() {
@@ -100,7 +100,7 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 
 	let result = match what_to_build {
 		WhatToBuild::BlenderAPI => {
-			let generator = generators::blender_api::BlenderAPIGenerator::new(
+			let generator = generators::blender_api::Generator::new(
 				&project_descriptor.settings.blender_api,
 				&configuration,
 			)?;
@@ -111,13 +111,7 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 				shader_descriptor = shader_minifier.minify(&shader_descriptor)?;
 			}
 
-			let template_renderer = TemplateRenderer::new()?;
-
-			generator.generate(
-				options.project_directory,
-				&template_renderer,
-				&shader_descriptor,
-			)?;
+			generator.generate(&custom_codes, &shader_descriptor)?;
 
 			let _ = build_hash.store();
 			let _ = cpp_hash.store();
@@ -145,8 +139,4 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 	println!("Build duration: {:?}", duration);
 
 	Ok(result)
-}
-
-pub fn get_blender_api_path() -> PathBuf {
-	generators::blender_api::BlenderAPIGenerator::get_path()
 }

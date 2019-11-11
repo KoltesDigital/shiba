@@ -1,0 +1,19 @@
+{% if development %}
+
+	auto _shibaGlewError = glewInit();
+	shibaClearWindowsError();
+	if (GLEW_OK != _shibaGlewError)
+	{
+		shibaError() << "Failed to initialize GLEW: " << glewGetErrorString(_shibaGlewError) << ".";
+		return;
+	}
+
+{% else %}
+
+	for (auto i = 0; i < _shibaOpenGLExtFunctionCount; ++i)
+	{
+		_shibaOpenGLExtFunctions[i] = wglGetProcAddress(_shibaOpenGLExtFunctionNames[i]);
+		shibaCheckWindowsError();
+	}
+
+{% endif %}

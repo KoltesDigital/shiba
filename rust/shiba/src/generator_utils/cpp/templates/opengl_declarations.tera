@@ -1,0 +1,25 @@
+{% if not development %}
+
+	#define GLAPIENTRY __stdcall
+	typedef char GLchar;
+	typedef ptrdiff_t GLintptr;
+	typedef ptrdiff_t GLsizeiptr;
+
+	{% for constant in opengl_ext_constants %}
+		{{ constant.declaration }}
+	{% endfor %}
+
+	SHIBA_CONST int _shibaOpenGLExtFunctionCount = {{ opengl_ext_functions | length }};
+	SHIBA_CONST char *_shibaOpenGLExtFunctionNames[_shibaOpenGLExtFunctionCount] = {
+		{% for function in opengl_ext_functions %}
+			{{ function.name | string_literal }},
+		{% endfor %}
+	};
+
+	SHIBA_VARIABLE void *_shibaOpenGLExtFunctions[_shibaOpenGLExtFunctionCount];
+	{% for function in opengl_ext_functions %}
+		{{ function.typedef_declaration }}
+		{{ function.declaration }}
+	{% endfor %}
+
+{% endif %}

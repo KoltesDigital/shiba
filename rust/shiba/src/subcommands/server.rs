@@ -1,3 +1,4 @@
+use crate::generators;
 use crate::subcommands;
 use crate::types::Pass;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
@@ -10,21 +11,21 @@ use std::sync::{mpsc::channel, Arc, RwLock};
 use std::thread::spawn;
 use std::time::Duration;
 
-fn default_command_build_diff() -> bool {
+fn default_command_build_blender_api_diff() -> bool {
 	false
 }
 
-fn default_command_build_force() -> bool {
+fn default_command_build_blender_api_force() -> bool {
 	false
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "command")]
 enum Command {
-	Build {
-		#[serde(default = "default_command_build_diff")]
+	BuildBlenderApi {
+		#[serde(default = "default_command_build_blender_api_diff")]
 		diff: bool,
-		#[serde(default = "default_command_build_force")]
+		#[serde(default = "default_command_build_blender_api_force")]
 		force: bool,
 	},
 	GetBlenderApiPath,
@@ -80,19 +81,19 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 		loop {
 			match rx_command.recv() {
 				Ok(command) => match command {
-					Command::Build { diff, force } => {
-						match subcommands::build::subcommand(&subcommands::build::Options {
+					Command::BuildBlenderApi { diff, force } => {
+						match subcommands::build_blender_api::subcommand(&subcommands::build_blender_api::Options {
 							diff,
 							force,
 							project_directory: &command_project_directory,
 						}) {
 							Ok(result) => match result {
-								subcommands::build::ResultKind::BlenderAPIAvailable => {
+								subcommands::build_blender_api::ResultKind::BlenderAPIAvailable => {
 									let mut state = command_state.write().unwrap();
 									state.broadcast(&Event::BlenderApiAvailable)
 								}
-								subcommands::build::ResultKind::Nothing => {}
-								subcommands::build::ResultKind::ShaderPassesAvailable(passes) => {
+								subcommands::build_blender_api::ResultKind::Nothing => {}
+								subcommands::build_blender_api::ResultKind::ShaderPassesAvailable(passes) => {
 									let mut state = command_state.write().unwrap();
 									state.broadcast(&Event::ShaderPassesAvailable {
 										passes: &passes,
@@ -108,7 +109,7 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 						}
 					}
 					Command::GetBlenderApiPath => {
-						let path = subcommands::build::get_blender_api_path();
+						let path = generators::blender_api::Generator::get_path();
 						let mut state = command_state.write().unwrap();
 						state.broadcast(&Event::BlenderApiPath { path: &path })
 					}
@@ -136,17 +137,15 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 				| DebouncedEvent::Rename(_, _)
 				| DebouncedEvent::Rescan
 				| DebouncedEvent::Write(_) => {
-					println!("Rebuild");
-					let _ = watcher_tx_command.send(Command::Build {
+					let _ = watcher_tx_command.send(Command::BuildBlenderApi {
 						diff: true,
 						force: false,
 					});
 				}
-				_ => {} //event => println!("event {:?}", event),
+				_ => {}
 			},
 			Err(err) => {
-				println!("Error while watching: {}", err);
-				panic!();
+				panic!("Error while watching: {}", err);
 			}
 		};
 	});

@@ -1,5 +1,5 @@
-{% if custom.rendering %}
-	{{ custom.rendering }}
+{% if custom_codes.rendering %}
+	{{ custom_codes.rendering }}
 {% else %}
 	#ifdef shibaUniformTime
 		shibaUniformTime = shibaTime;
@@ -13,7 +13,7 @@
 		shibaUniformResolutionHeight = shibaResolutionHeight;
 	#endif
 
-	{% if blender_api %}
+	{% if target == "blender_api" %}
 		glUseProgram(shibaProgram);
 		shibaCheckGlError();
 	{% endif %}

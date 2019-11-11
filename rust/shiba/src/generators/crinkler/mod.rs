@@ -16,6 +16,7 @@ use tera::Tera;
 struct Context<'a> {
 	api: &'a String,
 	custom_codes: &'a BTreeMap<String, String>,
+	development: bool,
 	opengl_declarations: &'a String,
 	opengl_loading: &'a String,
 	passes: &'a [Pass],
@@ -27,7 +28,7 @@ struct Context<'a> {
 
 pub struct Generator<'a> {
 	cpp_template_renderer: cpp::TemplateRenderer,
-	glew_path: PathBuf,
+	crinkler_path: PathBuf,
 	msvc_command_generator: cpp::msvc::CommandGenerator,
 	settings: &'a Settings,
 	tera: Tera,
@@ -36,29 +37,25 @@ pub struct Generator<'a> {
 impl<'a> Generator<'a> {
 	pub fn new(settings: &'a Settings, configuration: &'a Configuration) -> Result<Self, String> {
 		let cpp_template_renderer = cpp::TemplateRenderer::new(configuration)?;
-		let glew_path = configuration
+		let crinkler_path = configuration
 			.paths
-			.get("glew")
-			.ok_or("Please set configuration key paths.glew.")?
+			.get("crinkler")
+			.ok_or("Please set configuration key paths.crinkler.")?
 			.clone();
 		let msvc_command_generator = cpp::msvc::CommandGenerator::new()?;
 
 		let mut tera = Tera::default();
 
-		tera.add_raw_template("template", include_str!("template.tera"))
+		tera.add_raw_template("template", include_str!("../executable/template.tera"))
 			.map_err(|err| err.to_string())?;
 
 		Ok(Generator {
 			cpp_template_renderer,
-			glew_path,
+			crinkler_path,
 			msvc_command_generator,
 			settings,
 			tera,
 		})
-	}
-
-	pub fn get_path() -> PathBuf {
-		TEMP_DIRECTORY.join("blender_api.dll")
 	}
 }
 
@@ -71,13 +68,14 @@ impl<'a> traits::Generator for Generator<'a> {
 		let contents = self.cpp_template_renderer.render(
 			custom_codes,
 			shader_descriptor,
-			true,
-			"blender_api",
+			false,
+			"crinkler",
 		)?;
 
 		let context = Context {
 			api: &contents.api,
 			custom_codes: &custom_codes,
+			development: false,
 			opengl_declarations: &contents.opengl_declarations,
 			opengl_loading: &contents.opengl_loading,
 			passes: &shader_descriptor.passes,
@@ -91,38 +89,24 @@ impl<'a> traits::Generator for Generator<'a> {
 			.render("template", &context)
 			.map_err(|_| "Failed to render template.")?;
 
-		fs::write(TEMP_DIRECTORY.join("blender_api.cpp"), contents.as_bytes())
+		fs::write(TEMP_DIRECTORY.join("crinkler.cpp"), contents.as_bytes())
 			.map_err(|_| "Failed to write to file.")?;
 
 		let mut compilation = self
 			.msvc_command_generator
-			.command(cpp::msvc::Platform::X64)
+			.command(cpp::msvc::Platform::X86)
 			.arg("cl")
 			.arg("/c")
-			.arg("/EHsc")
+			.args(&self.settings.cl.args)
 			.arg("/FA")
-			.arg("/Fablender_api.asm")
-			.arg("/Foblender_api.obj")
-			.arg(format!(
-				"/I{}",
-				self.glew_path.join("include").to_string_lossy(),
-			))
-			.arg("blender_api.cpp")
+			.arg("/Facrinkler.asm")
+			.arg("/Focrinkler.obj")
+			.arg("crinkler.cpp")
 			.arg("&&")
-			.arg("link")
-			.arg("/DLL")
-			.arg("/OUT:blender_api.dll")
-			.args(&self.settings.link.args)
-			.arg(
-				self.glew_path
-					.join("lib")
-					.join("Release")
-					.join("x64")
-					.join("glew32s.lib")
-					.to_string_lossy()
-					.to_string(),
-			)
-			.arg("blender_api.obj")
+			.arg(&self.crinkler_path)
+			.arg("/OUT:crinkler.exe")
+			.args(&self.settings.crinkler.args)
+			.arg("crinkler.obj")
 			.current_dir(&*TEMP_DIRECTORY)
 			.spawn()
 			.map_err(|err| err.to_string())?;
@@ -136,6 +120,6 @@ impl<'a> traits::Generator for Generator<'a> {
 	}
 
 	fn get_path(&self) -> PathBuf {
-		Generator::get_path()
+		TEMP_DIRECTORY.join("crinkler.exe")
 	}
 }

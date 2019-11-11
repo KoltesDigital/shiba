@@ -12,7 +12,7 @@ use serde::Serialize;
 use std::cell::Cell;
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::str;
 use tera::Tera;
 
@@ -25,14 +25,13 @@ impl ShaderMinifier {
 	pub fn new(configuration: &Configuration) -> Result<Self, String> {
 		let exe_path = configuration
 			.paths
-			.shader_minifier
-			.as_ref()
-			.ok_or("Please set configuration key paths.glew.")?
+			.get("shader-minifier")
+			.ok_or("Please set configuration key paths.shader-minifier.")?
 			.clone();
 
 		let mut tera = Tera::default();
 
-		tera.add_raw_templates(vec![("shader", include_str!("shader.tera"))])
+		tera.add_raw_template("template", include_str!("template.tera"))
 			.map_err(|err| err.to_string())?;
 
 		Ok(ShaderMinifier { exe_path, tera })
@@ -78,32 +77,29 @@ impl traits::ShaderMinifier for ShaderMinifier {
 
 		let shader = self
 			.tera
-			.render("shader", &context)
-			.map_err(|_| "Failed to render shader.")?;
+			.render("template", &context)
+			.map_err(|_| "Failed to render template.")?;
 
 		let input_path = TEMP_DIRECTORY.join("shader.glsl");
 		let output_path = TEMP_DIRECTORY.join("shader.min.glsl");
 
 		fs::write(&input_path, shader).map_err(|_| "Failed to write shader.")?;
 
-		let compilation = Command::new(&self.exe_path)
+		let mut minification = Command::new(&self.exe_path)
 			.args(vec!["--field-names", "rgba", "--format", "none", "-o"])
 			.arg(&output_path)
 			.args(vec!["-v", "--"])
 			.arg(&input_path)
 			.current_dir(&*TEMP_DIRECTORY)
-			.output()
+			.stdout(Stdio::inherit())
+			.stderr(Stdio::inherit())
+			.spawn()
 			.map_err(|err| err.to_string())?;
 
-		println!(
-			"stdout: {}",
-			str::from_utf8(&compilation.stdout).map_err(|_| "Failed to convert UTF8.")?
-		);
-
-		println!(
-			"stderr: {}",
-			str::from_utf8(&compilation.stderr).map_err(|_| "Failed to convert UTF8.")?
-		);
+		let status = minification.wait().map_err(|err| err.to_string())?;
+		if !status.success() {
+			return Err("Failed to compile.".to_string());
+		}
 
 		let contents = fs::read_to_string(&output_path)
 			.map_err(|_| "Failed to read shader.".to_string())?
@@ -167,23 +163,23 @@ impl traits::ShaderMinifier for ShaderMinifier {
 
 		process_code(input);
 
-		for pair in glsl::variables(&uniform_arrays_string.unwrap())
+		for (index, variable) in glsl::variables(&uniform_arrays_string.unwrap())
 			.unwrap()
 			.1
 			.iter()
 			.enumerate()
 		{
-			uniform_arrays[pair.0].minified_name = Some(pair.1.name.clone());
+			uniform_arrays[index].minified_name = Some(variable.name.clone());
 		}
 
 		if !non_uniform_variables.is_empty() {
-			for pair in glsl::variables(&non_uniform_variables_string.unwrap())
+			for (index, variable) in glsl::variables(&non_uniform_variables_string.unwrap())
 				.unwrap()
 				.1
 				.iter()
 				.enumerate()
 			{
-				non_uniform_variables[pair.0].minified_name = Some(pair.1.name.clone());
+				non_uniform_variables[index].minified_name = Some(variable.name.clone());
 			}
 		}
 

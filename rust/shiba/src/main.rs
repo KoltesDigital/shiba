@@ -5,6 +5,11 @@ mod configuration;
 mod custom_codes;
 mod generators {
 	pub mod blender_api;
+	pub mod crinkler;
+	pub mod executable;
+}
+mod generator_utils {
+	pub mod cpp;
 }
 mod parsers;
 mod paths;
@@ -18,10 +23,10 @@ mod shader_providers {
 mod shader_codes;
 mod stored_hash;
 mod subcommands {
-	pub mod build;
+	pub mod build_blender_api;
+	pub mod build_executable;
 	pub mod server;
 }
-mod template;
 mod traits;
 mod types;
 
@@ -35,7 +40,12 @@ enum Command {
 		#[structopt(short, long)]
 		force: bool,
 	},
-	/// Starts a server.
+	/// Builds the Blender API
+	BuildBlender {
+		#[structopt(short, long)]
+		force: bool,
+	},
+	/// Starts a server
 	Server,
 }
 
@@ -60,12 +70,21 @@ fn main() -> Result<(), String> {
 
 	let command = args.command.unwrap_or_else(Command::default);
 	match command {
-		Command::Build { force } => subcommands::build::subcommand(&subcommands::build::Options {
-			diff: false,
-			force,
-			project_directory: &args.project_directory,
-		})
-		.map(|_| ()),
+		Command::Build { force } => {
+			subcommands::build_executable::subcommand(&subcommands::build_executable::Options {
+				force,
+				project_directory: &args.project_directory,
+			})
+			.map(|_| ())
+		}
+		Command::BuildBlender { force } => {
+			subcommands::build_blender_api::subcommand(&subcommands::build_blender_api::Options {
+				diff: false,
+				force,
+				project_directory: &args.project_directory,
+			})
+			.map(|_| ())
+		}
 		Command::Server => subcommands::server::subcommand(&args.project_directory),
 	}
 }
