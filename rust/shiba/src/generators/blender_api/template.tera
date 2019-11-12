@@ -124,7 +124,7 @@ _SHIBA_EXPORT void _shibaViewportRender(float shibaTime, int32_t shibaResolution
 	{
 		{{ opengl_loading }}
 
-		glGetIntegerv(GL_FRAMEBUFFER_BINDING, &shibaFinalFramebufferId);
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING, reinterpret_cast<GLint*>(&shibaFinalFramebufferId));
 		shibaCheckGlError();
 
 		_shibaCommonInitialize(shibaResolutionWidth, shibaResolutionHeight);
