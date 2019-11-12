@@ -34,38 +34,11 @@ impl Default for Cl {
 	}
 }
 
-fn default_crinkler_args() -> Vec<String> {
-	vec![
-		"/ENTRY:main",
-		"/PRIORITY:NORMAL",
-		"/COMPMODE:FAST",
-		"/RANGE:opengl32",
-		"/REPORT:crinkler.html",
-		// "/TRUNCATEFLOATS:16",
-		"/UNSAFEIMPORT",
-		"gdi32.lib",
-		"opengl32.lib",
-		"kernel32.lib",
-		"user32.lib",
-	]
-	.into_iter()
-	.map(|s| s.to_string())
-	.collect()
-}
-
-#[derive(Debug, Deserialize, Hash, Serialize)]
+#[derive(Debug, Default, Deserialize, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Crinkler {
-	#[serde(default = "default_crinkler_args")]
+	#[serde(default)]
 	pub args: Vec<String>,
-}
-
-impl Default for Crinkler {
-	fn default() -> Crinkler {
-		Crinkler {
-			args: default_crinkler_args(),
-		}
-	}
 }
 
 #[derive(Debug, Default, Deserialize, Hash, Serialize)]

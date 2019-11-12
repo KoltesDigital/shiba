@@ -111,7 +111,15 @@ impl<'a> traits::Generator for Generator<'a> {
 			.args(&compilation_descriptor.cl.args)
 			.arg("&&")
 			.arg(&self.crinkler_path)
-			.arg("/OUT:crinkler.exe")
+			.args(vec![
+				"/ENTRY:main",
+				"/OUT:crinkler.exe",
+				"/REPORT:crinkler.html",
+				"gdi32.lib",
+				"kernel32.lib",
+				"opengl32.lib",
+				"user32.lib",
+			])
 			.args(&self.settings.crinkler.args)
 			.args(&compilation_descriptor.crinkler.args)
 			.arg("crinkler.obj")
