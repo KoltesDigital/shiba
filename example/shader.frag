@@ -101,9 +101,9 @@ float floors(float x) {
 	return floor(x) + smoothstep(0.9, 1.0, fract(x));
 }
 
-// RIBBONS
-
 #pragma shiba vertex 0
+
+// RIBBONS
 
 void mainV0() {
 	vec3 position = aPosition;
@@ -127,9 +127,9 @@ void mainF0() {
 	color = colorize();
 }
 
-// PARTICLES
-
 #pragma shiba vertex 1
+
+// PARTICLES
 
 void mainV1() {
 	vec3 position = curve(aPosition.y);
@@ -155,9 +155,9 @@ void mainF1() {
 	color = colorize();
 }
 
-// POST FX
-
 #pragma shiba fragment 2
+
+// POST FX
 
 void mainF2() {
 	vec2 uv = gl_FragCoord.xy / vec2(resolutionWidth, resolutionHeight);
@@ -169,6 +169,4 @@ void mainF2() {
 	
 	image = texture(firstPassTexture, uv + vec2(0.01));
 	color = mix(color, image, smoothstep(0.0, 0.001, image.a));
-
-	//color.a = 1.;
 }

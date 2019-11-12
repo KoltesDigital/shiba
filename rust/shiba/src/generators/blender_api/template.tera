@@ -192,6 +192,7 @@ _SHIBA_EXPORT void _shibaReloadShaderPasses(int count, _ShibaShaderPasses *passe
 
 		{% for uniform_array in uniform_arrays %}
 			shibaUniformLocations[i][{{ loop.index - 1 }}] = glGetUniformLocation(program, "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
+			shibaCheckGlError();
 		{% endfor %}
 
 		shibaLog() << "Uniform locations in pass " << i << ":";

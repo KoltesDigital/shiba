@@ -1,5 +1,7 @@
 {% if passes | length == 1 %}
 
+	shibaLog() << "Loading lone pass.";
+
 	{
 		shibaProgram = glCreateProgram();
 		shibaCheckGlError();
@@ -73,6 +75,7 @@
 
 		{% for uniform_array in uniform_arrays %}
 			shibaUniformLocations[0][{{ loop.index - 1 }}] = glGetUniformLocation(shibaProgram, "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
+			shibaCheckGlError();
 		{% endfor %}
 
 		{% if development %}
@@ -88,6 +91,8 @@
 
 	for (auto i = 0; i < {{ passes | length }}; ++i)
 	{
+		shibaLog() << "Loading pass " << i << ".";
+
 		shibaPrograms[i] = glCreateProgram();
 		shibaCheckGlError();
 
@@ -185,6 +190,7 @@
 
 		{% for uniform_array in uniform_arrays %}
 			shibaUniformLocations[i][{{ loop.index - 1 }}] = glGetUniformLocation(shibaPrograms[i], "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
+			shibaCheckGlError();
 		{% endfor %}
 
 		{% if development %}
