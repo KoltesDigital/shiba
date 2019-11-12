@@ -1,15 +1,20 @@
 use crate::custom_codes::CustomCodes;
-use crate::types::ShaderDescriptor;
+use crate::types::{CompilationDescriptor, ShaderDescriptor};
 use std::hash::Hash;
 use std::path::PathBuf;
 
 pub trait AudioSynthesizer {
-	fn integrate(&self, custom_codes: &mut CustomCodes) -> Result<(), String>;
+	fn integrate(
+		&self,
+		custom_codes: &mut CustomCodes,
+		compilation_descriptor: &mut CompilationDescriptor,
+	) -> Result<(), String>;
 }
 
 pub trait Generator {
 	fn generate(
 		&self,
+		compilation_descriptor: &CompilationDescriptor,
 		custom_codes: &CustomCodes,
 		shader_descriptor: &ShaderDescriptor,
 	) -> Result<(), String>;

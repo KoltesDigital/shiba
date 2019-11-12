@@ -64,3 +64,25 @@ impl ProjectDescriptor {
 		Ok(ProjectDescriptor { settings })
 	}
 }
+
+#[derive(Default)]
+pub struct ClCompilationDescriptor {
+	pub args: Vec<String>,
+}
+
+#[derive(Default)]
+pub struct CrinklerCompilationDescriptor {
+	pub args: Vec<String>,
+}
+
+#[derive(Default)]
+pub struct LinkCompilationDescriptor {
+	pub args: Vec<String>,
+}
+
+#[derive(Default)]
+pub struct CompilationDescriptor {
+	pub cl: ClCompilationDescriptor,
+	pub crinkler: CrinklerCompilationDescriptor,
+	pub link: LinkCompilationDescriptor,
+}

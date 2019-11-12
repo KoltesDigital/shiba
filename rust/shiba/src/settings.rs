@@ -10,6 +10,7 @@ use std::path::Path;
 #[serde(rename_all = "kebab-case", tag = "tool")]
 pub enum AudioSynthesizer {
 	None(audio_synthesizers::none::Settings),
+	Oidos(audio_synthesizers::oidos::Settings),
 }
 
 impl Default for AudioSynthesizer {

@@ -6,7 +6,7 @@ use crate::custom_codes::CustomCodes;
 use crate::generator_utils::cpp;
 use crate::paths::TEMP_DIRECTORY;
 use crate::traits;
-use crate::types::{Pass, ShaderDescriptor, UniformArray};
+use crate::types::{CompilationDescriptor, Pass, ShaderDescriptor, UniformArray};
 use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
@@ -63,6 +63,7 @@ impl<'a> Generator<'a> {
 impl<'a> traits::Generator for Generator<'a> {
 	fn generate(
 		&self,
+		compilation_descriptor: &CompilationDescriptor,
 		custom_codes: &CustomCodes,
 		shader_descriptor: &ShaderDescriptor,
 	) -> Result<(), String> {
@@ -104,10 +105,12 @@ impl<'a> traits::Generator for Generator<'a> {
 			.arg("/Facrinkler.asm")
 			.arg("/Focrinkler.obj")
 			.arg("crinkler.cpp")
+			.args(&compilation_descriptor.cl.args)
 			.arg("&&")
 			.arg(&self.crinkler_path)
 			.arg("/OUT:crinkler.exe")
 			.args(&self.settings.crinkler.args)
+			.args(&compilation_descriptor.crinkler.args)
 			.arg("crinkler.obj")
 			.current_dir(&*TEMP_DIRECTORY)
 			.spawn()

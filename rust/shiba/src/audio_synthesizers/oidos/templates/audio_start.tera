@@ -1,0 +1,3 @@
+Oidos_FillRandomData();
+Oidos_GenerateMusic();
+Oidos_StartMusic();

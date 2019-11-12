@@ -6,7 +6,7 @@ use crate::custom_codes::CustomCodes;
 use crate::generator_utils::cpp;
 use crate::paths::TEMP_DIRECTORY;
 use crate::traits;
-use crate::types::{Pass, ShaderDescriptor, UniformArray};
+use crate::types::{CompilationDescriptor, Pass, ShaderDescriptor, UniformArray};
 use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
@@ -63,6 +63,7 @@ impl<'a> Generator<'a> {
 impl<'a> traits::Generator for Generator<'a> {
 	fn generate(
 		&self,
+		compilation_descriptor: &CompilationDescriptor,
 		custom_codes: &CustomCodes,
 		shader_descriptor: &ShaderDescriptor,
 	) -> Result<(), String> {
@@ -106,6 +107,7 @@ impl<'a> traits::Generator for Generator<'a> {
 				"/I{}",
 				self.glew_path.join("include").to_string_lossy()
 			))
+			.args(&compilation_descriptor.cl.args)
 			.arg("executable.cpp")
 			.arg("&&")
 			.arg("link")
@@ -118,8 +120,9 @@ impl<'a> traits::Generator for Generator<'a> {
 					.join("x64")
 					.join("glew32s.lib")
 					.to_string_lossy()
-					.to_string(),
+					.as_ref(),
 			)
+			.args(&compilation_descriptor.link.args)
 			.arg("executable.obj")
 			.current_dir(&*TEMP_DIRECTORY)
 			.spawn()

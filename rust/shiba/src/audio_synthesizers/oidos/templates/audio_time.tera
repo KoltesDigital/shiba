@@ -1,0 +1,1 @@
+const float shibaTime = Oidos_GetPosition() / Oidos_TicksPerSecond;

@@ -12,8 +12,8 @@
 
 {{ shader_declarations }}
 
-{% if custom_codes.declaration %}
-	{{ custom_codes.declaration }}
+{% if custom_codes.declarations %}
+	{{ custom_codes.declarations }}
 {% endif %}
 
 #define _SHIBA_EXPORT extern "C" __declspec(dllexport)

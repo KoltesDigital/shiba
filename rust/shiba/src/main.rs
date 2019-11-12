@@ -30,6 +30,7 @@ macro_rules! template_enum {
 
 mod audio_synthesizers {
 	pub mod none;
+	pub mod oidos;
 }
 mod configuration;
 mod custom_codes;

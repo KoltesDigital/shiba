@@ -46,8 +46,8 @@ static const PIXELFORMATDESCRIPTOR _shibaPixelFormatDescriptor = {
 	0,
 };
 
-{% if custom_codes.declaration %}
-	{{ custom_codes.declaration }}
+{% if custom_codes.declarations %}
+	{{ custom_codes.declarations }}
 {% endif %}
 
 #pragma code_seg(".main")

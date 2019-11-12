@@ -8,7 +8,7 @@ use crate::shader_minifiers;
 use crate::shader_providers;
 use crate::stored_hash::StoredHash;
 use crate::traits::{AudioSynthesizer, Generator, ShaderMinifier, ShaderProvider};
-use crate::types::ProjectDescriptor;
+use crate::types::{CompilationDescriptor, ProjectDescriptor};
 use std::path::Path;
 use std::time::Instant;
 
@@ -29,11 +29,19 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 
 	let project_descriptor = ProjectDescriptor::load(options.project_directory)?;
 
-	let audio_synthesizer = match &project_descriptor.settings.audio_synthesizer {
-		settings::AudioSynthesizer::None(settings) => {
-			audio_synthesizers::none::AudioSynthesizer::new(settings)
-		}
-	}?;
+	let audio_synthesizer: Box<dyn AudioSynthesizer> =
+		match &project_descriptor.settings.audio_synthesizer {
+			settings::AudioSynthesizer::None(settings) => {
+				Box::new(audio_synthesizers::none::AudioSynthesizer::new(settings)?)
+			}
+			settings::AudioSynthesizer::Oidos(settings) => {
+				Box::new(audio_synthesizers::oidos::AudioSynthesizer::new(
+					options.project_directory,
+					settings,
+					&configuration,
+				)?)
+			}
+		};
 
 	let shader_minifier = project_descriptor
 		.settings
@@ -89,7 +97,9 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 
 	let must_build = options.force || build_hash.has_changed() || !generator.get_path().exists();
 	let result = if must_build {
-		audio_synthesizer.integrate(&mut custom_codes)?;
+		let mut compilation_descriptor = CompilationDescriptor::default();
+
+		audio_synthesizer.integrate(&mut custom_codes, &mut compilation_descriptor)?;
 
 		let mut shader_descriptor = shader_provider.provide()?;
 
@@ -97,7 +107,7 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 			shader_descriptor = shader_minifier.minify(&shader_descriptor)?;
 		}
 
-		generator.generate(&custom_codes, &shader_descriptor)?;
+		generator.generate(&compilation_descriptor, &custom_codes, &shader_descriptor)?;
 
 		let _ = build_hash.store();
 		let _ = cpp_hash.store();

@@ -8,7 +8,7 @@ use crate::shader_minifiers;
 use crate::shader_providers;
 use crate::stored_hash::StoredHash;
 use crate::traits::{Generator, ShaderMinifier, ShaderProvider};
-use crate::types::{Pass, ProjectDescriptor};
+use crate::types::{CompilationDescriptor, Pass, ProjectDescriptor};
 use std::path::Path;
 use std::time::Instant;
 
@@ -105,13 +105,15 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 				&configuration,
 			)?;
 
+			let compilation_descriptor = CompilationDescriptor::default();
+
 			let mut shader_descriptor = shader_provider.provide()?;
 
 			if let Some(shader_minifier) = shader_minifier {
 				shader_descriptor = shader_minifier.minify(&shader_descriptor)?;
 			}
 
-			generator.generate(&custom_codes, &shader_descriptor)?;
+			generator.generate(&compilation_descriptor, &custom_codes, &shader_descriptor)?;
 
 			let _ = build_hash.store();
 			let _ = cpp_hash.store();

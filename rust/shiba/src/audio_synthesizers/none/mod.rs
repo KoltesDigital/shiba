@@ -3,6 +3,7 @@ mod settings;
 pub use self::settings::Settings;
 use crate::custom_codes::CustomCodes;
 use crate::traits;
+use crate::types::CompilationDescriptor;
 use ordered_float::OrderedFloat;
 use serde::Serialize;
 use tera::Tera;
@@ -37,7 +38,11 @@ impl<'a> AudioSynthesizer<'a> {
 }
 
 impl<'a> traits::AudioSynthesizer for AudioSynthesizer<'a> {
-	fn integrate(&self, custom_codes: &mut CustomCodes) -> Result<(), String> {
+	fn integrate(
+		&self,
+		custom_codes: &mut CustomCodes,
+		_compilation_descriptor: &mut CompilationDescriptor,
+	) -> Result<(), String> {
 		let context = Context {
 			speed: self.settings.speed,
 		};
