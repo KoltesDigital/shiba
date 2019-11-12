@@ -114,13 +114,13 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 						state.broadcast(&Event::BlenderApiPath { path: &path })
 					}
 					Command::SetProjectDirectory { path } => {
-						watcher
-							.unwatch(command_project_directory.clone())
-							.expect("Failed to unwatch project directory");
+						if let Err(err) = watcher.unwatch(&command_project_directory) {
+							println!("Failed to unwatch project directory: {}", err);
+						}
 						command_project_directory = PathBuf::from(path);
-						watcher
-							.watch(command_project_directory.clone(), RecursiveMode::Recursive)
-							.expect("Failed to watch project directory");
+						if let Err(err) = watcher.watch(&command_project_directory, RecursiveMode::Recursive) {
+							println!("Failed to watch project directory: {}", err);
+						}
 					}
 				},
 				Err(err) => println!("Error while receiving command: {}", err),

@@ -9,12 +9,8 @@ class RenderEngine(bpy.types.RenderEngine):
     bl_use_preview = True
 
     def __init__(self):
-        tool.register_api_changed(self.__reload_viewport)
+        tool.register_api_changed_callback(self.__reload_viewport)
         self.__tool = tool.instance()
-
-    def __del__(self):
-        if tool.is_active():
-            tool.unregister_api_changed(self.__reload_viewport)
 
     @staticmethod
     def _get_time(depsgraph):

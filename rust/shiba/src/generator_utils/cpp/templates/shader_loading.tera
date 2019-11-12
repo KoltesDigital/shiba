@@ -6,34 +6,36 @@
 		shibaProgram = glCreateProgram();
 		shibaCheckGlError();
 
-		const char *vertexShaderSources[] = {
-			{% if passes[0].vertex %}
-				{% if shader_codes.before_stage_variables %}
-					_shibaShaderBeforeStageVariablesCode,
+		{% if passes[0].vertex or target == "blender_api" %}
+			const char *vertexShaderSources[] = {
+				{% if passes[0].vertex %}
+					{% if shader_codes.before_stage_variables %}
+						_shibaShaderBeforeStageVariablesCode,
+					{% endif %}
+					{% if shader_codes.vertex_specific %}
+						_shibaShaderVertexSpecificCode,
+					{% endif %}
+					{% if shader_codes.after_stage_variables %}
+						_shibaShaderAfterStageVariablesCode,
+					{% endif %}
+					_shibaShaderPassCodes[0],
+				{% elif target == "blender_api" %}
+					_shibaShaderNullVertexCode,
 				{% endif %}
-				{% if shader_codes.vertex_specific %}
-					_shibaShaderVertexSpecificCode,
-				{% endif %}
-				{% if shader_codes.after_stage_variables %}
-					_shibaShaderAfterStageVariablesCode,
-				{% endif %}
-				_shibaShaderPassCodes[0],
-			{% elif blender_api %}
-				_shibaShaderNullVertexCode,
+			};
+
+			GLint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+			glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
+			shibaCheckGlError();
+			glCompileShader(vertexShader);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(vertexShader);
+			glAttachShader(shibaProgram, vertexShader);
+			shibaCheckGlError();
+
+			{% if development %}
+				_shibaVertexShaders[0] = vertexShader;
 			{% endif %}
-		};
-
-		GLint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
-		shibaCheckGlError();
-		glCompileShader(vertexShader);
-		shibaCheckGlError();
-		shibaCheckShaderInfoLog(vertexShader);
-		glAttachShader(shibaProgram, vertexShader);
-		shibaCheckGlError();
-
-		{% if development %}
-			_shibaVertexShaders[0] = vertexShader;
 		{% endif %}
 
 		{% if passes[0].fragment %}

@@ -41,6 +41,7 @@ class LockedFile:
             try:
                 shutil.copy(self.__path, self.__opened_path)
             except FileNotFoundError:
+                print('File does not exist: %s.' % self.__path)
                 return False
             self.__copied = True
 
@@ -57,7 +58,10 @@ class LockedFile:
             self.__on_closed()
             self.__opened = False
 
-        os.remove(self.__opened_path)
+        try:
+            os.remove(self.__opened_path)
+        except PermissionError:
+            pass
         self.__copied = False
 
         return True

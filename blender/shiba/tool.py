@@ -1,4 +1,8 @@
+import bpy
+from bpy.app.handlers import persistent
+from itertools import filterfalse
 import json
+import os.path
 from shiba import paths
 from shiba.api import API
 from shiba.locked_file import LockedFile
@@ -147,35 +151,50 @@ class _Tool:
                 self.__socket.send(b'\n')
 
 
-def _on_api_changed():
-    for on_api_changed in _on_api_changed_list:
-        on_api_changed()
-
-
-def register_api_changed(on_api_changed):
-    _on_api_changed_list.append(on_api_changed)
-
-
-def unregister_api_changed(on_api_changed):
+def _call_callback_and_should_be_removed(callback):
     try:
-        _on_api_changed_list.remove(on_api_changed)
-    except ValueError:
-        pass
+        callback()
+        return False
+    except ReferenceError:
+        return True
+
+
+def _call_api_changed_callbacks():
+    _on_api_changed_callbacks[:] = filterfalse(
+        _call_callback_and_should_be_removed, _on_api_changed_callbacks)
+
+
+def register_api_changed_callback(on_api_changed):
+    _on_api_changed_callbacks.append(on_api_changed)
 
 
 def is_active():
     return _instance is not None
 
 
+def _get_project_path():
+    path = bpy.context.scene.shiba.project_path
+    if os.path.isabs(path):
+        path = os.path.join(bpy.data.filepath, path)
+    return path
+
+
 def instance():
     global _instance
     if _instance is None:
-        _instance = _Tool(_on_api_changed)
+        _instance = _Tool(_call_api_changed_callbacks)
         _instance.update_path()
         _instance.start()
-        _instance.set_project_directory('../example')
+        _instance.set_project_directory(_get_project_path())
         _instance.build()
     return _instance
+
+
+def update_path():
+    if is_active():
+        i = instance()
+        i.set_project_directory(_get_project_path())
+        i.build()
 
 
 def _stop():
@@ -183,7 +202,7 @@ def _stop():
     if _instance is not None:
         instance = _instance
         _instance = None
-        _on_api_changed_list.clear()
+        _on_api_changed_callbacks.clear()
         instance.stop()
 
 
@@ -200,9 +219,15 @@ def unregister():
     _stop()
 
 
-_on_api_changed_list = []
+@persistent
+def load_handler(_dummy):
+    update_path()
+
+
+_on_api_changed_callbacks = []
 _instance = None
 
+bpy.app.handlers.load_post.append(load_handler)
 
 _thread = Thread(
     target=_run_thread

@@ -18,7 +18,7 @@ if __project_path is not None:
     __shiba_path = os.path.join(
         __project_path, 'rust', 'target', 'debug', 'shiba.exe')
 else:
-    __shiba_path = os.path.join(os.path.dirname(__file__), 'shiba')
+    __shiba_path = os.path.join(os.path.dirname(__file__), 'shiba.exe')
 
 
 def shiba():
