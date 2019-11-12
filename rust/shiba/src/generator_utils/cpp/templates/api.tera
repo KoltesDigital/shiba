@@ -20,8 +20,6 @@ public:
 
 {% if development %}
 
-	#define SHIBA_DEVELOPMENT
-
 	#include <iostream>
 	#include <memory>
 	#include <ostream>
@@ -174,7 +172,7 @@ void main()\n{ \
 	gl_Position = vec4(pos, 0., 1.);\n\
 }\n";
 
-	SHIBA_VARIABLE GLint shibaFinalFramebufferId = 0;
+	SHIBA_VARIABLE GLuint shibaFinalFramebufferId = 0;
 
 	SHIBA_VARIABLE GLuint _shibaScreenRectVAO, _shibaScreenRectVBO;
 	static GLfloat _shibaScreenRectPositionBuffer[] = {

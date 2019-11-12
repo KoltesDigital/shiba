@@ -32,8 +32,8 @@ mod audio_synthesizers {
 	pub mod none;
 	pub mod oidos;
 }
+mod code_map;
 mod configuration;
-mod custom_codes;
 mod generators {
 	pub mod blender_api;
 	pub mod crinkler;

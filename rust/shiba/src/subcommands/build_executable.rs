@@ -1,6 +1,6 @@
 use crate::audio_synthesizers;
+use crate::code_map;
 use crate::configuration;
-use crate::custom_codes;
 use crate::generators;
 use crate::paths::LOCAL_DATA_DIRECTORY;
 use crate::settings;
@@ -70,7 +70,8 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 		),
 	};
 
-	let mut custom_codes = custom_codes::load(options.project_directory)?;
+	let project_codes =
+		code_map::load_project_codes(options.project_directory, generator.get_development())?;
 
 	let build_hash_path = LOCAL_DATA_DIRECTORY.join("build.hash");
 	let mut build_hash = StoredHash::new(&build_hash_path);
@@ -84,12 +85,12 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 	{
 		let mut updater = build_hash.get_updater();
 		updater.add(&project_descriptor);
-		updater.add(&custom_codes);
+		updater.add(&project_codes);
 		updater.add(&shader_provider);
 
 		let mut updater = cpp_hash.get_updater();
 		updater.add(&project_descriptor);
-		updater.add(&custom_codes);
+		updater.add(&project_codes);
 
 		let mut updater = glsl_hash.get_updater();
 		updater.add(&shader_provider);
@@ -99,7 +100,7 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 	let result = if must_build {
 		let mut compilation_descriptor = CompilationDescriptor::default();
 
-		audio_synthesizer.integrate(&mut custom_codes, &mut compilation_descriptor)?;
+		let audio_codes = audio_synthesizer.integrate(&mut compilation_descriptor)?;
 
 		let mut shader_descriptor = shader_provider.provide()?;
 
@@ -107,7 +108,12 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 			shader_descriptor = shader_minifier.minify(&shader_descriptor)?;
 		}
 
-		generator.generate(&compilation_descriptor, &custom_codes, &shader_descriptor)?;
+		generator.generate(
+			&audio_codes,
+			&compilation_descriptor,
+			&project_codes,
+			&shader_descriptor,
+		)?;
 
 		let _ = build_hash.store();
 		let _ = cpp_hash.store();

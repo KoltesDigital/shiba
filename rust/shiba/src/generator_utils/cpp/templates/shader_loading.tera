@@ -84,10 +84,6 @@
 		{% endif %}
 	}
 
-	#ifdef SERVER
-		startServerOptions.shibaPrograms = &shibaProgram;
-	#endif
-
 {% else %}
 
 	for (auto i = 0; i < {{ passes | length }}; ++i)
@@ -198,10 +194,6 @@
 			{% endfor %}
 			shibaLog();
 		{% endif %}
-
-		#ifdef SERVER
-		startServerOptions.shibaPrograms = shibaPrograms;
-		#endif
 	}
 
 {% endif %}

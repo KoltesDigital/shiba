@@ -1,8 +1,8 @@
 mod settings;
 
 pub use self::settings::Settings;
+use crate::code_map::CodeMap;
 use crate::configuration::Configuration;
-use crate::custom_codes::CustomCodes;
 use crate::generator_utils::cpp;
 use crate::paths::TEMP_DIRECTORY;
 use crate::traits;
@@ -15,10 +15,10 @@ use tera::Tera;
 #[derive(Serialize)]
 struct Context<'a> {
 	api: &'a String,
-	custom_codes: &'a CustomCodes,
 	opengl_declarations: &'a String,
 	opengl_loading: &'a String,
 	passes: &'a [Pass],
+	project_codes: &'a CodeMap,
 	render: &'a String,
 	shader_declarations: &'a String,
 	shader_loading: &'a String,
@@ -65,23 +65,24 @@ impl<'a> Generator<'a> {
 impl<'a> traits::Generator for Generator<'a> {
 	fn generate(
 		&self,
+		_audio_codes: &CodeMap,
 		compilation_descriptor: &CompilationDescriptor,
-		custom_codes: &CustomCodes,
+		project_codes: &CodeMap,
 		shader_descriptor: &ShaderDescriptor,
 	) -> Result<(), String> {
 		let contents = self.cpp_template_renderer.render(
-			custom_codes,
+			project_codes,
 			shader_descriptor,
-			true,
+			self.get_development(),
 			"blender_api",
 		)?;
 
 		let context = Context {
 			api: &contents.api,
-			custom_codes: &custom_codes,
 			opengl_declarations: &contents.opengl_declarations,
 			opengl_loading: &contents.opengl_loading,
 			passes: &shader_descriptor.passes,
+			project_codes: &project_codes,
 			render: &contents.render,
 			shader_declarations: &contents.shader_declarations,
 			shader_loading: &contents.shader_loading,
@@ -136,6 +137,10 @@ impl<'a> traits::Generator for Generator<'a> {
 		}
 
 		Ok(())
+	}
+
+	fn get_development(&self) -> bool {
+		true
 	}
 
 	fn get_path(&self) -> PathBuf {

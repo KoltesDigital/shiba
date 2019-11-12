@@ -8,7 +8,7 @@ shibaCheckGlError();
 glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, firstPassTextureId, 0);
 shibaCheckGlError();
 
-#ifdef SHIBA_DEVELOPMENT
+{% if development %}
 static bool checked = false;
 if (!checked)
 {
@@ -25,7 +25,7 @@ if (!checked)
 		shibaLog() << "Framebuffer is complete.";
 	}
 }
-#endif
+{% endif %}
 
 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 shibaCheckGlError();
@@ -69,13 +69,15 @@ shibaCheckGlError();
 //shibaCheckGlError();
 glDisable(GL_DEPTH_TEST);
 shibaCheckGlError();
+{% if development %}
 glActiveTexture(GL_TEXTURE0 + 0);
 shibaCheckGlError();
 glBindTexture(GL_TEXTURE_2D, firstPassTextureId);
 shibaCheckGlError();
 glUniform1i(shibaUniformLocations[2][shibaSampler2DUniformLocationIndex], 0);
 shibaCheckGlError();
-glClear(GL_COLOR_BUFFER_BIT);
-shibaCheckGlError();
+{% endif %}
+//glClear(GL_COLOR_BUFFER_BIT);
+//shibaCheckGlError();
 shibaDrawScreenRect();
 shibaCheckGlError();

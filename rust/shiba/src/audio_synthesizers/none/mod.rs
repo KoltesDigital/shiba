@@ -1,7 +1,7 @@
 mod settings;
 
 pub use self::settings::Settings;
-use crate::custom_codes::CustomCodes;
+use crate::code_map::CodeMap;
 use crate::traits;
 use crate::types::CompilationDescriptor;
 use ordered_float::OrderedFloat;
@@ -9,11 +9,11 @@ use serde::Serialize;
 use tera::Tera;
 
 template_enum! {
-	audio_duration: "audio_duration",
-	audio_is_playing: "audio_is_playing",
-	audio_start: "audio_start",
-	audio_time: "audio_time",
 	declarations: "declarations",
+	duration: "duration",
+	initialization: "initialization",
+	is_playing: "is_playing",
+	time_definition: "time_definition",
 }
 
 #[derive(Serialize)]
@@ -40,23 +40,21 @@ impl<'a> AudioSynthesizer<'a> {
 impl<'a> traits::AudioSynthesizer for AudioSynthesizer<'a> {
 	fn integrate(
 		&self,
-		custom_codes: &mut CustomCodes,
 		_compilation_descriptor: &mut CompilationDescriptor,
-	) -> Result<(), String> {
+	) -> Result<CodeMap, String> {
 		let context = Context {
 			speed: self.settings.speed,
 		};
 
+		let mut codes = CodeMap::default();
 		for (name, _) in Template::as_array() {
 			let s = self
 				.tera
 				.render(name, &context)
 				.map_err(|_| format!("Failed to render {}.", name))?;
-			*custom_codes
-				.entry(name.to_string())
-				.or_insert_with(String::new) += s.as_str();
+			codes.insert(name.to_string(), s);
 		}
 
-		Ok(())
+		Ok(codes)
 	}
 }

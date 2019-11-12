@@ -1,8 +1,8 @@
 mod settings;
 
 pub use self::settings::Settings;
+use crate::code_map::CodeMap;
 use crate::configuration::Configuration;
-use crate::custom_codes::CustomCodes;
 use crate::paths::TEMP_DIRECTORY;
 use crate::traits;
 use crate::types::CompilationDescriptor;
@@ -12,11 +12,11 @@ use std::process::Command;
 use tera::Tera;
 
 template_enum! {
-	audio_duration: "audio_duration",
-	audio_is_playing: "audio_is_playing",
-	audio_start: "audio_start",
-	audio_time: "audio_time",
 	declarations: "declarations",
+	duration: "duration",
+	initialization: "initialization",
+	is_playing: "is_playing",
+	time_definition: "time_definition",
 }
 
 #[derive(Serialize)]
@@ -74,9 +74,8 @@ impl<'a> AudioSynthesizer<'a> {
 impl<'a> traits::AudioSynthesizer for AudioSynthesizer<'a> {
 	fn integrate(
 		&self,
-		custom_codes: &mut CustomCodes,
 		compilation_descriptor: &mut CompilationDescriptor,
-	) -> Result<(), String> {
+	) -> Result<CodeMap, String> {
 		let mut conversion = Command::new(&self.python2_path)
 			.arg(
 				self.oidos_path
@@ -130,14 +129,13 @@ impl<'a> traits::AudioSynthesizer for AudioSynthesizer<'a> {
 
 		let context = Context {};
 
+		let mut codes = CodeMap::default();
 		for (name, _) in Template::as_array() {
 			let s = self
 				.tera
 				.render(name, &context)
 				.map_err(|_| format!("Failed to render {}.", name))?;
-			*custom_codes
-				.entry(name.to_string())
-				.or_insert_with(String::new) += s.as_str();
+			codes.insert(name.to_string(), s);
 		}
 
 		compilation_descriptor.cl.args.push(format!(
@@ -158,6 +156,6 @@ impl<'a> traits::AudioSynthesizer for AudioSynthesizer<'a> {
 			.args
 			.push("oidos-random.obj".to_string());
 
-		Ok(())
+		Ok(codes)
 	}
 }

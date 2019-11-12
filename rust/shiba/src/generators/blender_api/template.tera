@@ -12,8 +12,8 @@
 
 {{ shader_declarations }}
 
-{% if custom_codes.declarations %}
-	{{ custom_codes.declarations }}
+{% if project_codes.declarations %}
+	{{ project_codes.declarations }}
 {% endif %}
 
 #define _SHIBA_EXPORT extern "C" __declspec(dllexport)
@@ -32,8 +32,8 @@ static void _shibaCommonInitialize(int32_t shibaResolutionWidth, int32_t shibaRe
 
 	{{ shader_loading }}
 
-	{% if custom_codes.initialization %}
-		{{ custom_codes.initialization }}
+	{% if project_codes.initialization %}
+		{{ project_codes.initialization }}
 	{% endif %}
 }
 

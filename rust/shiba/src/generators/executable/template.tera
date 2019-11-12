@@ -46,8 +46,12 @@ static const PIXELFORMATDESCRIPTOR _shibaPixelFormatDescriptor = {
 	0,
 };
 
-{% if custom_codes.declarations %}
-	{{ custom_codes.declarations }}
+{% if audio_codes.declarations %}
+	{{ audio_codes.declarations }}
+{% endif %}
+
+{% if project_codes.declarations %}
+	{{ project_codes.declarations }}
 {% endif %}
 
 #pragma code_seg(".main")
@@ -103,12 +107,12 @@ void main()
 
 	{{ shader_loading }}
 
-	{% if custom_codes.initialization %}
-		{{ custom_codes.initialization }}
+	{% if project_codes.initialization %}
+		{{ project_codes.initialization }}
 	{% endif %}
 
-	{% if custom_codes.audio_start %}
-		{{ custom_codes.audio_start }}
+	{% if audio_codes.initialization %}
+		{{ audio_codes.initialization }}
 	{% endif %}
 
 	do
@@ -117,8 +121,8 @@ void main()
 		PeekMessage(NULL, NULL, 0, 0, PM_REMOVE);
 		shibaClearWindowsError();
 
-		{% if custom_codes.audio_time %}
-			{{ custom_codes.audio_time }}
+		{% if audio_codes.time_definition %}
+			{{ audio_codes.time_definition }}
 		{% else %}
 			const float shibaTime = 0.;
 		{% endif %}
@@ -131,10 +135,10 @@ void main()
 		{% if settings.close_when_finished %}
 			{% if settings.duration %}
 				time < {{ settings.duration }}
-			{% elif custom_codes.audio_duration %}
-				time < {{ custom_codes.audio_duration }}
-			{% elif custom_codes.audio_is_playing %}
-				{{ custom_codes.audio_is_playing }}
+			{% elif audio_codes.duration %}
+				time < {{ audio_codes.duration }}
+			{% elif audio_codes.is_playing %}
+				{{ audio_codes.is_playing }}
 			{% else %}
 				true
 			{% endif %}

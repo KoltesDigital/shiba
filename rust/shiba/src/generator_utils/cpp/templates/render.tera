@@ -1,5 +1,5 @@
-{% if custom_codes.rendering %}
-	{{ custom_codes.rendering }}
+{% if project_codes.rendering %}
+	{{ project_codes.rendering }}
 {% else %}
 	#ifdef shibaUniformTime
 		shibaUniformTime = shibaTime;

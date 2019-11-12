@@ -1,5 +1,5 @@
+use crate::code_map::CodeMap;
 use crate::configuration::Configuration;
-use crate::custom_codes::CustomCodes;
 use crate::shader_codes::ShaderCodes;
 use crate::types::{Pass, ShaderDescriptor, UniformArray};
 use regex::Regex;
@@ -53,7 +53,7 @@ struct OpenGLLoadingContext<'a> {
 
 #[derive(Serialize)]
 struct RenderContext<'a> {
-	custom_codes: &'a CustomCodes,
+	project_codes: &'a CodeMap,
 	target: &'a str,
 }
 
@@ -143,7 +143,7 @@ impl TemplateRenderer {
 
 	pub fn render(
 		&self,
-		custom_codes: &CustomCodes,
+		project_codes: &CodeMap,
 		shader_descriptor: &ShaderDescriptor,
 		development: bool,
 		target: &str,
@@ -158,7 +158,7 @@ impl TemplateRenderer {
 		let api = self.render_template(Template::API, &api_context)?;
 
 		let render_context = RenderContext {
-			custom_codes: &custom_codes,
+			project_codes: &project_codes,
 			target,
 		};
 		let render = self.render_template(Template::Render, &render_context)?;
@@ -254,7 +254,7 @@ impl TemplateRenderer {
 				parse(&shader_declarations);
 				parse(&shader_loading);
 
-				for code in custom_codes.values() {
+				for code in project_codes.values() {
 					parse(code);
 				}
 			}
