@@ -1,6 +1,0 @@
-name: project
-
-generator:
-  tool: crinkler
-shader-minifier:
-  tool: shader-minifier
