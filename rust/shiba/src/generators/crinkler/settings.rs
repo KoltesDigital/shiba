@@ -42,7 +42,7 @@ pub struct Crinkler {
 }
 
 #[derive(Debug, Default, Deserialize, Hash, Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all(deserialize = "kebab-case", serialize = "snake_case"))]
 pub struct Settings {
 	#[serde(default)]
 	pub close_when_finished: bool,

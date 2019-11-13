@@ -11,29 +11,17 @@ use std::sync::{mpsc::channel, Arc, RwLock};
 use std::thread::spawn;
 use std::time::Duration;
 
-fn default_command_build_blender_api_diff() -> bool {
-	false
-}
-
-fn default_command_build_blender_api_force() -> bool {
-	false
-}
-
-fn default_command_build_executable_force() -> bool {
-	false
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "command")]
 enum Command {
 	BuildBlenderApi {
-		#[serde(default = "default_command_build_blender_api_diff")]
+		#[serde(default)]
 		diff: bool,
-		#[serde(default = "default_command_build_blender_api_force")]
+		#[serde(default)]
 		force: bool,
 	},
 	BuildExecutable {
-		#[serde(default = "default_command_build_executable_force")]
+		#[serde(default)]
 		force: bool,
 	},
 	GetBlenderApiPath,

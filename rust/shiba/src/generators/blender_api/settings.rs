@@ -24,7 +24,7 @@ impl Default for Link {
 }
 
 #[derive(Debug, Default, Deserialize, Hash)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all(deserialize = "kebab-case", serialize = "snake_case"))]
 pub struct Settings {
 	#[serde(default)]
 	pub link: Link,
