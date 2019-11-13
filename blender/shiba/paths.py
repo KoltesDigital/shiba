@@ -1,6 +1,6 @@
-import bpy
 import json
 import os
+from shiba import addon_preferences
 
 # For development purpose, change paths to use paths from the project itself.
 __project_path = None
@@ -22,8 +22,7 @@ else:
 
 
 def shiba():
-    path = bpy.context.preferences.addons[__package__]\
-        .preferences.get('override_shiba_path', None)
+    path = addon_preferences.get('override_shiba_path', None)
     if path:
         return path
 

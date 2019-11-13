@@ -35,12 +35,27 @@ enum Command {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "kebab-case", tag = "result")]
+enum BuildEndedResult<'a> {
+	BlenderApi,
+	Nothing,
+	ShaderPasses { passes: &'a [Pass] },
+}
+
+#[derive(Serialize)]
 #[serde(rename_all = "kebab-case", tag = "event")]
 enum Event<'a> {
-	BlenderApiAvailable,
-	BlenderApiPath { path: &'a Path },
-	Error { message: &'a str },
-	ShaderPassesAvailable { passes: &'a [Pass] },
+	BuildStarted,
+	BuildEnded {
+		#[serde(flatten)]
+		result: BuildEndedResult<'a>,
+	},
+	BlenderApiPath {
+		path: &'a Path,
+	},
+	Error {
+		message: &'a str,
+	},
 }
 
 #[derive(Default)]
@@ -82,43 +97,51 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 			match rx_command.recv() {
 				Ok(command) => match command {
 					Command::BuildBlenderApi { diff, force } => {
-						match subcommands::build_blender_api::subcommand(&subcommands::build_blender_api::Options {
-							diff,
-							force,
-							project_directory: &command_project_directory,
-						}) {
-							Ok(result) => match result {
-								subcommands::build_blender_api::ResultKind::BlenderAPIAvailable => {
-									let mut state = command_state.write().unwrap();
-									state.broadcast(&Event::BlenderApiAvailable)
-								}
-								subcommands::build_blender_api::ResultKind::Nothing => {}
-								subcommands::build_blender_api::ResultKind::ShaderPassesAvailable(passes) => {
-									let mut state = command_state.write().unwrap();
-									state.broadcast(&Event::ShaderPassesAvailable {
-										passes: &passes,
-									});
-								}
+						{
+							let mut state = command_state.write().unwrap();
+							state.broadcast(&Event::BuildStarted)
+						}
+
+						match subcommands::build_blender_api::subcommand(
+							&subcommands::build_blender_api::Options {
+								diff,
+								force,
+								project_directory: &command_project_directory,
 							},
+						) {
+							Ok(result) => {
+								let result = match &result {
+									subcommands::build_blender_api::ResultKind::BlenderAPIAvailable => BuildEndedResult::BlenderApi,
+									subcommands::build_blender_api::ResultKind::Nothing => BuildEndedResult::Nothing,
+									subcommands::build_blender_api::ResultKind::ShaderPassesAvailable(passes) => BuildEndedResult::ShaderPasses{ passes: &passes },
+								};
+
+								let mut state = command_state.write().unwrap();
+								state.broadcast(&Event::BuildEnded { result });
+							}
 							Err(err) => {
 								let mut state = command_state.write().unwrap();
 								state.broadcast(&Event::Error {
 									message: &err.to_string(),
-								})
+								});
 							}
 						}
 					}
+
 					Command::GetBlenderApiPath => {
 						let path = generators::blender_api::Generator::get_path();
 						let mut state = command_state.write().unwrap();
 						state.broadcast(&Event::BlenderApiPath { path: &path })
 					}
+
 					Command::SetProjectDirectory { path } => {
 						if let Err(err) = watcher.unwatch(&command_project_directory) {
 							println!("Failed to unwatch project directory: {}", err);
 						}
 						command_project_directory = PathBuf::from(path);
-						if let Err(err) = watcher.watch(&command_project_directory, RecursiveMode::Recursive) {
+						if let Err(err) =
+							watcher.watch(&command_project_directory, RecursiveMode::Recursive)
+						{
 							println!("Failed to watch project directory: {}", err);
 						}
 					}
