@@ -19,7 +19,11 @@ fn default_command_build_blender_api_force() -> bool {
 	false
 }
 
-#[derive(Deserialize)]
+fn default_command_build_executable_force() -> bool {
+	false
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "command")]
 enum Command {
 	BuildBlenderApi {
@@ -28,24 +32,39 @@ enum Command {
 		#[serde(default = "default_command_build_blender_api_force")]
 		force: bool,
 	},
+	BuildExecutable {
+		#[serde(default = "default_command_build_executable_force")]
+		force: bool,
+	},
 	GetBlenderApiPath,
 	SetProjectDirectory {
 		path: String,
 	},
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "kebab-case", tag = "kind")]
+enum BuildStartedKind {
+	BlenderApi,
+	Executable,
+}
+
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "result")]
 enum BuildEndedResult<'a> {
 	BlenderApi,
+	Executable,
 	Nothing,
 	ShaderPasses { passes: &'a [Pass] },
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "event")]
 enum Event<'a> {
-	BuildStarted,
+	BuildStarted {
+		#[serde(flatten)]
+		kind: BuildStartedKind,
+	},
 	BuildEnded {
 		#[serde(flatten)]
 		result: BuildEndedResult<'a>,
@@ -99,7 +118,9 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 					Command::BuildBlenderApi { diff, force } => {
 						{
 							let mut state = command_state.write().unwrap();
-							state.broadcast(&Event::BuildStarted)
+							state.broadcast(&Event::BuildStarted {
+								kind: BuildStartedKind::BlenderApi,
+							});
 						}
 
 						match subcommands::build_blender_api::subcommand(
@@ -114,6 +135,38 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 									subcommands::build_blender_api::ResultKind::BlenderAPIAvailable => BuildEndedResult::BlenderApi,
 									subcommands::build_blender_api::ResultKind::Nothing => BuildEndedResult::Nothing,
 									subcommands::build_blender_api::ResultKind::ShaderPassesAvailable(passes) => BuildEndedResult::ShaderPasses{ passes: &passes },
+								};
+
+								let mut state = command_state.write().unwrap();
+								state.broadcast(&Event::BuildEnded { result });
+							}
+							Err(err) => {
+								let mut state = command_state.write().unwrap();
+								state.broadcast(&Event::Error {
+									message: &err.to_string(),
+								});
+							}
+						}
+					}
+
+					Command::BuildExecutable { force } => {
+						{
+							let mut state = command_state.write().unwrap();
+							state.broadcast(&Event::BuildStarted {
+								kind: BuildStartedKind::Executable,
+							});
+						}
+
+						match subcommands::build_executable::subcommand(
+							&subcommands::build_executable::Options {
+								force,
+								project_directory: &command_project_directory,
+							},
+						) {
+							Ok(result) => {
+								let result = match &result {
+									subcommands::build_executable::ResultKind::ExecutableAvailable => BuildEndedResult::Executable,
+									subcommands::build_executable::ResultKind::Nothing => BuildEndedResult::Nothing,
 								};
 
 								let mut state = command_state.write().unwrap();

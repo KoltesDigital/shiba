@@ -56,15 +56,22 @@ class _Tool:
 
     def __handle_event(self, obj):
         global _building_count
+        global _building_notification
 
         event = obj['event']
+
         if event == "blender-api-path":
             self.__api.set_path(obj['path'])
+
         if event == "build-started":
             with _building_lock:
                 if _building_count == 0:
+                    kind = obj['kind']
+                    _building_notification = Notification(
+                        "Building %s..." % kind)
                     add_notification(_building_notification)
                 _building_count += 1
+
         if event == "build-ended":
             with _building_lock:
                 _building_count -= 1
@@ -73,8 +80,11 @@ class _Tool:
             result = obj['result']
             if result == "blender-api":
                 self.__api.reload()
+                with self.__lock:
+                    self.__socket.send(b'{"command":"build-executable"}\n')
             if result == 'shader-passes':
                 self.__api.set_shader_passes(obj['passes'])
+
         if event == 'error':
             print('Error: %s' % obj['message'])
 
@@ -299,7 +309,7 @@ _draw_notifications_handler = None
 
 _building_lock = Lock()
 _building_count = None
-_building_notification = Notification("Building...")
+_building_notification = None
 
 bpy.app.handlers.load_post.append(load_handler)
 

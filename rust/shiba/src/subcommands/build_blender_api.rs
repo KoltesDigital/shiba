@@ -56,13 +56,13 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 
 	let project_codes = code_map::load_project_codes(options.project_directory, true)?;
 
-	let build_hash_path = LOCAL_DATA_DIRECTORY.join("build.hash");
+	let build_hash_path = LOCAL_DATA_DIRECTORY.join("blender_api.build.hash");
 	let mut build_hash = StoredHash::new(&build_hash_path);
 
-	let cpp_hash_path = LOCAL_DATA_DIRECTORY.join("cpp.hash");
+	let cpp_hash_path = LOCAL_DATA_DIRECTORY.join("blender_api.cpp.hash");
 	let mut cpp_hash = StoredHash::new(&cpp_hash_path);
 
-	let glsl_hash_path = LOCAL_DATA_DIRECTORY.join("glsl.hash");
+	let glsl_hash_path = LOCAL_DATA_DIRECTORY.join("blender_api.glsl.hash");
 	let mut glsl_hash = StoredHash::new(&glsl_hash_path);
 
 	{

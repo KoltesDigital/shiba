@@ -73,26 +73,13 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 	let project_codes =
 		code_map::load_project_codes(options.project_directory, generator.get_development())?;
 
-	let build_hash_path = LOCAL_DATA_DIRECTORY.join("build.hash");
+	let build_hash_path = LOCAL_DATA_DIRECTORY.join("executable.build.hash");
 	let mut build_hash = StoredHash::new(&build_hash_path);
-
-	let cpp_hash_path = LOCAL_DATA_DIRECTORY.join("cpp.hash");
-	let mut cpp_hash = StoredHash::new(&cpp_hash_path);
-
-	let glsl_hash_path = LOCAL_DATA_DIRECTORY.join("glsl.hash");
-	let mut glsl_hash = StoredHash::new(&glsl_hash_path);
 
 	{
 		let mut updater = build_hash.get_updater();
 		updater.add(&project_descriptor);
 		updater.add(&project_codes);
-		updater.add(&shader_provider);
-
-		let mut updater = cpp_hash.get_updater();
-		updater.add(&project_descriptor);
-		updater.add(&project_codes);
-
-		let mut updater = glsl_hash.get_updater();
 		updater.add(&shader_provider);
 	}
 
@@ -116,8 +103,6 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 		)?;
 
 		let _ = build_hash.store();
-		let _ = cpp_hash.store();
-		let _ = glsl_hash.store();
 
 		ResultKind::ExecutableAvailable
 	} else {
