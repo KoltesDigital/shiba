@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::hash::Hash;
 use std::path::Path;
 
-#[derive(Debug, Default, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Serialize)]
 pub struct Pass {
 	pub fragment: Option<String>,
 	pub vertex: Option<String>,

@@ -7,25 +7,28 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{mpsc::channel, Arc, RwLock};
+use std::sync::{mpsc::channel, Arc, Mutex, RwLock};
 use std::thread::spawn;
 use std::time::Duration;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "command")]
+struct SetBuildExecutableCommand {
+	build_executable: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "command")]
 enum Command {
-	BuildBlenderApi {
+	Build {
 		#[serde(default)]
 		diff: bool,
 		#[serde(default)]
 		force: bool,
 	},
-	BuildExecutable {
-		#[serde(default)]
-		force: bool,
-	},
 	GetBlenderApiPath,
 	GetExecutableSize,
+	SetBuildExecutable(SetBuildExecutableCommand),
 	SetProjectDirectory {
 		path: String,
 	},
@@ -33,40 +36,27 @@ enum Command {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "kind")]
-enum BuildStartedKind {
+enum BuildStartedWhat {
 	BlenderApi,
 	Executable,
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "kebab-case", tag = "result")]
-enum BuildEndedResult<'a> {
+#[serde(rename_all = "kebab-case", tag = "kind")]
+enum BuildEndedWhat {
 	BlenderApi,
 	Executable,
-	Nothing,
-	ShaderPasses { passes: &'a [Pass] },
+	ShaderPasses { passes: Vec<Pass> },
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "event")]
 enum Event<'a> {
-	BuildStarted {
-		#[serde(flatten)]
-		kind: BuildStartedKind,
-	},
-	BuildEnded {
-		#[serde(flatten)]
-		result: BuildEndedResult<'a>,
-	},
-	BlenderApiPath {
-		path: &'a Path,
-	},
-	Error {
-		message: &'a str,
-	},
-	ExecutableSize {
-		size: u64,
-	},
+	BuildStarted { what: &'a [BuildStartedWhat] },
+	BuildEnded { what: &'a [BuildEndedWhat] },
+	BlenderApiPath { path: &'a Path },
+	Error { message: &'a str },
+	ExecutableSize { size: u64 },
 }
 
 #[derive(Default)]
@@ -98,6 +88,9 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 	let command_state = state.clone();
 	let mut command_project_directory = project_directory.to_path_buf();
 	spawn(move || {
+		let command_build_blender_api = true;
+		let mut command_build_executable = false;
+
 		let mut watcher: RecommendedWatcher =
 			Watcher::new(tx_watcher, Duration::from_secs_f32(0.1))
 				.expect("Failed to create watcher.");
@@ -107,70 +100,91 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 		loop {
 			match rx_command.recv() {
 				Ok(command) => match command {
-					Command::BuildBlenderApi { diff, force } => {
+					Command::Build { diff, force } => {
+						let mut threads = vec![];
+						let mut started_what = vec![];
+						let ended_what = Arc::new(Mutex::new(vec![]));
+
+						if command_build_blender_api {
+							started_what.push(BuildStartedWhat::BlenderApi);
+							let command_state = command_state.clone();
+							let command_project_directory = command_project_directory.clone();
+							let ended_what = ended_what.clone();
+							let thread = spawn(move || {
+								match subcommands::build_blender_api::subcommand(
+									&subcommands::build_blender_api::Options {
+										diff,
+										force,
+										project_directory: &command_project_directory,
+									},
+								) {
+									Ok(result) => {
+										let result = match &result {
+									subcommands::build_blender_api::ResultKind::BlenderAPIAvailable => Some(BuildEndedWhat::BlenderApi),
+									subcommands::build_blender_api::ResultKind::Nothing => None,
+									subcommands::build_blender_api::ResultKind::ShaderPassesAvailable(passes) => Some(BuildEndedWhat::ShaderPasses{ passes: passes.to_vec() }),
+								};
+
+										if let Some(result) = result {
+											let mut ended_what = ended_what.lock().unwrap();
+											ended_what.push(result);
+										}
+									}
+									Err(err) => {
+										let mut state = command_state.write().unwrap();
+										state.broadcast(&Event::Error { message: &err });
+									}
+								}
+							});
+							threads.push(thread);
+						}
+
+						if command_build_executable {
+							started_what.push(BuildStartedWhat::Executable);
+							let command_state = command_state.clone();
+							let command_project_directory = command_project_directory.clone();
+							let ended_what = ended_what.clone();
+							let thread = spawn(move || {
+								match subcommands::build_executable::subcommand(
+									&subcommands::build_executable::Options {
+										force,
+										project_directory: &command_project_directory,
+									},
+								) {
+									Ok(result) => {
+										let result = match &result {
+									subcommands::build_executable::ResultKind::ExecutableAvailable => Some(BuildEndedWhat::Executable),
+									subcommands::build_executable::ResultKind::Nothing => None,
+								};
+
+										if let Some(result) = result {
+											let mut ended_what = ended_what.lock().unwrap();
+											ended_what.push(result);
+										}
+									}
+									Err(err) => {
+										let mut state = command_state.write().unwrap();
+										state.broadcast(&Event::Error { message: &err });
+									}
+								}
+							});
+							threads.push(thread);
+						}
+
 						{
 							let mut state = command_state.write().unwrap();
 							state.broadcast(&Event::BuildStarted {
-								kind: BuildStartedKind::BlenderApi,
+								what: &started_what,
 							});
 						}
 
-						match subcommands::build_blender_api::subcommand(
-							&subcommands::build_blender_api::Options {
-								diff,
-								force,
-								project_directory: &command_project_directory,
-							},
-						) {
-							Ok(result) => {
-								let result = match &result {
-									subcommands::build_blender_api::ResultKind::BlenderAPIAvailable => BuildEndedResult::BlenderApi,
-									subcommands::build_blender_api::ResultKind::Nothing => BuildEndedResult::Nothing,
-									subcommands::build_blender_api::ResultKind::ShaderPassesAvailable(passes) => BuildEndedResult::ShaderPasses{ passes: &passes },
-								};
-
-								let mut state = command_state.write().unwrap();
-								state.broadcast(&Event::BuildEnded { result });
-							}
-							Err(err) => {
-								let mut state = command_state.write().unwrap();
-								state.broadcast(&Event::Error {
-									message: &err.to_string(),
-								});
-							}
-						}
-					}
-
-					Command::BuildExecutable { force } => {
-						{
-							let mut state = command_state.write().unwrap();
-							state.broadcast(&Event::BuildStarted {
-								kind: BuildStartedKind::Executable,
-							});
+						for thread in threads {
+							thread.join().unwrap();
 						}
 
-						match subcommands::build_executable::subcommand(
-							&subcommands::build_executable::Options {
-								force,
-								project_directory: &command_project_directory,
-							},
-						) {
-							Ok(result) => {
-								let result = match &result {
-									subcommands::build_executable::ResultKind::ExecutableAvailable => BuildEndedResult::Executable,
-									subcommands::build_executable::ResultKind::Nothing => BuildEndedResult::Nothing,
-								};
-
-								let mut state = command_state.write().unwrap();
-								state.broadcast(&Event::BuildEnded { result });
-							}
-							Err(err) => {
-								let mut state = command_state.write().unwrap();
-								state.broadcast(&Event::Error {
-									message: &err.to_string(),
-								});
-							}
-						}
+						let mut state = command_state.write().unwrap();
+						let ended_what = ended_what.lock().unwrap();
+						state.broadcast(&Event::BuildEnded { what: &ended_what });
 					}
 
 					Command::GetBlenderApiPath => {
@@ -192,6 +206,10 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 								});
 							}
 						}
+					}
+
+					Command::SetBuildExecutable(SetBuildExecutableCommand { build_executable }) => {
+						command_build_executable = build_executable;
 					}
 
 					Command::SetProjectDirectory { path } => {
@@ -220,7 +238,7 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 				| DebouncedEvent::Rename(_, _)
 				| DebouncedEvent::Rescan
 				| DebouncedEvent::Write(_) => {
-					let _ = watcher_tx_command.send(Command::BuildBlenderApi {
+					let _ = watcher_tx_command.send(Command::Build {
 						diff: true,
 						force: false,
 					});

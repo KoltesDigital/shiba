@@ -71,9 +71,11 @@ class _Tool:
         if event == "build-started":
             with _building_lock:
                 if _building_count == 0:
-                    kind = obj['kind']
+                    what = obj['what']
+                    what_str = " + ".join(
+                        map(lambda what_item: what_item['kind'], what))
                     _building_notification = Notification(
-                        "Building %s..." % kind)
+                        "Building %s..." % what_str)
                     add_notification(_building_notification)
                 _building_count += 1
 
@@ -82,16 +84,17 @@ class _Tool:
                 _building_count -= 1
                 if _building_count == 0:
                     remove_notification(_building_notification)
-            result = obj['result']
-            if result == "blender-api":
-                self.__api.reload()
-                with self.__lock:
-                    self.__socket.send(b'{"command":"build-executable"}\n')
-            if result == "executable":
-                with self.__lock:
-                    self.__socket.send(b'{"command":"get-executable-size"}\n')
-            if result == 'shader-passes':
-                self.__api.set_shader_passes(obj['passes'])
+            what = obj['what']
+            for what_item in what:
+                kind = what_item['kind']
+                if kind == "blender-api":
+                    self.__api.reload()
+                if kind == "executable":
+                    with self.__lock:
+                        self.__socket.send(
+                            b'{"command":"get-executable-size"}\n')
+                if kind == 'shader-passes':
+                    self.__api.set_shader_passes(what_item['passes'])
 
         if event == 'error':
             print('Error: %s' % obj['message'])
@@ -169,7 +172,7 @@ class _Tool:
 
         print("Shiba stopped.")
 
-    def update_path(self):
+    def update_shiba_path(self):
         with self.__lock:
             self.__locked_file.set_path(paths.shiba())
 
@@ -184,7 +187,18 @@ class _Tool:
     def build(self):
         with self.__lock:
             if self.__socket:
-                self.__socket.send(b'{"command":"build-blender-api"}\n')
+                self.__socket.send(b'{"command":"build"}\n')
+
+    def set_build_executable(self, build_executable):
+        with self.__lock:
+            if self.__socket:
+                message = {
+                    "command": "set-build-executable",
+                    "build-executable": build_executable,
+                }
+                message_as_bytes = str.encode(json.dumps(message))
+                self.__socket.send(message_as_bytes)
+                self.__socket.send(b'\n')
 
     def set_project_directory(self, path):
         with self.__lock:
@@ -219,10 +233,9 @@ def is_active():
     return _instance is not None
 
 
-def _get_project_path():
-    path = bpy.context.scene.shiba.project_path
-    if os.path.isabs(path):
-        path = os.path.join(bpy.data.filepath, path)
+def _get_project_directory():
+    path = bpy.context.scene.shiba.project_directory
+    path = os.path.realpath(bpy.path.abspath(path))
     return path
 
 
@@ -230,17 +243,26 @@ def instance():
     global _instance
     if _instance is None:
         _instance = _Tool(_call_api_changed_callbacks)
-        _instance.update_path()
+        _instance.update_shiba_path()
         _instance.start()
-        _instance.set_project_directory(_get_project_path())
+        _instance.set_build_executable(
+            bpy.context.scene.shiba.build_executable)
+        _instance.set_project_directory(_get_project_directory())
         _instance.build()
     return _instance
 
 
-def update_path():
+def update_build_executable():
     if is_active():
         i = instance()
-        i.set_project_directory(_get_project_path())
+        i.set_build_executable(bpy.context.scene.shiba.build_executable)
+        i.build()
+
+
+def update_project_directory():
+    if is_active():
+        i = instance()
+        i.set_project_directory(_get_project_directory())
         i.build()
 
 
@@ -316,7 +338,7 @@ def unregister():
 
 @persistent
 def load_handler(_dummy):
-    update_path()
+    update_project_directory()
 
 
 _on_api_changed_callbacks = []

@@ -13,7 +13,8 @@ class AddProjectPreset(AddPresetBase, Operator):
     ]
 
     preset_values = [
-        "render_settings.project_path",
+        "render_settings.build_executable",
+        "render_settings.project_directory",
     ]
 
     preset_subdir = "shiba/project"

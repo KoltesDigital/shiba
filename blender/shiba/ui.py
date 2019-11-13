@@ -38,4 +38,5 @@ class SHIBA_RENDER_PT_project(_Panel, Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        layout.prop(render_settings, 'project_path')
+        layout.prop(render_settings, 'project_directory')
+        layout.prop(render_settings, 'build_executable')
