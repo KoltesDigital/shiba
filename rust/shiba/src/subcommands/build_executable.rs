@@ -9,6 +9,7 @@ use crate::shader_providers;
 use crate::stored_hash::StoredHash;
 use crate::traits::{AudioSynthesizer, Generator, ShaderMinifier, ShaderProvider};
 use crate::types::{CompilationDescriptor, ProjectDescriptor};
+use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
@@ -113,4 +114,25 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 	println!("Build duration: {:?}", duration);
 
 	Ok(result)
+}
+
+pub fn get_path(project_directory: &Path) -> Result<u64, String> {
+	let configuration = configuration::load()?;
+
+	let project_descriptor = ProjectDescriptor::load(project_directory)?;
+
+	let generator: Box<dyn Generator> = match &project_descriptor.settings.generator {
+		settings::Generator::Crinkler(settings) => Box::new(generators::crinkler::Generator::new(
+			settings,
+			&configuration,
+		)?),
+		settings::Generator::Executable(settings) => Box::new(
+			generators::executable::Generator::new(settings, &configuration)?,
+		),
+	};
+
+	let metadata =
+		fs::metadata(&generator.get_path()).map_err(|_| "Failed to retrieve metadata.")?;
+
+	Ok(metadata.len())
 }

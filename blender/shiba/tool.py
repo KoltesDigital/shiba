@@ -14,11 +14,16 @@ import time
 
 
 class Notification:
-    def __init__(self, message):
+    def __init__(self, message, duration=None):
         self.__message = message
+        self.__duration = duration
 
     def __str__(self):
         return self.__message
+
+    @property
+    def duration(self):
+        return self.__duration
 
 
 class _Tool:
@@ -82,11 +87,18 @@ class _Tool:
                 self.__api.reload()
                 with self.__lock:
                     self.__socket.send(b'{"command":"build-executable"}\n')
+            if result == "executable":
+                with self.__lock:
+                    self.__socket.send(b'{"command":"get-executable-size"}\n')
             if result == 'shader-passes':
                 self.__api.set_shader_passes(obj['passes'])
 
         if event == 'error':
             print('Error: %s' % obj['message'])
+
+        if event == "executable-size":
+            size = obj['size']
+            add_notification(Notification("Executable size: %d" % size, 5))
 
     def __run_socket_thread(self):
         buffer = bytearray()
@@ -269,6 +281,14 @@ def add_notification(notification):
         _notifications.append(notification)
     _call_api_changed_callbacks()
 
+    if notification.duration is not None:
+        def _run_thread_wait_and_remove_notification():
+            time.sleep(notification.duration)
+            remove_notification(notification)
+
+        thread = Thread(target=_run_thread_wait_and_remove_notification)
+        thread.start()
+
 
 def remove_notification(notification):
     with _notifications_lock:
@@ -283,9 +303,8 @@ def register():
 
     _building_count = 0
     _notifications = []
-    _draw_notifications_handler = \
-        bpy.types.SpaceView3D.draw_handler_add(
-            _draw_notifications, (), 'WINDOW', 'POST_PIXEL')
+    _draw_notifications_handler = bpy.types.SpaceView3D.draw_handler_add(
+        _draw_notifications, (), 'WINDOW', 'POST_PIXEL')
 
 
 def unregister():

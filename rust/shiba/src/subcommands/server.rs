@@ -37,6 +37,7 @@ enum Command {
 		force: bool,
 	},
 	GetBlenderApiPath,
+	GetExecutableSize,
 	SetProjectDirectory {
 		path: String,
 	},
@@ -74,6 +75,9 @@ enum Event<'a> {
 	},
 	Error {
 		message: &'a str,
+	},
+	ExecutableSize {
+		size: u64,
 	},
 }
 
@@ -185,6 +189,21 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 						let path = generators::blender_api::Generator::get_path();
 						let mut state = command_state.write().unwrap();
 						state.broadcast(&Event::BlenderApiPath { path: &path })
+					}
+
+					Command::GetExecutableSize => {
+						match subcommands::build_executable::get_path(&command_project_directory) {
+							Ok(size) => {
+								let mut state = command_state.write().unwrap();
+								state.broadcast(&Event::ExecutableSize { size });
+							}
+							Err(err) => {
+								let mut state = command_state.write().unwrap();
+								state.broadcast(&Event::Error {
+									message: &err.to_string(),
+								});
+							}
+						}
 					}
 
 					Command::SetProjectDirectory { path } => {
