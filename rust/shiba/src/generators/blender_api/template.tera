@@ -129,7 +129,15 @@ _SHIBA_EXPORT void _shibaViewportRender(float shibaTime, int32_t shibaResolution
 
 		_shibaCommonInitialize(shibaResolutionWidth, shibaResolutionHeight);
 
+		glBindFramebuffer(GL_FRAMEBUFFER, shibaFinalFramebufferId);
+		shibaCheckGlError();
+
 		_shibaIsInitialized = true;
+	}
+	else
+	{
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING, reinterpret_cast<GLint*>(&shibaFinalFramebufferId));
+		shibaCheckGlError();
 	}
 
 	// Viewport sets a different default clear color.
