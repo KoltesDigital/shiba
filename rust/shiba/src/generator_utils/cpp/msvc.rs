@@ -3,11 +3,17 @@ use serde_json;
 use std::process::Command;
 use std::str;
 
+fn default_true() -> bool {
+	true
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct VSWhereItem {
 	pub installation_path: String,
+	#[serde(default = "default_true")]
 	pub is_complete: bool,
+	#[serde(default = "default_true")]
 	pub is_launchable: bool,
 }
 
