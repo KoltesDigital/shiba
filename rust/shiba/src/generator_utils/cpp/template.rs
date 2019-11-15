@@ -118,8 +118,11 @@ impl TemplateRenderer {
 				let new = match old.as_str() {
 					"bool" => "GLint",
 					"int" => "GLint",
-					"uint" => "GLuint",
 					"float" => "GLfloat",
+					"mat2" => "ShibaMat2",
+					"mat3" => "ShibaMat3",
+					"mat4" => "ShibaMat4",
+					"uint" => "GLuint",
 					_ => "GLint",
 				};
 				Ok(Value::String(new.to_string()))

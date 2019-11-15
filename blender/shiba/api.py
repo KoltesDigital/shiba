@@ -8,6 +8,7 @@ from threading import Lock
 
 class _ToUpdate:
     def __init__(self):
+        self.object_instances = None
         self.shader_passes = None
 
 
@@ -51,6 +52,12 @@ class API:
             self.__locked_file.set_path(path)
             self.__on_changed()
 
+    def set_object_instances(self, object_instances):
+        with self.__lock:
+            self.__to_update.object_instances = object_instances
+            self.__viewport_to_update.object_instances = object_instances
+            self.__on_changed()
+
     def set_shader_passes(self, passes):
         with self.__lock:
             self.__to_update.shader_passes = passes
@@ -58,6 +65,15 @@ class API:
             self.__on_changed()
 
     def _execute_updates(self, to_update):
+        if to_update.object_instances:
+            for object_instance in to_update.object_instances:
+                self.__library._shibaUpdateObject(
+                    ctypes.c_char_p(
+                        object_instance.object.name.encode('utf-8')),
+                    _to_c_matrix(object_instance.matrix_world),
+                )
+            to_update.object_instances = None
+
         if to_update.shader_passes:
             def to_char_p(d, key):
                 value = d.get(key, None)
@@ -75,7 +91,7 @@ class API:
             )
                 for shader_pass in to_update.shader_passes]
             passes = ShaderPasses(*array)
-            self.__library._shibaReloadShaderPasses(
+            self.__library._shibaUpdateShaderPasses(
                 count,
                 passes,
             )
@@ -109,6 +125,11 @@ class API:
         with self.__lock:
             if not self.__locked_file.opened:
                 return
+
+            self.__library._shibaEnsureIsInitialized(
+                ctypes.c_int32(width),
+                ctypes.c_int32(height),
+            )
 
             self._execute_updates(self.__to_update)
 
@@ -146,6 +167,11 @@ class API:
             if not self.__locked_file.opened:
                 return
 
+            self.__library._shibaViewportEnsureIsInitialized(
+                ctypes.c_int32(width),
+                ctypes.c_int32(height),
+            )
+
             self._execute_updates(self.__viewport_to_update)
 
             self.__library._shibaViewportRender(
@@ -153,3 +179,37 @@ class API:
                 ctypes.c_int32(width),
                 ctypes.c_int32(height),
             )
+
+    def set_viewport_matrices(self, view_matrix, projection_matrix):
+        with self.__lock:
+            if not self.__locked_file.opened:
+                return
+
+            self.__library._shibaSetViewportMatrices(
+                _to_c_matrix(view_matrix),
+                _to_c_matrix(projection_matrix),
+            )
+
+
+_Matrix = ctypes.c_float * 16
+
+
+def _to_c_matrix(matrix):
+    return _Matrix(
+        matrix[0][0],
+        matrix[1][0],
+        matrix[2][0],
+        matrix[3][0],
+        matrix[0][1],
+        matrix[1][1],
+        matrix[2][1],
+        matrix[3][1],
+        matrix[0][2],
+        matrix[1][2],
+        matrix[2][2],
+        matrix[3][2],
+        matrix[0][3],
+        matrix[1][3],
+        matrix[2][3],
+        matrix[3][3],
+    )

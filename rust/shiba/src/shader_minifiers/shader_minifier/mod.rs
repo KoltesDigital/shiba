@@ -132,23 +132,23 @@ impl traits::ShaderMinifier for ShaderMinifier {
 					let code = Some(code);
 
 					match next_section {
-						Section::Attributes => sections.attributes = code,
+						Directive::Attributes => sections.attributes = code,
 
-						Section::Common => sections.common = code,
+						Directive::Common => sections.common = code,
 
-						Section::Fragment(index) => {
+						Directive::Fragment(index) => {
 							passes[index].fragment = code;
 						}
 
-						Section::Outputs => sections.outputs = code,
+						Directive::Outputs => sections.outputs = code,
 
-						Section::UniformArrays => uniform_arrays_string = code,
+						Directive::UniformArrays => uniform_arrays_string = code,
 
-						Section::Variables => non_uniform_variables_string = code,
+						Directive::Variables => non_uniform_variables_string = code,
 
-						Section::Varyings => sections.varyings = code,
+						Directive::Varyings => sections.varyings = code,
 
-						Section::Vertex(index) => {
+						Directive::Vertex(index) => {
 							passes[index].vertex = code;
 						}
 					}

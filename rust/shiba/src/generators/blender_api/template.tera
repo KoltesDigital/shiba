@@ -18,12 +18,8 @@
 
 #define _SHIBA_EXPORT extern "C" __declspec(dllexport)
 
-static void _shibaCommonRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+static void _shibaCommonUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
-	glViewport(0, 0, shibaResolutionWidth, shibaResolutionHeight);
-	shibaCheckGlError();
-
-	{{ render }}
 }
 
 static void _shibaCommonInitialize(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
@@ -32,17 +28,19 @@ static void _shibaCommonInitialize(int32_t shibaResolutionWidth, int32_t shibaRe
 
 	{{ shader_loading }}
 
+	_shibaObjectMatrices.reset(new std::map<std::string, ShibaMat4>{});
+
 	{% if project_codes.initialization %}
 		{{ project_codes.initialization }}
 	{% endif %}
 }
 
-SHIBA_VARIABLE bool _shibaIsInitialized = false;
-SHIBA_VARIABLE GLuint _shibaFinalFramebufferId;
-SHIBA_VARIABLE GLuint _shibaFinalFramebufferTextureId;
-
-static void _shibaCommonUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+static void _shibaCommonRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
+	glViewport(0, 0, shibaResolutionWidth, shibaResolutionHeight);
+	shibaCheckGlError();
+
+	{{ render }}
 }
 
 _SHIBA_EXPORT void _shibaUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
@@ -50,7 +48,7 @@ _SHIBA_EXPORT void _shibaUpdate(float shibaTime, int32_t shibaResolutionWidth, i
 	_shibaCommonUpdate(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
 }
 
-_SHIBA_EXPORT void _shibaRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
+_SHIBA_EXPORT void _shibaEnsureIsInitialized(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
 {
 	_shibaStandaloneContext.use();
 
@@ -104,7 +102,10 @@ _SHIBA_EXPORT void _shibaRender(float shibaTime, int32_t shibaResolutionWidth, i
 		glBindFramebuffer(GL_FRAMEBUFFER, shibaFinalFramebufferId);
 		shibaCheckGlError();
 	}
+}
 
+_SHIBA_EXPORT void _shibaRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
+{
 	_shibaCommonRender(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
 
 	glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -118,7 +119,7 @@ _SHIBA_EXPORT void _shibaViewportUpdate(float shibaTime, int32_t shibaResolution
 	_shibaCommonUpdate(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
 }
 
-_SHIBA_EXPORT void _shibaViewportRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+_SHIBA_EXPORT void _shibaViewportEnsureIsInitialized(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
 	if (!_shibaIsInitialized)
 	{
@@ -139,12 +140,20 @@ _SHIBA_EXPORT void _shibaViewportRender(float shibaTime, int32_t shibaResolution
 		glGetIntegerv(GL_FRAMEBUFFER_BINDING, reinterpret_cast<GLint*>(&shibaFinalFramebufferId));
 		shibaCheckGlError();
 	}
+}
 
+_SHIBA_EXPORT void _shibaViewportRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+{
 	// Viewport sets a different default clear color.
 	glClearColor(0.f, 0.f, 0.f, 0.f);
 	shibaCheckGlError();
 
 	_shibaCommonRender(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
+}
+
+_SHIBA_EXPORT void _shibaUpdateObject(const char *name, ShibaMat4 worldMatrix)
+{
+	shibaObjectMatrices[name] = worldMatrix;
 }
 
 struct _ShibaShaderPasses
@@ -153,7 +162,7 @@ struct _ShibaShaderPasses
 	const char *fragment;
 };
 
-_SHIBA_EXPORT void _shibaReloadShaderPasses(int count, _ShibaShaderPasses *passes)
+_SHIBA_EXPORT void _shibaUpdateShaderPasses(int count, _ShibaShaderPasses *passes)
 {
 	if (count != {{ passes | length }})
 	{
@@ -209,6 +218,13 @@ _SHIBA_EXPORT void _shibaReloadShaderPasses(int count, _ShibaShaderPasses *passe
 		{% endfor %}
 		shibaLog();
 	}
+}
+
+_SHIBA_EXPORT void _shibaSetViewportMatrices(ShibaMat4 viewMatrix, ShibaMat4 projectionMatrix)
+{
+	shibaViewportMatricesSet = true;
+	shibaViewportViewMatrix = viewMatrix;
+	shibaViewportProjectionMatrix = projectionMatrix;
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)

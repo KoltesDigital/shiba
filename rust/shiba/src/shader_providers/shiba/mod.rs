@@ -41,7 +41,7 @@ fn ensure_passes_has_index(shader_descriptor: &mut ShaderDescriptor, index: usiz
 	}
 }
 
-fn parse(code: &str) -> Result<ShaderDescriptor, String> {
+fn parse(code: &str, development: bool) -> Result<ShaderDescriptor, String> {
 	let (input, (glsl_version, sections)) =
 		parsers::contents(code).map_err(|_| "Parsing error.".to_string())?;
 
@@ -51,7 +51,8 @@ fn parse(code: &str) -> Result<ShaderDescriptor, String> {
 	};
 
 	let mut prolog_code = None;
-	let next_section = Cell::from(Section::Prolog);
+	let next_append_enable = Cell::from(true);
+	let next_section = Cell::from(Directive::Prolog);
 
 	let mut process_code = |code| {
 		lazy_static! {
@@ -68,35 +69,47 @@ fn parse(code: &str) -> Result<ShaderDescriptor, String> {
 		let code = MAIN_RE.replace_all(&code, "void main()");
 		let code = code.trim();
 		if !code.is_empty() {
-			let code = Some(code.to_string());
+			let append = |section: &mut Option<String>| {
+				if next_append_enable.get() {
+					section.get_or_insert(String::new()).push_str(code);
+				}
+			};
 
 			match next_section.get() {
-				Section::Attributes => shader_descriptor.sections.attributes = code,
+				Directive::Attributes => append(&mut shader_descriptor.sections.attributes),
 
-				Section::Common => shader_descriptor.sections.common = code,
+				Directive::Common => append(&mut shader_descriptor.sections.common),
 
-				Section::Fragment(index) => {
+				Directive::Fragment(index) => {
 					ensure_passes_has_index(&mut shader_descriptor, index);
-					shader_descriptor.passes[index].fragment = code;
+					append(&mut shader_descriptor.passes[index].fragment);
 				}
 
-				Section::Outputs => shader_descriptor.sections.outputs = code,
+				Directive::Outputs => append(&mut shader_descriptor.sections.outputs),
 
-				Section::Prolog => prolog_code = code,
+				Directive::Prolog => append(&mut prolog_code),
 
-				Section::Varyings => shader_descriptor.sections.varyings = code,
+				Directive::Varyings => append(&mut shader_descriptor.sections.varyings),
 
-				Section::Vertex(index) => {
+				Directive::Vertex(index) => {
 					ensure_passes_has_index(&mut shader_descriptor, index);
-					shader_descriptor.passes[index].vertex = code;
+					append(&mut shader_descriptor.passes[index].vertex);
 				}
+
+				_ => unreachable!(),
 			}
 		}
 	};
 
-	for (code, section) in sections {
+	let process_directive = |directive| match directive {
+		Directive::Always => next_append_enable.set(true),
+		Directive::Development => next_append_enable.set(development),
+		directive => next_section.set(directive),
+	};
+
+	for (code, directive) in sections {
 		process_code(code);
-		next_section.set(section);
+		process_directive(directive);
 	}
 
 	process_code(input);
@@ -111,8 +124,8 @@ fn parse(code: &str) -> Result<ShaderDescriptor, String> {
 }
 
 impl traits::ShaderProvider for ShaderProvider {
-	fn provide(&self) -> Result<ShaderDescriptor, String> {
-		let mut shader_descriptor = parse(&self.shader_contents)?;
+	fn provide(&self, development: bool) -> Result<ShaderDescriptor, String> {
+		let mut shader_descriptor = parse(&self.shader_contents, development)?;
 
 		if shader_descriptor.passes.is_empty() {
 			return Err("Shader should define at least one pass.".to_string());
@@ -257,6 +270,7 @@ vertex code
 #pragma shiba fragment 0
 fragment code
 "#,
+			false,
 		)
 		.unwrap();
 
@@ -321,6 +335,100 @@ fragment code
 						name: "uniformVar2".to_string(),
 						type_name: "vec2".to_string(),
 					}
+				],
+				..Default::default()
+			}
+		);
+	}
+
+	#[test]
+	fn test_parse_development_false() {
+		let shader_descriptor = parse(
+			r#"#version 450
+float first;
+#pragma shiba development
+float second;
+#pragma shiba always
+float third;
+"#,
+			false,
+		)
+		.unwrap();
+
+		assert_eq!(
+			shader_descriptor,
+			ShaderDescriptor {
+				glsl_version: Some("450".to_string()),
+				passes: vec![],
+				sections: Sections::default(),
+				variables: vec![
+					Variable {
+						active: true,
+						kind: VariableKind::Regular,
+						length: None,
+						minified_name: None,
+						name: "first".to_string(),
+						type_name: "float".to_string(),
+					},
+					Variable {
+						active: true,
+						kind: VariableKind::Regular,
+						length: None,
+						minified_name: None,
+						name: "third".to_string(),
+						type_name: "float".to_string(),
+					},
+				],
+				..Default::default()
+			}
+		);
+	}
+
+	#[test]
+	fn test_parse_development_true() {
+		let shader_descriptor = parse(
+			r#"#version 450
+float first;
+#pragma shiba development
+float second;
+#pragma shiba always
+float third;
+"#,
+			true,
+		)
+		.unwrap();
+
+		assert_eq!(
+			shader_descriptor,
+			ShaderDescriptor {
+				glsl_version: Some("450".to_string()),
+				passes: vec![],
+				sections: Sections::default(),
+				variables: vec![
+					Variable {
+						active: true,
+						kind: VariableKind::Regular,
+						length: None,
+						minified_name: None,
+						name: "first".to_string(),
+						type_name: "float".to_string(),
+					},
+					Variable {
+						active: true,
+						kind: VariableKind::Regular,
+						length: None,
+						minified_name: None,
+						name: "second".to_string(),
+						type_name: "float".to_string(),
+					},
+					Variable {
+						active: true,
+						kind: VariableKind::Regular,
+						length: None,
+						minified_name: None,
+						name: "third".to_string(),
+						type_name: "float".to_string(),
+					},
 				],
 				..Default::default()
 			}

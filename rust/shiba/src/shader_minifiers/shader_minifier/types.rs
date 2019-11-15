@@ -1,5 +1,5 @@
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Section {
+pub enum Directive {
 	Attributes,
 	Common,
 	Fragment(usize),

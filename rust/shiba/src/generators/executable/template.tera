@@ -102,7 +102,7 @@ void main()
 		// Display Opengl info in console.
 		shibaLog() << "OpenGL version: " << glGetString(GL_VERSION);
 		// shibaLog() << "OpenGL extensions: " << glGetString(GL_EXTENSIONS);
-		shibaLog() << std::endl;
+		shibaLog();
 	{% endif %}
 
 	{{ shader_loading }}

@@ -20,10 +20,13 @@ public:
 
 {% if development %}
 
+	#include <cstring>
 	#include <iostream>
+	#include <map>
 	#include <memory>
 	#include <ostream>
 	#include <sstream>
+	#include <string>
 
 	class _ShibaLogger : public std::ostringstream
 	{
@@ -146,8 +149,36 @@ public:
 
 	#define SHIBA_VARIABLE static thread_local
 
-	static GLint _shibaFragmentShaders[{{ passes | length }}];
-	static GLint _shibaVertexShaders[{{ passes | length }}];
+	template <int Columns, int Rows>
+	class _ShibaMatrix
+	{
+	public:
+		_ShibaMatrix()
+		{
+			std::memset(data, 0, sizeof(float) * Columns * Rows);
+		}
+
+		_ShibaMatrix(const _ShibaMatrix &other)
+		{
+			std::memcpy(data, other.data, sizeof(float) * Columns * Rows);
+		}
+
+		_ShibaMatrix &operator=(const _ShibaMatrix &other)
+		{
+			std::memcpy(data, other.data, sizeof(float) * Columns * Rows);
+			return *this;
+		}
+
+	private:
+		float data[Columns * Rows];
+	};
+
+	using ShibaMat2 = _ShibaMatrix<2, 2>;
+	using ShibaMat3 = _ShibaMatrix<3, 3>;
+	using ShibaMat4 = _ShibaMatrix<4, 4>;
+
+	SHIBA_VARIABLE GLint _shibaFragmentShaders[{{ passes | length }}];
+	SHIBA_VARIABLE GLint _shibaVertexShaders[{{ passes | length }}];
 
 {% else %}
 
@@ -343,7 +374,18 @@ void main()\n{ \
 		HGLRC context{ nullptr };
 	};
 
+	SHIBA_VARIABLE bool _shibaIsInitialized;
+
+	SHIBA_VARIABLE std::unique_ptr<std::map<std::string, ShibaMat4>> _shibaObjectMatrices;
+	#define shibaObjectMatrices (*_shibaObjectMatrices)
+
+	SHIBA_VARIABLE bool shibaViewportMatricesSet;
+	SHIBA_VARIABLE ShibaMat4 shibaViewportViewMatrix;
+	SHIBA_VARIABLE ShibaMat4 shibaViewportProjectionMatrix;
+
 	SHIBA_VARIABLE _ShibaContext _shibaStandaloneContext;
+	SHIBA_VARIABLE GLuint _shibaFinalFramebufferId;
+	SHIBA_VARIABLE GLuint _shibaFinalFramebufferTextureId;
 
 {% else %}
 

@@ -5,18 +5,20 @@ use nom::{
 	IResult,
 };
 
-fn section(input: &str) -> IResult<&str, Section> {
+fn section(input: &str) -> IResult<&str, Directive> {
 	directive(alt((
-		value(Section::Attributes, tag("attributes")),
-		value(Section::Common, tag("common")),
-		map(fragment_directive, Section::Fragment),
-		value(Section::Outputs, tag("outputs")),
-		value(Section::Varyings, tag("varyings")),
-		map(vertex_directive, Section::Vertex),
+		value(Directive::Always, tag("always")),
+		value(Directive::Attributes, tag("attributes")),
+		value(Directive::Common, tag("common")),
+		value(Directive::Development, tag("development")),
+		map(fragment_directive, Directive::Fragment),
+		value(Directive::Outputs, tag("outputs")),
+		value(Directive::Varyings, tag("varyings")),
+		map(vertex_directive, Directive::Vertex),
 	)))(input)
 }
 
-fn sections(input: &str) -> IResult<&str, Vec<(&str, Section)>> {
+fn sections(input: &str) -> IResult<&str, Vec<(&str, Directive)>> {
 	many0(take_unless(map(section, Some)))(input)
 }
 
@@ -29,7 +31,7 @@ fn version(input: &str) -> IResult<&str, &str> {
 	Ok((input, version))
 }
 
-pub type Contents<'a> = (Option<&'a str>, Vec<(&'a str, Section)>);
+pub type Contents<'a> = (Option<&'a str>, Vec<(&'a str, Directive)>);
 
 pub fn contents(input: &str) -> IResult<&str, Contents> {
 	tuple((opt(version), sections))(input)
@@ -59,8 +61,8 @@ vertex code
 				(
 					Some("450"),
 					vec![
-						("#define foo bar\nprolog code\n", Section::Common),
-						("common code\n", Section::Vertex(42)),
+						("#define foo bar\nprolog code\n", Directive::Common),
+						("common code\n", Directive::Vertex(42)),
 					]
 				)
 			))

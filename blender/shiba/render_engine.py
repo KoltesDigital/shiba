@@ -9,6 +9,7 @@ class RenderEngine(bpy.types.RenderEngine):
     bl_use_preview = True
 
     def __init__(self):
+        self.__first_time_update = True
         tool.register_api_changed_callback(self.__reload_viewport)
         self.__tool = tool.instance()
 
@@ -26,9 +27,16 @@ class RenderEngine(bpy.types.RenderEngine):
         height = region.height
         return width, height
 
+    def __common_update(self, depsgraph):
+        if self.__first_time_update or depsgraph.id_type_updated('OBJECT'):
+            self.__tool.api.set_object_instances(depsgraph.object_instances)
+        self.__first_time_update = False
+
     def update(self, data, depsgraph):
         scene = depsgraph.scene
         scene.view_settings.view_transform = 'Raw'
+
+        self.__common_update(depsgraph)
 
         time = RenderEngine._get_time(depsgraph)
 
@@ -61,11 +69,17 @@ class RenderEngine(bpy.types.RenderEngine):
         self.tag_redraw()
 
     def view_update(self, context, depsgraph):
+        self.__common_update(depsgraph)
+
         time = RenderEngine._get_time(depsgraph)
         width, height = RenderEngine._get_view_resolution(context)
         self.__tool.api.viewport_update(time, width, height)
 
     def view_draw(self, context, depsgraph):
+        self.__tool.api.set_viewport_matrices(
+            context.region_data.view_matrix,
+            context.region_data.window_matrix,
+        )
         time = RenderEngine._get_time(depsgraph)
         width, height = RenderEngine._get_view_resolution(context)
         self.__tool.api.viewport_render(time, width, height)

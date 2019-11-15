@@ -90,7 +90,7 @@ pub fn subcommand(options: &Options) -> Result<ResultKind, String> {
 
 		let audio_codes = audio_synthesizer.integrate(&mut compilation_descriptor)?;
 
-		let mut shader_descriptor = shader_provider.provide()?;
+		let mut shader_descriptor = shader_provider.provide(generator.get_development())?;
 
 		if let Some(shader_minifier) = shader_minifier {
 			shader_descriptor = shader_minifier.minify(&shader_descriptor)?;

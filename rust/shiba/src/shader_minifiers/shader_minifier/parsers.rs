@@ -2,24 +2,24 @@ use super::types::*;
 use crate::parsers::{glsl::*, *};
 use nom::{branch::*, bytes::complete::*, combinator::*, multi::*, IResult};
 
-fn section(input: &str) -> IResult<&str, Section> {
+fn section(input: &str) -> IResult<&str, Directive> {
 	directive(alt((
-		value(Section::Attributes, tag("attributes")),
-		value(Section::Common, tag("common")),
-		map(fragment_directive, Section::Fragment),
-		value(Section::Outputs, tag("outputs")),
-		value(Section::UniformArrays, tag("uniform_arrays")),
-		value(Section::Variables, tag("variables")),
-		value(Section::Varyings, tag("varyings")),
-		map(vertex_directive, Section::Vertex),
+		value(Directive::Attributes, tag("attributes")),
+		value(Directive::Common, tag("common")),
+		map(fragment_directive, Directive::Fragment),
+		value(Directive::Outputs, tag("outputs")),
+		value(Directive::UniformArrays, tag("uniform_arrays")),
+		value(Directive::Variables, tag("variables")),
+		value(Directive::Varyings, tag("varyings")),
+		map(vertex_directive, Directive::Vertex),
 	)))(input)
 }
 
-fn sections(input: &str) -> IResult<&str, Vec<(&str, Section)>> {
+fn sections(input: &str) -> IResult<&str, Vec<(&str, Directive)>> {
 	many0(take_unless(map(section, Some)))(input)
 }
 
-pub fn contents(input: &str) -> IResult<&str, Vec<(&str, Section)>> {
+pub fn contents(input: &str) -> IResult<&str, Vec<(&str, Directive)>> {
 	sections(input)
 }
 
@@ -47,9 +47,9 @@ vertex code
 				vec![
 					(
 						"#version 450\n#define foo bar\nprolog code\n",
-						Section::Common
+						Directive::Common
 					),
-					("common code\n", Section::Vertex(42)),
+					("common code\n", Directive::Vertex(42)),
 				]
 			))
 		);

@@ -28,5 +28,5 @@ pub trait ShaderMinifier {
 }
 
 pub trait ShaderProvider: Hash {
-	fn provide(&self) -> Result<ShaderDescriptor, String>;
+	fn provide(&self, development: bool) -> Result<ShaderDescriptor, String>;
 }
