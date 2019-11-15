@@ -32,7 +32,7 @@ SHIBA_CONST char *_shibaShaderPassCodes[] = {
 	SHIBA_CONST int shiba{{ uniform_array.type_name | uppercase_first }}UniformCount = {{ uniform_array.variables | length }};
 	SHIBA_VARIABLE {{ uniform_array.type_name | to_opengl_type }} shiba{{ uniform_array.type_name | uppercase_first }}Uniforms[{{ uniform_array.variables | length }}];
 	{% for variable in uniform_array.variables %}
-		#define shibaUniform{{ variable.name | uppercase_first }} shiba{{ uniform_array.type_name | uppercase_first }}Uniforms[{{ loop.index - 1 }}]
+		#define {{ variable.name }} shiba{{ uniform_array.type_name | uppercase_first }}Uniforms[{{ loop.index - 1 }}]
 	{% endfor %}
 {% endfor %}
 

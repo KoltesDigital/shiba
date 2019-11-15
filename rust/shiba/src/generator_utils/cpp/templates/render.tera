@@ -1,16 +1,16 @@
 {% if project_codes.rendering %}
 	{{ project_codes.rendering }}
 {% else %}
-	#ifdef shibaUniformTime
-		shibaUniformTime = shibaTime;
+	#ifdef time
+		time = shibaTime;
 	#endif
 
-	#ifdef shibaUniformResolutionWidth
-		shibaUniformResolutionWidth = shibaResolutionWidth;
+	#ifdef resolutionWidth
+		resolutionWidth = shibaResolutionWidth;
 	#endif
 
-	#ifdef shibaUniformResolutionHeight
-		shibaUniformResolutionHeight = shibaResolutionHeight;
+	#ifdef resolutionHeight
+		resolutionHeight = shibaResolutionHeight;
 	#endif
 
 	{% if target == "blender_api" %}
