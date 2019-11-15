@@ -1,3 +1,5 @@
+use encoding::all::UTF_8;
+use encoding::{DecoderTrap, Encoding};
 use serde::Deserialize;
 use serde_json;
 use std::process::Command;
@@ -34,7 +36,9 @@ impl CommandGenerator {
 				.arg("json")
 				.output()
 				.map_err(|_| "Failed to execute vswhere.")?;
-		let json = str::from_utf8(&vswhere.stdout).map_err(|_| "Failed to convert UTF8.")?;
+		let json = UTF_8
+			.decode(&vswhere.stdout, DecoderTrap::Ignore)
+			.map_err(|_| "Failed to convert UTF8.")?;
 		let items: Vec<VSWhereItem> =
 			serde_json::from_str(&json).map_err(|_| "Failed to parse JSON.")?;
 		let installation_path = items
