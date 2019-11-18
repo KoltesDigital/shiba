@@ -7,10 +7,8 @@ use nom::{
 
 fn section(input: &str) -> IResult<&str, Directive> {
 	directive(alt((
-		value(Directive::Always, tag("always")),
 		value(Directive::Attributes, tag("attributes")),
 		value(Directive::Common, tag("common")),
-		value(Directive::Development, tag("development")),
 		map(fragment_directive, Directive::Fragment),
 		value(Directive::Outputs, tag("outputs")),
 		value(Directive::Varyings, tag("varyings")),

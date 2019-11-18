@@ -8,10 +8,17 @@ use crate::parsers::glsl;
 use crate::traits;
 use crate::types::{Pass, ShaderDescriptor, UniformArray, VariableKind};
 use regex::Regex;
+use serde::Serialize;
 use std::cell::Cell;
 use std::fs;
 use std::hash::Hash;
 use std::path::Path;
+use tera::Tera;
+
+#[derive(Serialize)]
+struct Context {
+	development: bool,
+}
 
 #[derive(Hash)]
 pub struct ShaderProvider {
@@ -42,8 +49,19 @@ fn ensure_passes_has_index(shader_descriptor: &mut ShaderDescriptor, index: usiz
 }
 
 fn parse(code: &str, development: bool) -> Result<ShaderDescriptor, String> {
+	let mut tera = Tera::default();
+
+	tera.add_raw_template("template", code)
+		.map_err(|err| err.to_string())?;
+
+	let context = Context { development };
+
+	let code = tera
+		.render("template", &context)
+		.map_err(|_| "Failed to render template.")?;
+
 	let (input, (glsl_version, sections)) =
-		parsers::contents(code).map_err(|_| "Parsing error.".to_string())?;
+		parsers::contents(code.as_str()).map_err(|_| "Parsing error.".to_string())?;
 
 	let mut shader_descriptor = ShaderDescriptor {
 		glsl_version: glsl_version.map(|s| s.to_owned()),
@@ -95,21 +113,13 @@ fn parse(code: &str, development: bool) -> Result<ShaderDescriptor, String> {
 					ensure_passes_has_index(&mut shader_descriptor, index);
 					append(&mut shader_descriptor.passes[index].vertex);
 				}
-
-				_ => unreachable!(),
 			}
 		}
 	};
 
-	let process_directive = |directive| match directive {
-		Directive::Always => next_append_enable.set(true),
-		Directive::Development => next_append_enable.set(development),
-		directive => next_section.set(directive),
-	};
-
 	for (code, directive) in sections {
 		process_code(code);
-		process_directive(directive);
+		next_section.set(directive);
 	}
 
 	process_code(input);
@@ -335,100 +345,6 @@ fragment code
 						name: "uniformVar2".to_string(),
 						type_name: "vec2".to_string(),
 					}
-				],
-				..Default::default()
-			}
-		);
-	}
-
-	#[test]
-	fn test_parse_development_false() {
-		let shader_descriptor = parse(
-			r#"#version 450
-float first;
-#pragma shiba development
-float second;
-#pragma shiba always
-float third;
-"#,
-			false,
-		)
-		.unwrap();
-
-		assert_eq!(
-			shader_descriptor,
-			ShaderDescriptor {
-				glsl_version: Some("450".to_string()),
-				passes: vec![],
-				sections: Sections::default(),
-				variables: vec![
-					Variable {
-						active: true,
-						kind: VariableKind::Regular,
-						length: None,
-						minified_name: None,
-						name: "first".to_string(),
-						type_name: "float".to_string(),
-					},
-					Variable {
-						active: true,
-						kind: VariableKind::Regular,
-						length: None,
-						minified_name: None,
-						name: "third".to_string(),
-						type_name: "float".to_string(),
-					},
-				],
-				..Default::default()
-			}
-		);
-	}
-
-	#[test]
-	fn test_parse_development_true() {
-		let shader_descriptor = parse(
-			r#"#version 450
-float first;
-#pragma shiba development
-float second;
-#pragma shiba always
-float third;
-"#,
-			true,
-		)
-		.unwrap();
-
-		assert_eq!(
-			shader_descriptor,
-			ShaderDescriptor {
-				glsl_version: Some("450".to_string()),
-				passes: vec![],
-				sections: Sections::default(),
-				variables: vec![
-					Variable {
-						active: true,
-						kind: VariableKind::Regular,
-						length: None,
-						minified_name: None,
-						name: "first".to_string(),
-						type_name: "float".to_string(),
-					},
-					Variable {
-						active: true,
-						kind: VariableKind::Regular,
-						length: None,
-						minified_name: None,
-						name: "second".to_string(),
-						type_name: "float".to_string(),
-					},
-					Variable {
-						active: true,
-						kind: VariableKind::Regular,
-						length: None,
-						minified_name: None,
-						name: "third".to_string(),
-						type_name: "float".to_string(),
-					},
 				],
 				..Default::default()
 			}
