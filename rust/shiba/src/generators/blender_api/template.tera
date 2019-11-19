@@ -95,6 +95,7 @@ _SHIBA_EXPORT void _shibaEnsureIsInitialized(int32_t shibaResolutionWidth, int32
 
 		shibaFinalFramebufferId = _shibaFinalFramebufferId;
 
+		shibaIsViewport = false;
 		_shibaIsInitialized = true;
 	}
 	else
@@ -133,6 +134,7 @@ _SHIBA_EXPORT void _shibaViewportEnsureIsInitialized(int32_t shibaResolutionWidt
 		glBindFramebuffer(GL_FRAMEBUFFER, shibaFinalFramebufferId);
 		shibaCheckGlError();
 
+		shibaIsViewport = true;
 		_shibaIsInitialized = true;
 	}
 	else
@@ -220,11 +222,16 @@ _SHIBA_EXPORT void _shibaUpdateShaderPasses(int count, _ShibaShaderPasses *passe
 	}
 }
 
-_SHIBA_EXPORT void _shibaSetViewportMatrices(ShibaMat4 viewMatrix, ShibaMat4 projectionMatrix)
+_SHIBA_EXPORT void _shibaSetOverrideMatrices(
+	ShibaMat4 viewMatrix, ShibaMat4 invViewMatrix,
+	ShibaMat4 projectionMatrix, ShibaMat4 invProjectionMatrix
+)
 {
-	shibaViewportMatricesSet = true;
-	shibaViewportViewMatrix = viewMatrix;
-	shibaViewportProjectionMatrix = projectionMatrix;
+	shibaOverrideMatricesSet = true;
+	shibaOverrideViewMatrix = viewMatrix;
+	shibaOverrideInvViewMatrix = invViewMatrix;
+	shibaOverrideProjectionMatrix = projectionMatrix;
+	shibaOverrideInvProjectionMatrix = invProjectionMatrix;
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)

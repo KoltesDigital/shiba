@@ -180,14 +180,16 @@ class API:
                 ctypes.c_int32(height),
             )
 
-    def set_viewport_matrices(self, view_matrix, projection_matrix):
+    def set_override_matrices(self, view_matrix, inv_view_matrix, projection_matrix):
         with self.__lock:
             if not self.__locked_file.opened:
                 return
 
-            self.__library._shibaSetViewportMatrices(
+            self.__library._shibaSetOverrideMatrices(
                 _to_c_matrix(view_matrix),
+                _to_c_matrix(inv_view_matrix),
                 _to_c_matrix(projection_matrix),
+                _to_c_matrix(projection_matrix.inverted()),
             )
 
 

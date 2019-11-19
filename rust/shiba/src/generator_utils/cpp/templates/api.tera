@@ -379,9 +379,12 @@ void main()\n{ \
 	SHIBA_VARIABLE std::unique_ptr<std::map<std::string, ShibaMat4>> _shibaObjectMatrices;
 	#define shibaObjectMatrices (*_shibaObjectMatrices)
 
-	SHIBA_VARIABLE bool shibaViewportMatricesSet;
-	SHIBA_VARIABLE ShibaMat4 shibaViewportViewMatrix;
-	SHIBA_VARIABLE ShibaMat4 shibaViewportProjectionMatrix;
+	SHIBA_VARIABLE bool shibaIsViewport;
+	SHIBA_VARIABLE bool shibaOverrideMatricesSet;
+	SHIBA_VARIABLE ShibaMat4 shibaOverrideViewMatrix;
+	SHIBA_VARIABLE ShibaMat4 shibaOverrideInvViewMatrix;
+	SHIBA_VARIABLE ShibaMat4 shibaOverrideProjectionMatrix;
+	SHIBA_VARIABLE ShibaMat4 shibaOverrideInvProjectionMatrix;
 
 	SHIBA_VARIABLE _ShibaContext _shibaStandaloneContext;
 	SHIBA_VARIABLE GLuint _shibaFinalFramebufferId;

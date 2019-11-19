@@ -7,6 +7,7 @@ class RenderEngine(bpy.types.RenderEngine):
     bl_label = "Shiba"
 
     bl_use_preview = True
+    bl_use_spherical_stereo = False
 
     def __init__(self):
         self.__first_time_update = True
@@ -48,21 +49,44 @@ class RenderEngine(bpy.types.RenderEngine):
         )
 
     def render(self, depsgraph):
+        scene = depsgraph.scene
         time = RenderEngine._get_time(depsgraph)
 
-        frame = self.__tool.api.render(
-            time,
-            self.resolution_x,
-            self.resolution_y,
-            self.is_preview,
-        )
+        views = self.get_result().views
+        for view in views:
+            self.active_view_set(view.name)
 
-        if frame:
-            result = self.begin_result(
-                0, 0, self.resolution_x, self.resolution_y)
-            layer = result.layers[0].passes["Combined"]
-            layer.rect = frame
-            self.end_result(result)
+            camera = self.camera_override or scene.camera
+            use_spherical_stereo = self.use_spherical_stereo(camera)
+            camera_matrix = self.camera_model_matrix(
+                camera, use_spherical_stereo=use_spherical_stereo)
+            projection_matrix = camera.calc_matrix_camera(
+                depsgraph,
+                x=self.render.resolution_x,
+                y=self.render.resolution_y,
+                scale_x=self.render.pixel_aspect_x,
+                scale_y=self.render.pixel_aspect_y,
+            )
+            self.__tool.api.set_override_matrices(
+                camera_matrix.inverted(),
+                camera_matrix,
+                projection_matrix,
+            )
+
+            frame = self.__tool.api.render(
+                time,
+                self.resolution_x,
+                self.resolution_y,
+                self.is_preview,
+            )
+
+            if frame:
+                result = self.begin_result(
+                    0, 0, self.resolution_x, self.resolution_y,
+                    view=view.name)
+                layer = result.layers[0].passes["Combined"]
+                layer.rect = frame
+                self.end_result(result)
 
     def __reload_viewport(self):
         self.tag_update()
@@ -76,8 +100,9 @@ class RenderEngine(bpy.types.RenderEngine):
         self.__tool.api.viewport_update(time, width, height)
 
     def view_draw(self, context, depsgraph):
-        self.__tool.api.set_viewport_matrices(
+        self.__tool.api.set_override_matrices(
             context.region_data.view_matrix,
+            context.region_data.view_matrix.inverted(),
             context.region_data.window_matrix,
         )
         time = RenderEngine._get_time(depsgraph)
