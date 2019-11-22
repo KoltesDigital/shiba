@@ -1,6 +1,6 @@
 import json
 import socket
-from shiba import api, notifications
+from shiba import addon_preferences, api, notifications
 from shiba.notifications import Notification
 from threading import Lock, Thread
 
@@ -61,6 +61,8 @@ def _run_socket_thread():
     while True:
         try:
             chunk = _socket.recv(1024)
+        except ConnectionAbortedError:
+            break
         except ConnectionResetError:
             break
 
@@ -87,8 +89,15 @@ def connect():
     global _socket_thread
     if not _socket:
         print("Connecting to server.")
+        preferences = addon_preferences.get()
         _socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        _socket.connect(('127.0.0.1', 5184))
+        try:
+            _socket.connect((preferences.server_ip, preferences.server_port))
+        except ConnectionRefusedError:
+            _socket = None
+            print("Failed to connect to %s:%d" %
+                  (preferences.server_ip, preferences.server_port))
+            return
         _socket_thread = Thread(
             target=_run_socket_thread
         )

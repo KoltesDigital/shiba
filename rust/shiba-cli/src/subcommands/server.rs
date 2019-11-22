@@ -4,12 +4,17 @@ use crate::types::Pass;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::{mpsc::channel, Arc, Mutex, RwLock};
 use std::thread::spawn;
 use std::time::Duration;
+
+pub struct Options<'a> {
+	pub ip: IpAddr,
+	pub port: u16,
+	pub project_directory: &'a Path,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case", tag = "command")]
@@ -76,9 +81,10 @@ impl State {
 	}
 }
 
-pub fn subcommand(project_directory: &Path) -> Result<(), String> {
-	let addr = SocketAddr::from_str("127.0.0.1:5184").map_err(|_| "Invalid socket address.")?;
+pub fn subcommand(options: &Options) -> Result<(), String> {
+	let addr = SocketAddr::new(options.ip, options.port);
 	let listener = TcpListener::bind(addr).map_err(|_| "Failed to start server.")?;
+	println!("Listening on {}.", addr);
 
 	let state = Arc::new(RwLock::new(State::default()));
 
@@ -86,7 +92,7 @@ pub fn subcommand(project_directory: &Path) -> Result<(), String> {
 
 	let (tx_command, rx_command) = channel();
 	let command_state = state.clone();
-	let mut command_project_directory = project_directory.to_path_buf();
+	let mut command_project_directory = options.project_directory.to_path_buf();
 	spawn(move || {
 		let command_build_blender_api = true;
 		let mut command_build_executable = false;

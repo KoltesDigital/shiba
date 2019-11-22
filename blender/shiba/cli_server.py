@@ -1,4 +1,4 @@
-from shiba import paths
+from shiba import addon_preferences, paths
 from shiba.locked_file import LockedFile
 import subprocess
 from threading import Lock, Thread
@@ -23,8 +23,13 @@ def _start_process(path):
 
     print("Starting CLI server.")
 
+    preferences = addon_preferences.get()
     _process = subprocess.Popen(
-        [path, 'server'],
+        [
+            path, 'server',
+            '--ip', preferences.server_ip,
+            '--port', str(preferences.server_port),
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )

@@ -62,6 +62,7 @@ mod subcommands {
 mod traits;
 mod types;
 
+use std::net::IpAddr;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -78,7 +79,12 @@ enum Command {
 		force: bool,
 	},
 	/// Starts a server
-	Server,
+	Server {
+		#[structopt(long, default_value = "127.0.0.1")]
+		ip: IpAddr,
+		#[structopt(short, long, default_value = "5184")]
+		port: u16,
+	},
 }
 
 impl Default for Command {
@@ -117,6 +123,12 @@ fn main() -> Result<(), String> {
 			})
 			.map(|_| ())
 		}
-		Command::Server => subcommands::server::subcommand(&args.project_directory),
+		Command::Server { ip, port } => {
+			subcommands::server::subcommand(&subcommands::server::Options {
+				ip,
+				port,
+				project_directory: &args.project_directory,
+			})
+		}
 	}
 }

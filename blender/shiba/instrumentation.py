@@ -15,7 +15,9 @@ def set_exiting():
 class _State:
     api_loaded: bool = False
     server_custom_cli_path: str = None
+    server_ip: str = None
     server_location: str = None
+    server_port: int = None
     server_started: bool = False
 
 
@@ -60,12 +62,15 @@ def _match_states():
 def update():
     if not _exiting:
         preferences = addon_preferences.get()
-        _desired_state.server_location = preferences.server_location \
-            if preferences is not None else None
-        _desired_state.server_custom_cli_path = \
-            preferences.server_custom_cli_path \
-            if _desired_state.server_location == 'CUSTOM_CLI' \
-            else None
+        if preferences:
+            _desired_state.server_ip = preferences.server_ip
+            _desired_state.server_location = preferences.server_location
+            _desired_state.server_port = preferences.server_port
+
+            _desired_state.server_custom_cli_path = \
+                preferences.server_custom_cli_path \
+                if _desired_state.server_location == 'CUSTOM_CLI' \
+                else None
 
     if _desired_state != _current_state:
         _match_states()

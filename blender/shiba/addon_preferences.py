@@ -17,6 +17,13 @@ class AddonPreferences(bpy.types.AddonPreferences):
         update=_update_instrumentation,
     )
 
+    server_ip: StringProperty(
+        name="Server IP",
+        description="Both for internal and external servers",
+        default="127.0.0.1",
+        update=_update_instrumentation,
+    )
+
     server_location: EnumProperty(
         name="Server location",
         items=[
@@ -60,6 +67,7 @@ class AddonPreferences(bpy.types.AddonPreferences):
         layout.prop(self, 'server_location')
         if preferences.server_location == 'CUSTOM_CLI':
             layout.prop(self, 'server_custom_cli_path')
+        layout.prop(self, 'server_ip')
         layout.prop(self, 'server_port')
 
         layout.prop(self, 'server_notification_size')
