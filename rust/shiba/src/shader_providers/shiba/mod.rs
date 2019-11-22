@@ -74,17 +74,11 @@ fn parse(code: &str, development: bool) -> Result<ShaderDescriptor, String> {
 
 	let mut process_code = |code| {
 		lazy_static! {
-			static ref IFDEF_RE: Regex =
-				Regex::new(r"(?s)#ifdef\s+BUILD_ONLY(.*?)(?:#else.*?)?#endif").expect("Bad regex.");
-			static ref IFNDEF_RE: Regex =
-				Regex::new(r"(?s)#ifndef\s+BUILD_ONLY.*?(?:#else(.*?))?#endif")
-					.expect("Bad regex.");
-			static ref MAIN_RE: Regex = Regex::new(r"void main\w+\(\)").expect("Bad regex.");
+			static ref MAIN_RE: Regex =
+				Regex::new(r"(?s)void\s+main\w+\s*\(\s*\)").expect("Bad regex.");
 		}
 
-		let code = IFDEF_RE.replace_all(code, "$1");
-		let code = IFNDEF_RE.replace_all(&code, "$1");
-		let code = MAIN_RE.replace_all(&code, "void main()");
+		let code = MAIN_RE.replace_all(code, "void main()");
 		let code = code.trim();
 		if !code.is_empty() {
 			let append = |section: &mut Option<String>| {
