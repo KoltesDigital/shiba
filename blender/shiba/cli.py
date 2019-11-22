@@ -51,13 +51,13 @@ class _Tool:
         while True:
             try:
                 line = self.__process.stdout.readline()
-                print('Shiba: %s' % line.decode().rstrip())
+                print('CLI: %s' % line.decode().rstrip())
             except ValueError:
                 if self.__process.poll() is not None:
                     break
 
         rc = self.__process.poll()
-        print('Shiba exited with code %d.' % rc)
+        print('Server exited with code %d.' % rc)
 
     def __handle_event(self, obj):
         global _building_count
@@ -146,16 +146,16 @@ class _Tool:
 
         self.__socket.send(b'{"command":"get-blender-api-path"}\n')
 
-        print("Shiba started.")
+        print("CLI started.")
 
     def __end_process(self):
-        print("Exiting Shiba.")
+        print("Exiting CLI.")
         self.__process.terminate()
 
         try:
             self.__process.communicate(timeout=15)
         except subprocess.TimeoutExpired:
-            print("Forcing Shiba to exit.")
+            print("Forcing CLI to exit.")
             self.__process.kill()
             self.__process.communicate()
 
@@ -170,11 +170,11 @@ class _Tool:
 
         self.__api.unload()
 
-        print("Shiba stopped.")
+        print("CLI stopped.")
 
-    def update_shiba_path(self):
+    def update_cli_path(self):
         with self.__lock:
-            self.__locked_file.set_path(paths.shiba())
+            self.__locked_file.set_path(paths.cli())
 
     def start(self):
         with self.__lock:
@@ -243,7 +243,7 @@ def instance():
     global _instance
     if _instance is None:
         _instance = _Tool(_call_api_changed_callbacks)
-        _instance.update_shiba_path()
+        _instance.update_cli_path()
         _instance.start()
         _instance.set_build_executable(
             bpy.context.scene.shiba.build_executable)

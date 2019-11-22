@@ -11,17 +11,17 @@ class AddonPreferences(bpy.types.AddonPreferences):
         min=0,
     )
 
-    override_shiba_path: StringProperty(
-        name="Override path to shiba.exe",
+    override_cli_path: StringProperty(
+        name="Override path to CLI",
         description="If ever you need to use a custom build instead of the \
-built-in tool. Leave empty otherwise",
+built-in CLI. Leave empty otherwise",
         subtype='FILE_PATH',
     )
 
     def draw(self, context):
         layout = self.layout
         layout.prop(self, 'notification_size')
-        layout.prop(self, 'override_shiba_path')
+        layout.prop(self, 'override_cli_path')
 
 
 def get(key, default):

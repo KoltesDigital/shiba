@@ -1,5 +1,5 @@
 import bpy
-from shiba import tool
+from shiba import cli
 
 
 class RenderEngine(bpy.types.RenderEngine):
@@ -11,8 +11,8 @@ class RenderEngine(bpy.types.RenderEngine):
 
     def __init__(self):
         self.__first_time_update = True
-        tool.register_api_changed_callback(self.__reload_viewport)
-        self.__tool = tool.instance()
+        cli.register_api_changed_callback(self.__reload_viewport)
+        self.__tool = cli.instance()
 
     @staticmethod
     def _get_time(depsgraph):

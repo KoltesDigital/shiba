@@ -16,13 +16,13 @@ if addons_to_load is not None:
 
 if __project_path is not None:
     __shiba_path = os.path.join(
-        __project_path, 'rust', 'target', 'debug', 'shiba.exe')
+        __project_path, 'rust', 'target', 'debug', 'shiba-cli.exe')
 else:
-    __shiba_path = os.path.join(os.path.dirname(__file__), 'shiba.exe')
+    __shiba_path = os.path.join(os.path.dirname(__file__), 'shiba-cli.exe')
 
 
-def shiba():
-    path = addon_preferences.get('override_shiba_path', None)
+def cli():
+    path = addon_preferences.get('override_cli_path', None)
     if path:
         return path
 
