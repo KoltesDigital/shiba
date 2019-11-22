@@ -1,29 +1,71 @@
 import bpy
-from bpy.props import IntProperty, StringProperty
+from bpy.props import EnumProperty, IntProperty, StringProperty
+from shiba import instrumentation
+
+
+def _update_instrumentation(_self, _context):
+    instrumentation.update()
 
 
 class AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
-    notification_size: IntProperty(
-        name="Notification size",
+    server_custom_cli_path: StringProperty(
+        name="Path to custom CLI",
+        description="Full path including the executable filename",
+        subtype='FILE_PATH',
+        update=_update_instrumentation,
+    )
+
+    server_location: EnumProperty(
+        name="Server location",
+        items=[
+            (
+                'BUILT_IN_CLI',
+                "Built-in CLI",
+                "Use built-in CLI to start the server"
+            ),
+            (
+                'CUSTOM_CLI',
+                "Custom CLI",
+                "Use a custom CLI to start the server"
+            ),
+            (
+                'EXTERNAL',
+                "External",
+                "Connect to an external server which is already started"
+            ),
+        ],
+        default='BUILT_IN_CLI',
+        update=_update_instrumentation,
+    )
+
+    server_notification_size: IntProperty(
+        name="Server notification size",
         default=50,
         min=0,
     )
 
-    override_cli_path: StringProperty(
-        name="Override path to CLI",
-        description="If ever you need to use a custom build instead of the \
-built-in CLI. Leave empty otherwise",
-        subtype='FILE_PATH',
+    server_port: IntProperty(
+        name="Server port",
+        description="Both for internal and external servers",
+        default=5184,
+        min=0,
+        update=_update_instrumentation,
     )
 
     def draw(self, context):
+        preferences = get()
         layout = self.layout
-        layout.prop(self, 'notification_size')
-        layout.prop(self, 'override_cli_path')
+        layout.prop(self, 'server_location')
+        if preferences.server_location == 'CUSTOM_CLI':
+            layout.prop(self, 'server_custom_cli_path')
+        layout.prop(self, 'server_port')
+
+        layout.prop(self, 'server_notification_size')
 
 
-def get(key, default):
-    return bpy.context.preferences.addons[__package__]\
-        .preferences.get(key, default)
+def get():
+    addon = bpy.context.preferences.addons.get(__package__, None)
+    preferences = addon.preferences if addon else None
+    return preferences

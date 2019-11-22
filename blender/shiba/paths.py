@@ -22,7 +22,7 @@ else:
 
 
 def cli():
-    path = addon_preferences.get('override_cli_path', None)
+    path = addon_preferences.get().server_custom_cli_path
     if path:
         return path
 

@@ -1,5 +1,5 @@
 import bpy
-from shiba import cli
+from shiba import api, callback_lists, instrumentation
 
 
 class RenderEngine(bpy.types.RenderEngine):
@@ -11,8 +11,10 @@ class RenderEngine(bpy.types.RenderEngine):
 
     def __init__(self):
         self.__first_time_update = True
-        cli.register_api_changed_callback(self.__reload_viewport)
-        self.__tool = cli.instance()
+        callback_lists.viewport_update.add(self.__update_viewport)
+        with instrumentation.state() as state:
+            state.api_loaded = True
+            state.server_started = True
 
     @staticmethod
     def _get_time(depsgraph):
@@ -30,7 +32,7 @@ class RenderEngine(bpy.types.RenderEngine):
 
     def __common_update(self, depsgraph):
         if self.__first_time_update or depsgraph.id_type_updated('OBJECT'):
-            self.__tool.api.set_object_instances(depsgraph.object_instances)
+            api.set_object_instances(depsgraph.object_instances)
         self.__first_time_update = False
 
     def update(self, data, depsgraph):
@@ -41,7 +43,7 @@ class RenderEngine(bpy.types.RenderEngine):
 
         time = RenderEngine._get_time(depsgraph)
 
-        self.__tool.api.update(
+        api.update(
             time,
             self.resolution_x,
             self.resolution_y,
@@ -67,13 +69,13 @@ class RenderEngine(bpy.types.RenderEngine):
                 scale_x=self.render.pixel_aspect_x,
                 scale_y=self.render.pixel_aspect_y,
             )
-            self.__tool.api.set_override_matrices(
+            api.set_override_matrices(
                 camera_matrix.inverted(),
                 camera_matrix,
                 projection_matrix,
             )
 
-            frame = self.__tool.api.render(
+            frame = api.render(
                 time,
                 self.resolution_x,
                 self.resolution_y,
@@ -88,7 +90,7 @@ class RenderEngine(bpy.types.RenderEngine):
                 layer.rect = frame
                 self.end_result(result)
 
-    def __reload_viewport(self):
+    def __update_viewport(self):
         self.tag_update()
         self.tag_redraw()
 
@@ -97,17 +99,17 @@ class RenderEngine(bpy.types.RenderEngine):
 
         time = RenderEngine._get_time(depsgraph)
         width, height = RenderEngine._get_view_resolution(context)
-        self.__tool.api.viewport_update(time, width, height)
+        api.viewport_update(time, width, height)
 
     def view_draw(self, context, depsgraph):
-        self.__tool.api.set_override_matrices(
+        api.set_override_matrices(
             context.region_data.view_matrix,
             context.region_data.view_matrix.inverted(),
             context.region_data.window_matrix,
         )
         time = RenderEngine._get_time(depsgraph)
         width, height = RenderEngine._get_view_resolution(context)
-        self.__tool.api.viewport_render(time, width, height)
+        api.viewport_render(time, width, height)
 
 
 def get_panels():

@@ -1,15 +1,15 @@
 import bpy
 from bpy.props import BoolProperty, PointerProperty, StringProperty
 from bpy.types import PropertyGroup
-from shiba import cli
+from shiba import server_utils
 
 
 def _build_executable_update(_self, _context):
-    cli.update_build_executable()
+    server_utils.update_build_executable()
 
 
 def _project_directory_update(_self, _context):
-    cli.update_project_directory()
+    server_utils.update_project_directory()
 
 
 class RenderSettings(PropertyGroup):
