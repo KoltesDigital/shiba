@@ -29,7 +29,6 @@ _desired_state = _State()
 def _match_states():
     print("Starting to match states.")
 
-    print(_current_state)
     if _current_state.server_started:
         if _current_state.server_location:
             if _current_state.server_location != 'EXTERNAL':

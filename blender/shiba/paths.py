@@ -22,8 +22,12 @@ else:
 
 
 def cli():
-    path = addon_preferences.get().server_custom_cli_path
-    if path:
-        return path
+    preferences = addon_preferences.get()
+    if preferences.server_location == 'CUSTOM_CLI':
+        path = preferences.server_custom_cli_path
+        if path:
+            return path
+        else:
+            print("No path to custom CLI given")
 
     return __shiba_path

@@ -47,6 +47,7 @@ def _end_process():
     global _process_thread
 
     print("Exiting CLI server.")
+
     _process.terminate()
 
     try:
