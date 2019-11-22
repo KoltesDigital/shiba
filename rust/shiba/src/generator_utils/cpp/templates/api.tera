@@ -199,7 +199,7 @@ public:
 	SHIBA_CONST char *_shibaShaderNullVertexCode =
 "#version 150\n\
 in vec2 pos;\n\
-void main()\n{ \
+void main() {\n\
 	gl_Position = vec4(pos, 0., 1.);\n\
 }\n";
 
