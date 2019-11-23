@@ -178,14 +178,11 @@ _SHIBA_EXPORT void _shibaUpdateShaderPasses(int count, _ShibaShaderPasses *passe
 	{
 		auto &pass = passes[i];
 
-		if (pass.vertex != nullptr && i != {{ passes | length - 1 }})
-		{
-			glShaderSource(_shibaVertexShaders[i], 1, &pass.vertex, 0);
-			shibaCheckGlError();
-			glCompileShader(_shibaVertexShaders[i]);
-			shibaCheckGlError();
-			shibaCheckShaderInfoLog(_shibaVertexShaders[i]);
-		}
+		glShaderSource(_shibaVertexShaders[i], 1, pass.vertex != nullptr ? &pass.vertex : &_shibaShaderNullVertexCode, 0);
+		shibaCheckGlError();
+		glCompileShader(_shibaVertexShaders[i]);
+		shibaCheckGlError();
+		shibaCheckShaderInfoLog(_shibaVertexShaders[i]);
 
 		if (pass.fragment != nullptr)
 		{

@@ -98,9 +98,9 @@
 		shibaPrograms[i] = glCreateProgram();
 		shibaCheckGlError();
 
-		if (_shibaShaderPassCodes[i * 2]
+		if (_shibaShaderPassCodes[i * 2] != nullptr
 			{% if target == "blender_api" %}
-				|| i == {{ passes | length - 1 }}
+				|| true
 			{% endif %}
 		)
 		{
@@ -120,13 +120,13 @@
 			GLint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 			shibaCheckGlError();
 			{% if target == "blender_api" %}
-				if (i == {{ passes | length - 1 }})
+				if (_shibaShaderPassCodes[i * 2] != nullptr)
 				{
-					glShaderSource(vertexShader, 1, &_shibaShaderNullVertexCode, 0);
+					glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
 				}
 				else
 				{
-					glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
+					glShaderSource(vertexShader, 1, &_shibaShaderNullVertexCode, 0);
 				}
 			{% else %}
 				glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
@@ -149,7 +149,7 @@
 			}
 		{% endif %}
 
-		if (_shibaShaderPassCodes[i * 2 + 1])
+		if (_shibaShaderPassCodes[i * 2 + 1] != nullptr)
 		{
 			const char *fragmentShaderSources[] = {
 				{% if shader_codes.before_stage_variables %}
