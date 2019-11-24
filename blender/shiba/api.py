@@ -45,6 +45,11 @@ def reload():
         _locked_file.reload()
 
 
+def is_loaded():
+    with _lock:
+        return _locked_file.is_opened
+
+
 def set_path(path):
     parent_path = os.path.dirname(path)
 
@@ -124,7 +129,7 @@ def _execute_updates(to_update):
 
 def update(time, width, height, is_preview):
     with _lock:
-        if not _locked_file.opened:
+        if not _locked_file.is_opened:
             return
 
         _library._shibaUpdate(
@@ -137,7 +142,7 @@ def update(time, width, height, is_preview):
 
 def render(time, width, height, is_preview):
     with _lock:
-        if not _locked_file.opened:
+        if not _locked_file.is_opened:
             return
 
         _library._shibaEnsureIsInitialized(
@@ -168,7 +173,7 @@ def render(time, width, height, is_preview):
 
 def viewport_update(time, width, height):
     with _lock:
-        if not _locked_file.opened:
+        if not _locked_file.is_opened:
             return
 
         _library._shibaViewportUpdate(
@@ -180,7 +185,7 @@ def viewport_update(time, width, height):
 
 def viewport_render(time, width, height):
     with _lock:
-        if not _locked_file.opened:
+        if not _locked_file.is_opened:
             return
 
         _library._shibaViewportEnsureIsInitialized(
@@ -202,7 +207,7 @@ def set_override_matrices(
     projection_matrix
 ):
     with _lock:
-        if not _locked_file.opened:
+        if not _locked_file.is_opened:
             return
 
         _library._shibaSetOverrideMatrices(

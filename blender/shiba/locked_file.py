@@ -23,7 +23,7 @@ class LockedFile:
         self.close()
 
     @property
-    def opened(self):
+    def is_opened(self):
         return self.__opened
 
     @property
