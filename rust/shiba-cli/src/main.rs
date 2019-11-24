@@ -33,6 +33,11 @@ mod audio_synthesizers {
 	pub mod oidos;
 }
 mod code_map;
+mod commands {
+	pub mod build_blender_api;
+	pub mod build_executable;
+	pub mod server;
+}
 mod configuration;
 mod generators {
 	pub mod blender_api;
@@ -54,11 +59,6 @@ mod shader_providers {
 }
 mod shader_codes;
 mod stored_hash;
-mod subcommands {
-	pub mod build_blender_api;
-	pub mod build_executable;
-	pub mod server;
-}
 mod traits;
 mod types;
 
@@ -109,26 +109,24 @@ fn main() -> Result<(), String> {
 	let command = args.command.unwrap_or_else(Command::default);
 	match command {
 		Command::Build { force } => {
-			subcommands::build_executable::subcommand(&subcommands::build_executable::Options {
+			commands::build_executable::subcommand(&commands::build_executable::Options {
 				force,
 				project_directory: &args.project_directory,
 			})
 			.map(|_| ())
 		}
 		Command::BuildBlender { force } => {
-			subcommands::build_blender_api::subcommand(&subcommands::build_blender_api::Options {
+			commands::build_blender_api::subcommand(&commands::build_blender_api::Options {
 				diff: false,
 				force,
 				project_directory: &args.project_directory,
 			})
 			.map(|_| ())
 		}
-		Command::Server { ip, port } => {
-			subcommands::server::subcommand(&subcommands::server::Options {
-				ip,
-				port,
-				project_directory: &args.project_directory,
-			})
-		}
+		Command::Server { ip, port } => commands::server::subcommand(&commands::server::Options {
+			ip,
+			port,
+			project_directory: &args.project_directory,
+		}),
 	}
 }

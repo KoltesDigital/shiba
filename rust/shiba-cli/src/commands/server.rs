@@ -1,5 +1,5 @@
+use crate::commands;
 use crate::generators;
-use crate::subcommands;
 use crate::types::Pass;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
@@ -116,9 +116,9 @@ pub fn subcommand(options: &Options) -> Result<(), String> {
 							let command_state = command_state.clone();
 							let command_project_directory = command_project_directory.clone();
 							let ended_what = ended_what.clone();
-							let thread = spawn(move || {
-								match subcommands::build_blender_api::subcommand(
-									&subcommands::build_blender_api::Options {
+							let thread = spawn(
+								move || match commands::build_blender_api::subcommand(
+									&commands::build_blender_api::Options {
 										diff,
 										force,
 										project_directory: &command_project_directory,
@@ -126,9 +126,9 @@ pub fn subcommand(options: &Options) -> Result<(), String> {
 								) {
 									Ok(result) => {
 										let result = match &result {
-									subcommands::build_blender_api::ResultKind::BlenderAPIAvailable => Some(BuildEndedWhat::BlenderApi),
-									subcommands::build_blender_api::ResultKind::Nothing => None,
-									subcommands::build_blender_api::ResultKind::ShaderPassesAvailable(passes) => Some(BuildEndedWhat::ShaderPasses{ passes: passes.to_vec() }),
+									commands::build_blender_api::ResultKind::BlenderAPIAvailable => Some(BuildEndedWhat::BlenderApi),
+									commands::build_blender_api::ResultKind::Nothing => None,
+									commands::build_blender_api::ResultKind::ShaderPassesAvailable(passes) => Some(BuildEndedWhat::ShaderPasses{ passes: passes.to_vec() }),
 								};
 
 										if let Some(result) = result {
@@ -140,8 +140,8 @@ pub fn subcommand(options: &Options) -> Result<(), String> {
 										let mut state = command_state.write().unwrap();
 										state.broadcast(&Event::Error { message: &err });
 									}
-								}
-							});
+								},
+							);
 							threads.push(thread);
 						}
 
@@ -150,30 +150,31 @@ pub fn subcommand(options: &Options) -> Result<(), String> {
 							let command_state = command_state.clone();
 							let command_project_directory = command_project_directory.clone();
 							let ended_what = ended_what.clone();
-							let thread = spawn(move || {
-								match subcommands::build_executable::subcommand(
-									&subcommands::build_executable::Options {
-										force,
-										project_directory: &command_project_directory,
-									},
-								) {
-									Ok(result) => {
-										let result = match &result {
-									subcommands::build_executable::ResultKind::ExecutableAvailable => Some(BuildEndedWhat::Executable),
-									subcommands::build_executable::ResultKind::Nothing => None,
+							let thread =
+								spawn(move || {
+									match commands::build_executable::subcommand(
+										&commands::build_executable::Options {
+											force,
+											project_directory: &command_project_directory,
+										},
+									) {
+										Ok(result) => {
+											let result = match &result {
+									commands::build_executable::ResultKind::ExecutableAvailable => Some(BuildEndedWhat::Executable),
+									commands::build_executable::ResultKind::Nothing => None,
 								};
 
-										if let Some(result) = result {
-											let mut ended_what = ended_what.lock().unwrap();
-											ended_what.push(result);
+											if let Some(result) = result {
+												let mut ended_what = ended_what.lock().unwrap();
+												ended_what.push(result);
+											}
+										}
+										Err(err) => {
+											let mut state = command_state.write().unwrap();
+											state.broadcast(&Event::Error { message: &err });
 										}
 									}
-									Err(err) => {
-										let mut state = command_state.write().unwrap();
-										state.broadcast(&Event::Error { message: &err });
-									}
-								}
-							});
+								});
 							threads.push(thread);
 						}
 
@@ -200,7 +201,7 @@ pub fn subcommand(options: &Options) -> Result<(), String> {
 					}
 
 					Command::GetExecutableSize => {
-						match subcommands::build_executable::get_path(&command_project_directory) {
+						match commands::build_executable::get_path(&command_project_directory) {
 							Ok(size) => {
 								let mut state = command_state.write().unwrap();
 								state.broadcast(&Event::ExecutableSize { size });
