@@ -2,6 +2,7 @@ import bpy
 from bpy.props import BoolProperty, PointerProperty, StringProperty
 from bpy.types import PropertyGroup
 from shiba import server_utils
+from shiba.uniforms import Uniforms
 
 
 def _build_executable_update(_self, _context):
@@ -26,6 +27,8 @@ class RenderSettings(PropertyGroup):
         subtype='DIR_PATH',
         update=_project_directory_update,
     )
+
+    uniforms: bpy.props.PointerProperty(type=Uniforms)
 
     @classmethod
     def register(cls):

@@ -18,10 +18,34 @@ pub struct Sections {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+pub struct ConstVariable {
+	pub value: String,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+pub struct UniformAnnotationControlDescriptor {
+	pub control_kind: String,
+	pub control_parameters: Option<String>,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UniformAnnotationKind {
+	Control(UniformAnnotationControlDescriptor),
+	Time,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+pub struct UniformVariable {
+	pub annotations: Vec<UniformAnnotationKind>,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum VariableKind {
-	Const(String),
+	Const(ConstVariable),
 	Regular,
-	Uniform,
+	Uniform(UniformVariable),
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Serialize)]

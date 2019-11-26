@@ -1,7 +1,7 @@
 use crate::code_map::CodeMap;
 use crate::configuration::Configuration;
 use crate::shader_codes::ShaderCodes;
-use crate::types::{Pass, ShaderDescriptor, UniformArray};
+use crate::types::{Pass, ShaderDescriptor, UniformArray, Variable, VariableKind};
 use regex::Regex;
 use serde::Serialize;
 use std::fs;
@@ -13,8 +13,26 @@ template_enum! {
 	OpenGLDeclarations: "opengl_declarations",
 	OpenGLLoading: "opengl_loading",
 	Render: "render",
+	SetActiveUniformValues: "set_active_uniform_values",
 	ShaderDeclarations: "shader_declarations",
 	ShaderLoading: "shader_loading",
+}
+
+#[derive(Serialize)]
+struct UniformDescriptor<'a> {
+	#[serde(flatten)]
+	variable: &'a Variable,
+
+	opengl_type_name: &'static str,
+}
+
+#[derive(Serialize)]
+struct UniformArrayExt<'a> {
+	#[serde(flatten)]
+	uniform_array: &'a UniformArray,
+
+	first_letter_uppercased_type_name: String,
+	opengl_type_name: &'static str,
 }
 
 #[derive(Serialize)]
@@ -58,10 +76,18 @@ struct RenderContext<'a> {
 }
 
 #[derive(Serialize)]
+struct SetActiveUniformValuesContext<'a> {
+	active_uniforms: &'a [UniformDescriptor<'a>],
+	target: &'a str,
+}
+
+#[derive(Serialize)]
 struct ShaderDeclarationContext<'a> {
+	active_uniforms: &'a [UniformDescriptor<'a>],
 	passes: &'a [Pass],
 	shader_codes: &'a ShaderCodes,
-	uniform_arrays: &'a [UniformArray],
+	target: &'a str,
+	uniform_arrays: &'a [UniformArrayExt<'a>],
 }
 
 #[derive(Serialize)]
@@ -70,14 +96,16 @@ struct ShaderLoadingContext<'a> {
 	passes: &'a [Pass],
 	shader_codes: &'a ShaderCodes,
 	target: &'a str,
-	uniform_arrays: &'a [UniformArray],
+	uniform_arrays: &'a [UniformArrayExt<'a>],
 }
 
+#[derive(Serialize)]
 pub struct Contents {
 	pub api: String,
 	pub opengl_declarations: String,
 	pub opengl_loading: String,
 	pub render: String,
+	pub set_active_uniform_values: String,
 	pub shader_declarations: String,
 	pub shader_loading: String,
 }
@@ -113,34 +141,6 @@ impl TemplateRenderer {
 			_ => Err(tera::Error::from("string_literal expects a string")),
 		});
 
-		tera.register_filter("to_opengl_type", |value, _| match value {
-			Value::String(old) => {
-				let new = match old.as_str() {
-					"bool" => "GLint",
-					"int" => "GLint",
-					"float" => "GLfloat",
-					"mat2" => "ShibaMat2",
-					"mat3" => "ShibaMat3",
-					"mat4" => "ShibaMat4",
-					"uint" => "GLuint",
-					_ => "GLint",
-				};
-				Ok(Value::String(new.to_string()))
-			}
-			_ => Err(tera::Error::from("to_opengl_type expects a string")),
-		});
-
-		tera.register_filter("uppercase_first", |value, _| match value {
-			Value::String(old) => {
-				let mut new = old;
-				if let Some(c) = new.get_mut(0..1) {
-					c.make_ascii_uppercase();
-				}
-				Ok(Value::String(new))
-			}
-			_ => Err(tera::Error::from("uppercase_first expects a string")),
-		});
-
 		Ok(TemplateRenderer { glew_path, tera })
 	}
 
@@ -152,6 +152,42 @@ impl TemplateRenderer {
 		target: &str,
 	) -> Result<Contents, String> {
 		let shader_codes = ShaderCodes::load(shader_descriptor);
+
+		let active_uniforms = shader_descriptor
+			.variables
+			.iter()
+			.filter_map(|variable| {
+				if variable.active {
+					if let VariableKind::Uniform(_) = &variable.kind {
+						let opengl_type_name = to_opengl_type_name(variable.type_name.as_str());
+						return Some(UniformDescriptor {
+							opengl_type_name,
+							variable,
+						});
+					}
+				}
+				None
+			})
+			.collect::<Vec<UniformDescriptor>>();
+
+		let uniform_arrays = shader_descriptor
+			.uniform_arrays
+			.iter()
+			.map(|uniform_array| {
+				let opengl_type_name = to_opengl_type_name(uniform_array.type_name.as_str());
+				let mut first_letter_uppercased_type_name = uniform_array.type_name.clone();
+				if let Some(c) = first_letter_uppercased_type_name.get_mut(0..1) {
+					c.make_ascii_uppercase();
+				}
+
+				UniformArrayExt {
+					uniform_array,
+
+					first_letter_uppercased_type_name,
+					opengl_type_name,
+				}
+			})
+			.collect::<Vec<UniformArrayExt>>();
 
 		let api_context = APIContext {
 			development,
@@ -166,10 +202,21 @@ impl TemplateRenderer {
 		};
 		let render = self.render_template(Template::Render, &render_context)?;
 
+		let set_active_uniform_values_context = SetActiveUniformValuesContext {
+			active_uniforms: &active_uniforms,
+			target,
+		};
+		let set_active_uniform_values = self.render_template(
+			Template::SetActiveUniformValues,
+			&set_active_uniform_values_context,
+		)?;
+
 		let shader_declarations_context = ShaderDeclarationContext {
-			shader_codes: &shader_codes,
+			active_uniforms: &active_uniforms,
 			passes: &shader_descriptor.passes,
-			uniform_arrays: &shader_descriptor.uniform_arrays,
+			shader_codes: &shader_codes,
+			target,
+			uniform_arrays: &uniform_arrays,
 		};
 		let shader_declarations =
 			self.render_template(Template::ShaderDeclarations, &shader_declarations_context)?;
@@ -179,7 +226,7 @@ impl TemplateRenderer {
 			passes: &shader_descriptor.passes,
 			shader_codes: &shader_codes,
 			target,
-			uniform_arrays: &shader_descriptor.uniform_arrays,
+			uniform_arrays: &uniform_arrays,
 		};
 		let shader_loading =
 			self.render_template(Template::ShaderLoading, &shader_loading_context)?;
@@ -288,6 +335,7 @@ impl TemplateRenderer {
 			opengl_declarations,
 			opengl_loading,
 			render,
+			set_active_uniform_values,
 			shader_declarations,
 			shader_loading,
 		})
@@ -302,5 +350,18 @@ impl TemplateRenderer {
 		self.tera
 			.render(&name, context)
 			.map_err(|_| format!("Failed to render {}.", name))
+	}
+}
+
+fn to_opengl_type_name(type_name: &str) -> &'static str {
+	match type_name {
+		"bool" => "GLint",
+		"int" => "GLint",
+		"float" => "GLfloat",
+		"mat2" => "ShibaMat2",
+		"mat3" => "ShibaMat3",
+		"mat4" => "ShibaMat4",
+		"uint" => "GLuint",
+		_ => "GLint",
 	}
 }

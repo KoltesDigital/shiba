@@ -5,9 +5,9 @@ from shiba.presets import AddProjectPreset
 
 
 class _Panel:
-    bl_space_type = "PROPERTIES"
-    bl_region_type = "WINDOW"
-    bl_context = "render"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = 'render'
     COMPAT_ENGINES = {RenderEngine.bl_idname}
 
     @classmethod

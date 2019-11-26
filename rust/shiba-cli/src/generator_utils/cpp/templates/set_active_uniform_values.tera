@@ -1,0 +1,10 @@
+{% if target == "blender_api" %}
+	{% for variable in active_uniforms %}
+		{% set variable_index = loop.index0 %}
+		{% for annotation in variable.kind.uniform.annotations %}
+			{% if annotation.control %}
+				{{ variable.name }} = _shibaArgValues[{{ variable_index }}].as_{{ variable.opengl_type_name }};
+			{% endif %}
+		{% endfor %}
+	{% endfor %}
+{% endif %}

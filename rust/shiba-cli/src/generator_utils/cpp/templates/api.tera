@@ -180,6 +180,53 @@ public:
 	SHIBA_VARIABLE GLint _shibaFragmentShaders[{{ passes | length }}];
 	SHIBA_VARIABLE GLint _shibaVertexShaders[{{ passes | length }}];
 
+	enum class _ShibaUniformAnnotationKind
+	{
+		Control,
+	};
+
+	struct _ShibaUniformAnnotationDescriptor
+	{
+		_ShibaUniformAnnotationKind kind;
+	};
+
+	enum class _ShibaUniformAnnotationControlKind
+	{
+		Checkbox,
+		Object,
+		Slider,
+	};
+
+	struct _ShibaUniformAnnotationControlDescriptor : _ShibaUniformAnnotationDescriptor
+	{
+		_ShibaUniformAnnotationControlKind controlKind;
+		const char *controlParameters;
+
+		_ShibaUniformAnnotationControlDescriptor(_ShibaUniformAnnotationControlKind controlKind, const char *controlParameters)
+			: _ShibaUniformAnnotationDescriptor{ _ShibaUniformAnnotationKind::Control }
+			, controlKind{ controlKind }
+			, controlParameters{ controlParameters }
+		{}
+	};
+
+	struct _ShibaUniformDescriptor
+	{
+		int annotationCount;
+		_ShibaUniformAnnotationDescriptor **annotations;
+		const char *name;
+		const char *typeName;
+	};
+
+	union _ShibaUniformValue
+	{
+		float as_GLfloat;
+		GLint as_GLint;
+		ShibaMat2 as_ShibaMat2;
+		ShibaMat3 as_ShibaMat3;
+		ShibaMat4 as_ShibaMat4;
+		GLuint as_GLuint;
+	};
+
 {% else %}
 
 	#define SHIBA_VARIABLE static
@@ -380,7 +427,6 @@ void main() {\n\
 	#define shibaObjectMatrices (*_shibaObjectMatrices)
 
 	SHIBA_VARIABLE bool shibaIsViewport;
-	SHIBA_VARIABLE bool shibaOverrideMatricesSet;
 	SHIBA_VARIABLE ShibaMat4 shibaOverrideViewMatrix;
 	SHIBA_VARIABLE ShibaMat4 shibaOverrideInvViewMatrix;
 	SHIBA_VARIABLE ShibaMat4 shibaOverrideProjectionMatrix;

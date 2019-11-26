@@ -6,7 +6,7 @@ use crate::configuration::Configuration;
 use crate::generator_utils::cpp;
 use crate::paths::TEMP_DIRECTORY;
 use crate::traits;
-use crate::types::{CompilationDescriptor, Pass, ShaderDescriptor, UniformArray};
+use crate::types::{CompilationDescriptor, ShaderDescriptor};
 use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
@@ -14,15 +14,11 @@ use tera::Tera;
 
 #[derive(Serialize)]
 struct Context<'a> {
-	api: &'a String,
-	opengl_declarations: &'a String,
-	opengl_loading: &'a String,
-	passes: &'a [Pass],
+	#[serde(flatten)]
+	cpp_contents: &'a cpp::TemplateContents,
 	project_codes: &'a CodeMap,
-	render: &'a String,
-	shader_declarations: &'a String,
-	shader_loading: &'a String,
-	uniform_arrays: &'a [UniformArray],
+	#[serde(flatten)]
+	shader_descriptor: &'a ShaderDescriptor,
 }
 
 pub struct Generator<'a> {
@@ -78,15 +74,9 @@ impl<'a> traits::Generator for Generator<'a> {
 		)?;
 
 		let context = Context {
-			api: &contents.api,
-			opengl_declarations: &contents.opengl_declarations,
-			opengl_loading: &contents.opengl_loading,
-			passes: &shader_descriptor.passes,
+			cpp_contents: &contents,
 			project_codes: &project_codes,
-			render: &contents.render,
-			shader_declarations: &contents.shader_declarations,
-			shader_loading: &contents.shader_loading,
-			uniform_arrays: &shader_descriptor.uniform_arrays,
+			shader_descriptor: &shader_descriptor,
 		};
 		let contents = self
 			.tera

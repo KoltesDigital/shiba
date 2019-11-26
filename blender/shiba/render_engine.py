@@ -1,5 +1,5 @@
 import bpy
-from shiba import api, callback_lists, instrumentation
+from shiba import api, callback_lists, instrumentation, uniforms
 
 
 class RenderEngine(bpy.types.RenderEngine):
@@ -107,6 +107,10 @@ class RenderEngine(bpy.types.RenderEngine):
             context.region_data.view_matrix.inverted(),
             context.region_data.window_matrix,
         )
+
+        values = uniforms.get_api_uniform_values(context.scene.shiba.uniforms)
+        api.set_uniform_values(values)
+
         time = RenderEngine._get_time(depsgraph)
         width, height = RenderEngine._get_view_resolution(context)
         api.viewport_render(time, width, height)

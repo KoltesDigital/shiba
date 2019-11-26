@@ -1,4 +1,4 @@
-use crate::types::{Pass, ShaderDescriptor, VariableKind};
+use crate::types::{ConstVariable, Pass, ShaderDescriptor, VariableKind};
 use regex::Regex;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -56,7 +56,7 @@ impl ShaderCodes {
 			}
 
 			match variable.kind {
-				VariableKind::Uniform => {}
+				VariableKind::Uniform(_) => {}
 				_ => {
 					if !globals_by_type.contains_key(&variable.type_name) {
 						let _ = globals_by_type.insert(variable.type_name.clone(), Vec::new());
@@ -67,7 +67,7 @@ impl ShaderCodes {
 						.as_ref()
 						.unwrap_or(&variable.name)
 						.clone();
-					if let VariableKind::Const(value) = &variable.kind {
+					if let VariableKind::Const(ConstVariable { value }) = &variable.kind {
 						name += format!(" = {}", value).as_str();
 					}
 					globals_by_type

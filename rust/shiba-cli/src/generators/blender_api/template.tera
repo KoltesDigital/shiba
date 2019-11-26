@@ -224,11 +224,21 @@ _SHIBA_EXPORT void _shibaSetOverrideMatrices(
 	ShibaMat4 projectionMatrix, ShibaMat4 invProjectionMatrix
 )
 {
-	shibaOverrideMatricesSet = true;
 	shibaOverrideViewMatrix = viewMatrix;
 	shibaOverrideInvViewMatrix = invViewMatrix;
 	shibaOverrideProjectionMatrix = projectionMatrix;
 	shibaOverrideInvProjectionMatrix = invProjectionMatrix;
+}
+
+_SHIBA_EXPORT void _shibaGetActiveUniformDescriptors(int &activeUniformCount, const _ShibaUniformDescriptor *&uniformDescriptors)
+{
+	activeUniformCount = sizeof(_shibaActiveUniformDescriptors) / sizeof(_shibaActiveUniformDescriptors[0]);
+	uniformDescriptors = _shibaActiveUniformDescriptors;
+}
+
+_SHIBA_EXPORT void _shibaSetActiveUniformValues(_ShibaUniformValue *_shibaArgValues)
+{
+	{{ set_active_uniform_values }}
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)

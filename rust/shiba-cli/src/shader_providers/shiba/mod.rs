@@ -6,7 +6,7 @@ pub use self::settings::Settings;
 use self::types::*;
 use crate::parsers::glsl;
 use crate::traits;
-use crate::types::{Pass, ShaderDescriptor, UniformArray, VariableKind};
+use crate::types::{ConstVariable, Pass, ShaderDescriptor, UniformArray, VariableKind};
 use regex::Regex;
 use serde::Serialize;
 use std::cell::Cell;
@@ -142,7 +142,7 @@ impl traits::ShaderProvider for ShaderProvider {
 				let usage_re =
 					Regex::new(format!(r"\b{}\b", variable.name).as_str()).expect("Bad regex.");
 
-				if let VariableKind::Const(value) = &variable.kind {
+				if let VariableKind::Const(ConstVariable { value }) = &variable.kind {
 					/*
 					console.log(
 						`Replacing references to constant "${variable.name}" by its value "${variable.value}".`
@@ -202,7 +202,7 @@ impl traits::ShaderProvider for ShaderProvider {
 				continue;
 			}
 
-			if let VariableKind::Uniform = variable.kind {
+			if let VariableKind::Uniform(_) = variable.kind {
 				let uniform_array = match shader_descriptor
 					.uniform_arrays
 					.iter_mut()
@@ -254,7 +254,7 @@ impl traits::ShaderProvider for ShaderProvider {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::types::{Sections, Variable, VariableKind};
+	use crate::types::{Sections, UniformVariable, Variable, VariableKind};
 
 	#[test]
 	fn test_parse() {
@@ -309,7 +309,9 @@ fragment code
 					},
 					Variable {
 						active: true,
-						kind: VariableKind::Const("42.".to_string()),
+						kind: VariableKind::Const(ConstVariable {
+							value: "42.".to_string()
+						}),
 						length: None,
 						minified_name: None,
 						name: "constVar".to_string(),
@@ -317,7 +319,9 @@ fragment code
 					},
 					Variable {
 						active: true,
-						kind: VariableKind::Uniform,
+						kind: VariableKind::Uniform(UniformVariable {
+							annotations: vec![]
+						}),
 						length: None,
 						minified_name: None,
 						name: "uniformVar0".to_string(),
@@ -325,7 +329,9 @@ fragment code
 					},
 					Variable {
 						active: true,
-						kind: VariableKind::Uniform,
+						kind: VariableKind::Uniform(UniformVariable {
+							annotations: vec![]
+						}),
 						length: Some(4),
 						minified_name: None,
 						name: "uniformVar1".to_string(),
@@ -333,7 +339,9 @@ fragment code
 					},
 					Variable {
 						active: true,
-						kind: VariableKind::Uniform,
+						kind: VariableKind::Uniform(UniformVariable {
+							annotations: vec![]
+						}),
 						length: None,
 						minified_name: None,
 						name: "uniformVar2".to_string(),

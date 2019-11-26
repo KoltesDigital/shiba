@@ -64,7 +64,7 @@ impl traits::ShaderMinifier for ShaderMinifier {
 			.filter(|variable| {
 				variable.active
 					&& match variable.kind {
-						VariableKind::Uniform => false,
+						VariableKind::Uniform(_) => false,
 						_ => true,
 					}
 			})

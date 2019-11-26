@@ -17,7 +17,7 @@ pub struct Options<'a> {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case", tag = "command")]
+#[serde(rename_all = "kebab-case")]
 struct SetBuildExecutableCommand {
 	build_executable: bool,
 }

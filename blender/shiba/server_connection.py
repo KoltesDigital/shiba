@@ -1,6 +1,6 @@
 import json
 import socket
-from shiba import addon_preferences, api, notifications
+from shiba import addon_preferences, api, notifications, uniforms
 from shiba.notifications import Notification
 from threading import Lock, Thread
 
@@ -20,6 +20,8 @@ def _handle_event(obj):
 
     if event == "blender-api-path":
         api.set_path(obj['path'])
+        count, descriptors = api.get_active_uniform_descriptors()
+        uniforms.set_api_active_uniform_descriptors(count, descriptors)
 
     if event == "build-started":
         with _building_lock:

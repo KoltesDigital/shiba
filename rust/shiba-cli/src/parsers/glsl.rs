@@ -1,5 +1,8 @@
 use super::*;
-use crate::types::{Variable, VariableKind};
+use crate::types::{
+	ConstVariable, UniformAnnotationControlDescriptor, UniformAnnotationKind, UniformVariable,
+	Variable, VariableKind,
+};
 use nom::{
 	branch::*, bytes::complete::*, character::complete::*, combinator::*, multi::*, sequence::*,
 	IResult,
@@ -62,7 +65,9 @@ pub fn const_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 			list.into_iter()
 				.map(|(name, length, value)| Variable {
 					active: true,
-					kind: VariableKind::Const(value.to_string()),
+					kind: VariableKind::Const(ConstVariable {
+						value: value.to_string(),
+					}),
 					length,
 					minified_name: None,
 					name: name.to_string(),
@@ -96,6 +101,36 @@ pub fn regular_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 	)(input)
 }
 
+pub fn uniform_annotation<'a>(input: &'a str) -> IResult<&'a str, UniformAnnotationKind> {
+	alt((
+		map(
+			tuple((
+				tag("control"),
+				space1,
+				take_while(|c: char| c == '_' || c.is_alphabetic()),
+				opt(delimited(
+					char('('),
+					take_while(|c: char| c != ')'),
+					char(')'),
+				)),
+			)),
+			|(_, _, control_kind, control_parameters): (_, _, _, Option<&'a str>)| {
+				UniformAnnotationKind::Control(UniformAnnotationControlDescriptor {
+					control_kind: match control_kind {
+						"checkbox" => "Checkbox",
+						"object" => "Object",
+						"slider" => "Slider",
+						_ => "Unknown",
+					}
+					.to_string(),
+					control_parameters: control_parameters.map(|value| value.to_string()),
+				})
+			},
+		),
+		value(UniformAnnotationKind::Time, tag("time")),
+	))(input)
+}
+
 pub fn uniform_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 	map(
 		tuple((
@@ -105,12 +140,25 @@ pub fn uniform_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 			space1,
 			separated_list(tuple((char(','), space0)), identifier_length),
 			char(';'),
+			opt(map(
+				tuple((
+					space0,
+					tag("//"),
+					space0,
+					tag("shiba"),
+					space1,
+					separated_list(tuple((char(','), space0)), uniform_annotation),
+				)),
+				|(_, _, _, _, _, annotations)| annotations,
+			)),
 		)),
-		|(_, _, type_name, _, list, _)| {
+		|(_, _, type_name, _, list, _, annotations)| {
 			list.into_iter()
 				.map(|(name, length)| Variable {
 					active: true,
-					kind: VariableKind::Uniform,
+					kind: VariableKind::Uniform(UniformVariable {
+						annotations: annotations.clone().unwrap_or_else(Vec::new),
+					}),
 					length,
 					minified_name: None,
 					name: name.to_string(),
@@ -191,6 +239,7 @@ pub fn vertex_directive(input: &str) -> IResult<&str, usize> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::types::UniformAnnotationControlDescriptor;
 
 	#[test]
 	fn test_identifier() {
@@ -207,7 +256,8 @@ float regularVar1[1];
 const float constVar0 = 42., constVar1 = 1337.;
 uniform float uniformVar0;
 uniform float uniformVar1[4];
-uniform vec2 uniformVar2;
+uniform vec2 uniformVar2; // simple comment
+uniform bool uniformVar3; // shiba control checkbox(default=true)
 "#,
 		);
 
@@ -234,7 +284,9 @@ uniform vec2 uniformVar2;
 					},
 					Variable {
 						active: true,
-						kind: VariableKind::Const("42.".to_string()),
+						kind: VariableKind::Const(ConstVariable {
+							value: "42.".to_string()
+						}),
 						length: None,
 						minified_name: None,
 						name: "constVar0".to_string(),
@@ -242,7 +294,9 @@ uniform vec2 uniformVar2;
 					},
 					Variable {
 						active: true,
-						kind: VariableKind::Const("1337.".to_string()),
+						kind: VariableKind::Const(ConstVariable {
+							value: "1337.".to_string()
+						}),
 						length: None,
 						minified_name: None,
 						name: "constVar1".to_string(),
@@ -250,7 +304,9 @@ uniform vec2 uniformVar2;
 					},
 					Variable {
 						active: true,
-						kind: VariableKind::Uniform,
+						kind: VariableKind::Uniform(UniformVariable {
+							annotations: vec![]
+						}),
 						length: None,
 						minified_name: None,
 						name: "uniformVar0".to_string(),
@@ -258,7 +314,9 @@ uniform vec2 uniformVar2;
 					},
 					Variable {
 						active: true,
-						kind: VariableKind::Uniform,
+						kind: VariableKind::Uniform(UniformVariable {
+							annotations: vec![]
+						}),
 						length: Some(4),
 						minified_name: None,
 						name: "uniformVar1".to_string(),
@@ -266,11 +324,28 @@ uniform vec2 uniformVar2;
 					},
 					Variable {
 						active: true,
-						kind: VariableKind::Uniform,
+						kind: VariableKind::Uniform(UniformVariable {
+							annotations: vec![]
+						}),
 						length: None,
 						minified_name: None,
 						name: "uniformVar2".to_string(),
 						type_name: "vec2".to_string(),
+					},
+					Variable {
+						active: true,
+						kind: VariableKind::Uniform(UniformVariable {
+							annotations: vec![UniformAnnotationKind::Control(
+								UniformAnnotationControlDescriptor {
+									control_kind: "checkbox".to_string(),
+									control_parameters: Some("default=true".to_string()),
+								}
+							)]
+						}),
+						length: None,
+						minified_name: None,
+						name: "uniformVar3".to_string(),
+						type_name: "bool".to_string(),
 					}
 				]
 			))

@@ -6,6 +6,55 @@ from shiba.locked_file import LockedFile
 import struct
 from threading import Lock
 
+UNIFORM_ANNOTATION_KIND_CONTROL = 0
+
+
+class UniformAnnotationDescriptor(ctypes.Structure):
+    _fields_ = [
+        ('kind', ctypes.c_int),
+    ]
+
+
+UNIFORM_ANNOTATION_CONTROL_KIND_CHECKBOX = 0
+UNIFORM_ANNOTATION_CONTROL_KIND_OBJECT = 1
+UNIFORM_ANNOTATION_CONTROL_KIND_SLIDER = 2
+
+
+class UniformAnnotationControlDescriptor(ctypes.Structure):
+    _fields_ = [
+        ('kind', ctypes.c_int),
+        ('control_kind', ctypes.c_int),
+        ('control_parameters', ctypes.c_char_p),
+    ]
+
+
+class UniformDescriptor(ctypes.Structure):
+    _fields_ = [
+        ('annotation_count', ctypes.c_int),
+        ('annotations', ctypes.POINTER(
+            ctypes.POINTER(UniformAnnotationDescriptor))),
+        ('name', ctypes.c_char_p),
+        ('type_name', ctypes.c_char_p),
+    ]
+
+
+class UniformValue(ctypes.Union):
+    _fields_ = [
+        ('as_float', ctypes.c_float),
+        ('as_int', ctypes.c_int),
+        ('as_mat2', ctypes.c_float * 4),
+        ('as_mat3', ctypes.c_float * 9),
+        ('as_mat4', ctypes.c_float * 16),
+        ('as_uint', ctypes.c_uint),
+    ]
+
+
+class ShaderPasses(ctypes.Structure):
+    _fields_ = [
+        ('vertex', ctypes.c_char_p),
+        ('fragment', ctypes.c_char_p),
+    ]
+
 
 _library = None
 
@@ -62,13 +111,6 @@ def set_path(path):
         callback_lists.viewport_update.trigger()
 
 
-class _API_ShaderPasses(ctypes.Structure):
-    _fields_ = [
-        ('vertex', ctypes.c_char_p),
-        ('fragment', ctypes.c_char_p)
-    ]
-
-
 class _ToUpdate:
     def __init__(self):
         self.object_instances = None
@@ -113,13 +155,13 @@ def _execute_updates(to_update):
             return value
 
         count = len(to_update.shader_passes)
-        ShaderPasses = _API_ShaderPasses * count
-        array = [_API_ShaderPasses(
+        ShaderPassArray = ShaderPasses * count
+        array = [ShaderPasses(
             vertex=to_char_p(shader_pass, 'vertex'),
             fragment=to_char_p(shader_pass, 'fragment'),
         )
             for shader_pass in to_update.shader_passes]
-        passes = ShaderPasses(*array)
+        passes = ShaderPassArray(*array)
         _library._shibaUpdateShaderPasses(
             count,
             passes,
@@ -216,6 +258,28 @@ def set_override_matrices(
             _to_c_matrix(projection_matrix),
             _to_c_matrix(projection_matrix.inverted()),
         )
+
+
+def get_active_uniform_descriptors():
+    with _lock:
+        if not _locked_file.is_opened:
+            return 0, None
+
+        active_uniform_count = ctypes.c_int()
+        active_uniform_descriptors = ctypes.POINTER(UniformDescriptor)()
+        _library._shibaGetActiveUniformDescriptors(
+            ctypes.byref(active_uniform_count),
+            ctypes.byref(active_uniform_descriptors),
+        )
+        return active_uniform_count.value, active_uniform_descriptors
+
+
+def set_uniform_values(uniform_values):
+    with _lock:
+        if not _locked_file.is_opened:
+            return
+
+        _library._shibaSetActiveUniformValues(uniform_values)
 
 
 _Matrix = ctypes.c_float * 16
