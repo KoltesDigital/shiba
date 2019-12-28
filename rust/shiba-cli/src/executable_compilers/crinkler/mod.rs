@@ -1,12 +1,12 @@
 mod settings;
 
-pub use self::settings::Settings;
+pub use self::settings::CrinklerSettings;
+use super::ExecutableCompiler;
 use crate::code_map::CodeMap;
-use crate::configuration::Configuration;
+use crate::compiler::{CompileOptions, Compiler};
 use crate::generator_utils::cpp;
 use crate::paths::TEMP_DIRECTORY;
-use crate::traits;
-use crate::types::{CompilationDescriptor, Pass, ShaderDescriptor, UniformArray};
+use crate::types::{Pass, ProjectDescriptor, UniformArray};
 use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
@@ -22,24 +22,30 @@ struct Context<'a> {
 	passes: &'a [Pass],
 	project_codes: &'a CodeMap,
 	render: &'a String,
-	settings: &'a Settings,
+	settings: &'a CrinklerSettings,
 	shader_declarations: &'a String,
 	shader_loading: &'a String,
 	uniform_arrays: &'a [UniformArray],
 }
 
-pub struct Generator<'a> {
+pub struct CrinklerCompiler<'a> {
+	project_descriptor: &'a ProjectDescriptor<'a>,
+	settings: &'a CrinklerSettings,
+
 	cpp_template_renderer: cpp::TemplateRenderer,
 	crinkler_path: PathBuf,
 	msvc_command_generator: cpp::msvc::CommandGenerator,
-	settings: &'a Settings,
 	tera: Tera,
 }
 
-impl<'a> Generator<'a> {
-	pub fn new(settings: &'a Settings, configuration: &'a Configuration) -> Result<Self, String> {
-		let cpp_template_renderer = cpp::TemplateRenderer::new(configuration)?;
-		let crinkler_path = configuration
+impl<'a> CrinklerCompiler<'a> {
+	pub fn new(
+		project_descriptor: &'a ProjectDescriptor,
+		settings: &'a CrinklerSettings,
+	) -> Result<Self, String> {
+		let cpp_template_renderer = cpp::TemplateRenderer::new(&project_descriptor.configuration)?;
+		let crinkler_path = project_descriptor
+			.configuration
 			.paths
 			.get("crinkler")
 			.ok_or("Please set configuration key paths.crinkler.")?
@@ -48,47 +54,43 @@ impl<'a> Generator<'a> {
 
 		let mut tera = Tera::default();
 
-		tera.add_raw_template("template", include_str!("../executable/template.tera"))
+		tera.add_raw_template("template", include_str!("../msvc/template.tera"))
 			.map_err(|err| err.to_string())?;
 
-		Ok(Generator {
+		Ok(CrinklerCompiler {
+			project_descriptor,
+			settings,
+
 			cpp_template_renderer,
 			crinkler_path,
 			msvc_command_generator,
-			settings,
 			tera,
 		})
 	}
 }
 
-impl<'a> traits::Generator for Generator<'a> {
-	fn generate(
-		&self,
-		audio_codes: &CodeMap,
-		compilation_descriptor: &CompilationDescriptor,
-		project_codes: &CodeMap,
-		shader_descriptor: &ShaderDescriptor,
-	) -> Result<(), String> {
+impl<'a> Compiler for CrinklerCompiler<'a> {
+	fn compile(&self, options: &CompileOptions) -> Result<PathBuf, String> {
 		let contents = self.cpp_template_renderer.render(
-			project_codes,
-			shader_descriptor,
-			self.get_development(),
+			options.project_codes,
+			options.shader_descriptor,
+			self.project_descriptor.development,
 			"crinkler",
 		)?;
 
 		let context = Context {
 			api: &contents.api,
-			audio_codes: &audio_codes,
-			development: self.get_development(),
+			audio_codes: &options.audio_codes,
+			development: self.project_descriptor.development,
 			opengl_declarations: &contents.opengl_declarations,
 			opengl_loading: &contents.opengl_loading,
-			passes: &shader_descriptor.passes,
-			project_codes: &project_codes,
+			passes: &options.shader_descriptor.passes,
+			project_codes: &options.project_codes,
 			render: &contents.render,
 			settings: self.settings,
 			shader_declarations: &contents.shader_declarations,
 			shader_loading: &contents.shader_loading,
-			uniform_arrays: &shader_descriptor.uniform_arrays,
+			uniform_arrays: &options.shader_descriptor.uniform_arrays,
 		};
 		let contents = self
 			.tera
@@ -108,7 +110,7 @@ impl<'a> traits::Generator for Generator<'a> {
 			.arg("/Facrinkler.asm")
 			.arg("/Focrinkler.obj")
 			.arg("crinkler.cpp")
-			.args(&compilation_descriptor.cl.args)
+			.args(&options.compilation_descriptor.cl.args)
 			.arg("&&")
 			.arg(&self.crinkler_path)
 			.args(vec![
@@ -121,7 +123,7 @@ impl<'a> traits::Generator for Generator<'a> {
 				"user32.lib",
 			])
 			.args(&self.settings.crinkler.args)
-			.args(&compilation_descriptor.crinkler.args)
+			.args(&options.compilation_descriptor.crinkler.args)
 			.arg("crinkler.obj")
 			.current_dir(&*TEMP_DIRECTORY)
 			.spawn()
@@ -132,14 +134,8 @@ impl<'a> traits::Generator for Generator<'a> {
 			return Err("Failed to compile.".to_string());
 		}
 
-		Ok(())
-	}
-
-	fn get_development(&self) -> bool {
-		false
-	}
-
-	fn get_path(&self) -> PathBuf {
-		TEMP_DIRECTORY.join("crinkler.exe")
+		Ok(TEMP_DIRECTORY.join("crinkler.exe"))
 	}
 }
+
+impl ExecutableCompiler for CrinklerCompiler<'_> {}

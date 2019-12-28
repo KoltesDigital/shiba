@@ -16,7 +16,7 @@ pub struct Link {
 }
 
 impl Default for Link {
-	fn default() -> Link {
+	fn default() -> Self {
 		Link {
 			args: default_args(),
 		}
@@ -25,7 +25,7 @@ impl Default for Link {
 
 #[derive(Debug, Default, Deserialize, Hash)]
 #[serde(rename_all(deserialize = "kebab-case", serialize = "snake_case"))]
-pub struct Settings {
+pub struct MsvcSettings {
 	#[serde(default)]
 	pub link: Link,
 }

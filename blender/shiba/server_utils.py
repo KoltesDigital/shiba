@@ -10,25 +10,34 @@ def _get_project_directory():
     return path
 
 
+def _send_build_commands(library_mode):
+    server_connection.send_build_command(library_mode, 'library')
+    if bpy.context.scene.shiba.build_executable_on_change:
+        server_connection.send_build_command('full', 'executable')
+
+
 def bootstrap():
-    server_connection.send_get_blender_api_path_command()
-    server_connection.send_set_build_executable_command(
-        bpy.context.scene.shiba.build_executable)
+    server_connection.send_set_build_mode_on_change_command(
+        'full' if bpy.context.scene.shiba.build_executable_on_change else None,
+        'updates',
+    )
     server_connection.send_set_project_directory_command(
         _get_project_directory())
-    server_connection.send_build_command()
+    _send_build_commands('full')
 
 
-def update_build_executable():
-    server_connection.send_set_build_executable_command(
-        bpy.context.scene.shiba.build_executable)
-    server_connection.send_build_command()
+def update_build_on_change():
+    server_connection.send_set_build_mode_on_change_command(
+        'full' if bpy.context.scene.shiba.build_executable_on_change else None,
+        'updates',
+    )
+    _send_build_commands('updates')
 
 
 def update_project_directory():
     server_connection.send_set_project_directory_command(
         _get_project_directory())
-    server_connection.send_build_command()
+    _send_build_commands('updates')
 
 
 @persistent

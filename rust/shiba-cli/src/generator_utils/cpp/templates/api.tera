@@ -241,7 +241,7 @@ public:
 
 {% endif %}
 
-{% if target == "blender_api" %}
+{% if target == "library" %}
 
 	SHIBA_CONST char *_shibaShaderNullVertexCode =
 "#version 150\n\

@@ -1,4 +1,4 @@
-{% if target == "blender_api" %}
+{% if target == "library" %}
 	{% for variable in active_uniforms %}
 		{% set variable_index = loop.index0 %}
 		{% for annotation in variable.kind.uniform.annotations %}

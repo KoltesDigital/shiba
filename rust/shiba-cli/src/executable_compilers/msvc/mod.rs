@@ -1,12 +1,12 @@
 mod settings;
 
-pub use self::settings::Settings;
+pub use self::settings::MsvcSettings;
+use super::ExecutableCompiler;
 use crate::code_map::CodeMap;
-use crate::configuration::Configuration;
+use crate::compiler::{CompileOptions, Compiler};
 use crate::generator_utils::cpp;
 use crate::paths::TEMP_DIRECTORY;
-use crate::traits;
-use crate::types::{CompilationDescriptor, Pass, ShaderDescriptor, UniformArray};
+use crate::types::{Pass, ProjectDescriptor, UniformArray};
 use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
@@ -22,24 +22,30 @@ struct Context<'a> {
 	passes: &'a [Pass],
 	project_codes: &'a CodeMap,
 	render: &'a String,
-	settings: &'a Settings,
+	settings: &'a MsvcSettings,
 	shader_declarations: &'a String,
 	shader_loading: &'a String,
 	uniform_arrays: &'a [UniformArray],
 }
 
-pub struct Generator<'a> {
+pub struct MsvcCompiler<'a> {
+	project_descriptor: &'a ProjectDescriptor<'a>,
+	settings: &'a MsvcSettings,
+
 	cpp_template_renderer: cpp::TemplateRenderer,
 	glew_path: PathBuf,
 	msvc_command_generator: cpp::msvc::CommandGenerator,
-	settings: &'a Settings,
 	tera: Tera,
 }
 
-impl<'a> Generator<'a> {
-	pub fn new(settings: &'a Settings, configuration: &'a Configuration) -> Result<Self, String> {
-		let cpp_template_renderer = cpp::TemplateRenderer::new(configuration)?;
-		let glew_path = configuration
+impl<'a> MsvcCompiler<'a> {
+	pub fn new(
+		project_descriptor: &'a ProjectDescriptor,
+		settings: &'a MsvcSettings,
+	) -> Result<Self, String> {
+		let cpp_template_renderer = cpp::TemplateRenderer::new(&project_descriptor.configuration)?;
+		let glew_path = project_descriptor
+			.configuration
 			.paths
 			.get("glew")
 			.ok_or("Please set configuration key paths.glew.")?
@@ -48,47 +54,43 @@ impl<'a> Generator<'a> {
 
 		let mut tera = Tera::default();
 
-		tera.add_raw_template("template", include_str!("../executable/template.tera"))
+		tera.add_raw_template("template", include_str!("./template.tera"))
 			.map_err(|err| err.to_string())?;
 
-		Ok(Generator {
+		Ok(MsvcCompiler {
+			project_descriptor,
+			settings,
+
 			cpp_template_renderer,
 			glew_path,
 			msvc_command_generator,
-			settings,
 			tera,
 		})
 	}
 }
 
-impl<'a> traits::Generator for Generator<'a> {
-	fn generate(
-		&self,
-		audio_codes: &CodeMap,
-		compilation_descriptor: &CompilationDescriptor,
-		project_codes: &CodeMap,
-		shader_descriptor: &ShaderDescriptor,
-	) -> Result<(), String> {
+impl Compiler for MsvcCompiler<'_> {
+	fn compile(&self, options: &CompileOptions) -> Result<PathBuf, String> {
 		let contents = self.cpp_template_renderer.render(
-			project_codes,
-			shader_descriptor,
-			self.get_development(),
+			options.project_codes,
+			options.shader_descriptor,
+			self.project_descriptor.development,
 			"executable",
 		)?;
 
 		let context = Context {
 			api: &contents.api,
-			audio_codes: &audio_codes,
-			development: self.get_development(),
+			audio_codes: &options.audio_codes,
+			development: self.project_descriptor.development,
 			opengl_declarations: &contents.opengl_declarations,
 			opengl_loading: &contents.opengl_loading,
-			passes: &shader_descriptor.passes,
-			project_codes: &project_codes,
+			passes: &options.shader_descriptor.passes,
+			project_codes: &options.project_codes,
 			render: &contents.render,
 			settings: self.settings,
 			shader_declarations: &contents.shader_declarations,
 			shader_loading: &contents.shader_loading,
-			uniform_arrays: &shader_descriptor.uniform_arrays,
+			uniform_arrays: &options.shader_descriptor.uniform_arrays,
 		};
 		let contents = self
 			.tera
@@ -110,7 +112,7 @@ impl<'a> traits::Generator for Generator<'a> {
 				"/I{}",
 				self.glew_path.join("include").to_string_lossy()
 			))
-			.args(&compilation_descriptor.cl.args)
+			.args(&options.compilation_descriptor.cl.args)
 			.arg("executable.cpp")
 			.arg("&&")
 			.arg("link")
@@ -125,7 +127,7 @@ impl<'a> traits::Generator for Generator<'a> {
 					.to_string_lossy()
 					.as_ref(),
 			)
-			.args(&compilation_descriptor.link.args)
+			.args(&options.compilation_descriptor.link.args)
 			.arg("executable.obj")
 			.current_dir(&*TEMP_DIRECTORY)
 			.spawn()
@@ -136,14 +138,8 @@ impl<'a> traits::Generator for Generator<'a> {
 			return Err("Failed to compile.".to_string());
 		}
 
-		Ok(())
-	}
-
-	fn get_development(&self) -> bool {
-		true
-	}
-
-	fn get_path(&self) -> PathBuf {
-		TEMP_DIRECTORY.join("executable.exe")
+		Ok(TEMP_DIRECTORY.join("executable.exe"))
 	}
 }
+
+impl ExecutableCompiler for MsvcCompiler<'_> {}

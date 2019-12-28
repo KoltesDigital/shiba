@@ -2,17 +2,17 @@ mod parsers;
 mod settings;
 mod types;
 
-pub use self::settings::Settings;
+pub use self::settings::ShibaSettings;
 use self::types::*;
+use super::ShaderProvider;
 use crate::parsers::glsl;
-use crate::traits;
-use crate::types::{ConstVariable, Pass, ShaderDescriptor, UniformArray, VariableKind};
+use crate::types::{
+	ConstVariable, Pass, ProjectDescriptor, ShaderDescriptor, UniformArray, VariableKind,
+};
 use regex::Regex;
 use serde::Serialize;
 use std::cell::Cell;
 use std::fs;
-use std::hash::Hash;
-use std::path::Path;
 use tera::Tera;
 
 #[derive(Serialize)]
@@ -20,14 +20,21 @@ struct Context {
 	development: bool,
 }
 
-#[derive(Hash)]
-pub struct ShaderProvider {
+pub struct ShibaShaderProvider<'a> {
+	project_descriptor: &'a ProjectDescriptor<'a>,
+
 	shader_contents: String,
 }
 
-impl ShaderProvider {
-	pub fn new(project_directory: &Path, settings: &Settings) -> Result<Self, String> {
-		let path = project_directory.join(&settings.filename);
+impl<'a> ShibaShaderProvider<'a> {
+	pub fn new(
+		project_descriptor: &'a ProjectDescriptor,
+		settings: &'a ShibaSettings,
+	) -> Result<Self, String> {
+		let path = project_descriptor
+			.build_options
+			.project_directory
+			.join(&settings.filename);
 		let shader_contents = fs::read_to_string(&path).map_err(|err| {
 			format!(
 				"Failed to read shader at {}: {}",
@@ -36,7 +43,10 @@ impl ShaderProvider {
 			)
 		})?;
 
-		Ok(ShaderProvider { shader_contents })
+		Ok(ShibaShaderProvider {
+			project_descriptor,
+			shader_contents,
+		})
 	}
 }
 
@@ -127,9 +137,10 @@ fn parse(code: &str, development: bool) -> Result<ShaderDescriptor, String> {
 	Ok(shader_descriptor)
 }
 
-impl traits::ShaderProvider for ShaderProvider {
-	fn provide(&self, development: bool) -> Result<ShaderDescriptor, String> {
-		let mut shader_descriptor = parse(&self.shader_contents, development)?;
+impl ShaderProvider for ShibaShaderProvider<'_> {
+	fn provide(&self) -> Result<ShaderDescriptor, String> {
+		let mut shader_descriptor =
+			parse(&self.shader_contents, self.project_descriptor.development)?;
 
 		if shader_descriptor.passes.is_empty() {
 			return Err("Shader should define at least one pass.".to_string());

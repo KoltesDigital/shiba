@@ -2,11 +2,10 @@ mod parsers;
 mod types;
 
 use self::types::*;
-use crate::configuration::Configuration;
+use super::ShaderMinifier;
 use crate::parsers::glsl;
 use crate::paths::TEMP_DIRECTORY;
-use crate::traits;
-use crate::types::{Pass, Sections, ShaderDescriptor, Variable, VariableKind};
+use crate::types::{Pass, ProjectDescriptor, Sections, ShaderDescriptor, Variable, VariableKind};
 use regex::Regex;
 use serde::Serialize;
 use std::cell::Cell;
@@ -16,14 +15,15 @@ use std::process::{Command, Stdio};
 use std::str;
 use tera::Tera;
 
-pub struct ShaderMinifier {
+pub struct ShaderMinifierShaderMinifier {
 	exe_path: PathBuf,
 	tera: Tera,
 }
 
-impl ShaderMinifier {
-	pub fn new(configuration: &Configuration) -> Result<Self, String> {
-		let exe_path = configuration
+impl ShaderMinifierShaderMinifier {
+	pub fn new(project_descriptor: &ProjectDescriptor) -> Result<Self, String> {
+		let exe_path = project_descriptor
+			.configuration
 			.paths
 			.get("shader-minifier")
 			.ok_or("Please set configuration key paths.shader-minifier.")?
@@ -34,7 +34,7 @@ impl ShaderMinifier {
 		tera.add_raw_template("template", include_str!("template.tera"))
 			.map_err(|err| err.to_string())?;
 
-		Ok(ShaderMinifier { exe_path, tera })
+		Ok(ShaderMinifierShaderMinifier { exe_path, tera })
 	}
 }
 
@@ -44,7 +44,7 @@ struct Context<'a> {
 	pub shader_descriptor: &'a ShaderDescriptor,
 }
 
-impl traits::ShaderMinifier for ShaderMinifier {
+impl ShaderMinifier for ShaderMinifierShaderMinifier {
 	fn minify(
 		&self,
 		original_shader_descriptor: &ShaderDescriptor,

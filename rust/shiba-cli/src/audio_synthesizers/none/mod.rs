@@ -1,9 +1,9 @@
 mod settings;
 
-pub use self::settings::Settings;
+pub use self::settings::NoneSettings;
+use super::AudioSynthesizer;
 use crate::code_map::CodeMap;
-use crate::traits;
-use crate::types::CompilationDescriptor;
+use crate::types::{CompilationDescriptor, ProjectDescriptor};
 use ordered_float::OrderedFloat;
 use serde::Serialize;
 use tera::Tera;
@@ -21,23 +21,27 @@ struct Context {
 	speed: Option<OrderedFloat<f32>>,
 }
 
-pub struct AudioSynthesizer<'a> {
-	settings: &'a Settings,
+pub struct NoneAudioSynthesizer<'a> {
+	settings: &'a NoneSettings,
+
 	tera: Tera,
 }
 
-impl<'a> AudioSynthesizer<'a> {
-	pub fn new(settings: &'a Settings) -> Result<Self, String> {
+impl<'a> NoneAudioSynthesizer<'a> {
+	pub fn new(
+		_project_descriptor: &'a ProjectDescriptor,
+		settings: &'a NoneSettings,
+	) -> Result<Self, String> {
 		let mut tera = Tera::default();
 
 		tera.add_raw_templates(Template::as_array())
 			.map_err(|err| err.to_string())?;
 
-		Ok(AudioSynthesizer { tera, settings })
+		Ok(NoneAudioSynthesizer { settings, tera })
 	}
 }
 
-impl<'a> traits::AudioSynthesizer for AudioSynthesizer<'a> {
+impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 	fn integrate(
 		&self,
 		_compilation_descriptor: &mut CompilationDescriptor,

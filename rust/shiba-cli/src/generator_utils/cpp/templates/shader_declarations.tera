@@ -38,7 +38,7 @@ SHIBA_CONST char *_shibaShaderPassCodes[] = {
 
 SHIBA_VARIABLE int shibaUniformLocations[{{ passes | length }}][{{ uniform_arrays | length }}];
 
-{% if target == "blender_api" %}
+{% if target == "library" %}
 	// {{ active_uniforms | json_encode }}
 	{% for variable in active_uniforms %}
 		{% if variable.kind.uniform.annotations %}

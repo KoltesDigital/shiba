@@ -28,57 +28,47 @@ macro_rules! template_enum {
 	};
 }
 
-mod audio_synthesizers {
-	pub mod none;
-	pub mod oidos;
-}
+mod audio_synthesizers;
+mod build;
 mod code_map;
 mod commands {
-	pub mod build_blender_api;
-	pub mod build_executable;
+	pub mod build;
 	pub mod server;
 }
+mod compiler;
 mod configuration;
-mod generators {
-	pub mod blender_api;
-	pub mod crinkler;
-	pub mod executable;
-}
+mod executable_compilers;
 mod generator_utils {
 	pub mod cpp;
 	pub mod settings;
 }
+mod library_compilers;
 mod parsers;
 mod paths;
 mod settings;
-mod shader_minifiers {
-	pub mod shader_minifier;
-}
-mod shader_providers {
-	pub mod shiba;
-}
 mod shader_codes;
-mod stored_hash;
-mod traits;
+mod shader_minifiers;
+mod shader_providers;
 mod types;
 
+use crate::build::BuildTarget;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 enum Command {
-	/// Builds the project (default)
-	Build {
+	/// Builds the project as executable (default).
+	BuildExecutable {
 		#[structopt(short, long)]
 		force: bool,
 	},
-	/// Builds the Blender API
-	BuildBlender {
+	/// Builds the project as library.
+	BuildLibrary {
 		#[structopt(short, long)]
 		force: bool,
 	},
-	/// Starts a server
+	/// Starts a server.
 	Server {
 		#[structopt(long, default_value = "127.0.0.1")]
 		ip: IpAddr,
@@ -89,7 +79,7 @@ enum Command {
 
 impl Default for Command {
 	fn default() -> Self {
-		Command::Build { force: false }
+		Command::BuildExecutable { force: false }
 	}
 }
 
@@ -108,22 +98,19 @@ fn main() -> Result<(), String> {
 
 	let command = args.command.unwrap_or_else(Command::default);
 	match command {
-		Command::Build { force } => {
-			commands::build_executable::subcommand(&commands::build_executable::Options {
-				force,
-				project_directory: &args.project_directory,
-			})
-			.map(|_| ())
-		}
-		Command::BuildBlender { force } => {
-			commands::build_blender_api::subcommand(&commands::build_blender_api::Options {
-				diff: false,
-				force,
-				project_directory: &args.project_directory,
-			})
-			.map(|_| ())
-		}
-		Command::Server { ip, port } => commands::server::subcommand(&commands::server::Options {
+		Command::BuildExecutable { force } => commands::build::execute(&commands::build::Options {
+			force,
+			project_directory: &args.project_directory,
+			target: BuildTarget::Executable,
+		})
+		.map(|_| ()),
+		Command::BuildLibrary { force } => commands::build::execute(&commands::build::Options {
+			force,
+			project_directory: &args.project_directory,
+			target: BuildTarget::Library,
+		})
+		.map(|_| ()),
+		Command::Server { ip, port } => commands::server::execute(&commands::server::Options {
 			ip,
 			port,
 			project_directory: &args.project_directory,

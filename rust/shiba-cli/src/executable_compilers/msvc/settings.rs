@@ -3,55 +3,37 @@ use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
-fn default_cl_args() -> Vec<String> {
-	vec![
-		"/GR-",
-		"/GS-",
-		"/O1",
-		"/Oi",
-		"/Oy",
-		"/QIfist",
-		"/fp:fast",
-		"/arch:IA32",
-	]
-	.into_iter()
-	.map(|s| s.to_string())
-	.collect()
+fn default_link_args() -> Vec<String> {
+	vec!["/MACHINE:X64", "gdi32.lib", "opengl32.lib", "user32.lib"]
+		.into_iter()
+		.map(|s| s.to_string())
+		.collect()
 }
 
 #[derive(Debug, Deserialize, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct Cl {
-	#[serde(default = "default_cl_args")]
+pub struct Link {
+	#[serde(default = "default_link_args")]
 	pub args: Vec<String>,
 }
 
-impl Default for Cl {
-	fn default() -> Cl {
-		Cl {
-			args: default_cl_args(),
+impl Default for Link {
+	fn default() -> Self {
+		Link {
+			args: default_link_args(),
 		}
 	}
 }
 
 #[derive(Debug, Default, Deserialize, Hash, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct Crinkler {
-	#[serde(default)]
-	pub args: Vec<String>,
-}
-
-#[derive(Debug, Default, Deserialize, Hash, Serialize)]
 #[serde(rename_all(deserialize = "kebab-case", serialize = "snake_case"))]
-pub struct Settings {
+pub struct MsvcSettings {
 	#[serde(default)]
 	pub close_when_finished: bool,
 	#[serde(default)]
 	pub duration: Option<OrderedFloat<f32>>,
 	#[serde(default)]
-	pub cl: Cl,
-	#[serde(default)]
-	pub crinkler: Crinkler,
+	pub link: Link,
 	#[serde(default)]
 	pub loading_black_screen: bool,
 	#[serde(default)]

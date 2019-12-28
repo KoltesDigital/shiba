@@ -13,7 +13,7 @@ class AddProjectPreset(AddPresetBase, Operator):
     ]
 
     preset_values = [
-        "render_settings.build_executable",
+        "render_settings.build_executable_on_change",
         "render_settings.project_directory",
     ]
 

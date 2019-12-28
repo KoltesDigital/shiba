@@ -5,8 +5,8 @@ from shiba import server_utils
 from shiba.uniforms import Uniforms
 
 
-def _build_executable_update(_self, _context):
-    server_utils.update_build_executable()
+def _build_executable_on_change_update(_self, _context):
+    server_utils.update_build_on_change()
 
 
 def _project_directory_update(_self, _context):
@@ -14,11 +14,11 @@ def _project_directory_update(_self, _context):
 
 
 class RenderSettings(PropertyGroup):
-    build_executable: BoolProperty(
-        name="Build Executable",
-        description="In addition to building Blender API",
+    build_executable_on_change: BoolProperty(
+        name="Build Executable On Change",
+        description="Automatically build executable when a file is modified",
         default=True,
-        update=_build_executable_update
+        update=_build_executable_on_change_update
     )
 
     project_directory: StringProperty(

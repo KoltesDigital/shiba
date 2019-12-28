@@ -6,7 +6,7 @@
 		shibaProgram = glCreateProgram();
 		shibaCheckGlError();
 
-		{% if passes[0].vertex or target == "blender_api" %}
+		{% if passes[0].vertex or target == "library" %}
 			const char *vertexShaderSources[] = {
 				{% if passes[0].vertex %}
 					{% if shader_codes.before_stage_variables %}
@@ -19,7 +19,7 @@
 						_shibaShaderAfterStageVariablesCode,
 					{% endif %}
 					_shibaShaderPassCodes[0],
-				{% elif target == "blender_api" %}
+				{% elif target == "library" %}
 					_shibaShaderNullVertexCode,
 				{% endif %}
 			};
@@ -99,7 +99,7 @@
 		shibaCheckGlError();
 
 		if (_shibaShaderPassCodes[i * 2] != nullptr
-			{% if target == "blender_api" %}
+			{% if target == "library" %}
 				|| true
 			{% endif %}
 		)
@@ -119,7 +119,7 @@
 
 			GLint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 			shibaCheckGlError();
-			{% if target == "blender_api" %}
+			{% if target == "library" %}
 				if (_shibaShaderPassCodes[i * 2] != nullptr)
 				{
 					glShaderSource(vertexShader, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);

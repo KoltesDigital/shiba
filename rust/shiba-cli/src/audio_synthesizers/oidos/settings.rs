@@ -7,14 +7,14 @@ fn default_filename() -> String {
 
 #[derive(Debug, Deserialize, Hash)]
 #[serde(rename_all = "kebab-case")]
-pub struct Settings {
+pub struct OidosSettings {
 	#[serde(default = "default_filename")]
 	pub filename: String,
 }
 
-impl Default for Settings {
+impl Default for OidosSettings {
 	fn default() -> Self {
-		Settings {
+		OidosSettings {
 			filename: default_filename(),
 		}
 	}

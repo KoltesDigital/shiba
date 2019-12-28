@@ -13,7 +13,7 @@
 		resolutionHeight = shibaResolutionHeight;
 	#endif
 
-	{% if target == "blender_api" %}
+	{% if target == "library" %}
 		glUseProgram(shibaProgram);
 		shibaCheckGlError();
 	{% endif %}

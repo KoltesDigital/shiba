@@ -12,51 +12,56 @@ _socket_lock = Lock()
 _socket_thread = None
 
 
-def _handle_event(obj):
+def _handle_event_build_ended(obj):
     global _building_count
     global _building_notification
 
-    event = obj['event']
+    with _building_lock:
+        _building_count -= 1
+        if _building_count == 0:
+            notifications.remove(_building_notification)
 
-    if event == "blender-api-path":
-        api.set_path(obj['path'])
-        count, descriptors = api.get_active_uniform_descriptors()
-        uniforms.set_api_active_uniform_descriptors(count, descriptors)
+    print("Build duration: %fs." % obj['duration'])
 
-    if event == "build-started":
-        with _building_lock:
-            if _building_count == 0:
-                what = obj['what']
-                what_str = " + ".join(
-                    map(lambda what_item: what_item['kind'], what))
-                _building_notification = Notification(
-                    "Building %s..." % what_str)
-                notifications.add(_building_notification)
-            _building_count += 1
 
-    if event == "build-ended":
-        with _building_lock:
-            _building_count -= 1
-            if _building_count == 0:
-                notifications.remove(_building_notification)
-        what = obj['what']
-        for what_item in what:
-            kind = what_item['kind']
-            if kind == "blender-api":
-                api.reload()
-            if kind == "executable":
-                with _socket_lock:
-                    _socket.send(
-                        b'{"command":"get-executable-size"}\n')
-            if kind == 'shader-passes':
-                api.set_shader_passes(what_item['passes'])
+def _handle_event_build_started(obj):
+    global _building_count
+    global _building_notification
 
-    if event == 'error':
-        print('Server error: %s' % obj['message'])
+    with _building_lock:
+        if _building_count == 0:
+            _building_notification = Notification("Building...")
+            notifications.add(_building_notification)
+        _building_count += 1
 
-    if event == "executable-size":
-        size = obj['size']
-        notifications.add(Notification("Executable size: %d" % size, 5))
+
+def _handle_event_executable_compiled(obj):
+    size = obj['size']
+    notifications.add(Notification("Executable size: %d." % size, 5))
+
+
+def _handle_event_error(obj):
+    print("Server error: %s" % obj['message'])
+
+
+def _handle_event_library_compiled(obj):
+    api.set_path(obj['path'])
+    count, descriptors = api.get_active_uniform_descriptors()
+    uniforms.set_api_active_uniform_descriptors(count, descriptors)
+
+
+def _handle_event_shader_passes_generated(obj):
+    api.set_shader_passes(obj['passes'])
+
+
+_event_handlers = {
+    'build-ended': _handle_event_build_ended,
+    'build-started': _handle_event_build_started,
+    'executable-compiled': _handle_event_executable_compiled,
+    'error': _handle_event_error,
+    'library-compiled': _handle_event_library_compiled,
+    'shader-passes-generated': _handle_event_shader_passes_generated,
+}
 
 
 def _run_socket_thread():
@@ -77,7 +82,12 @@ def _run_socket_thread():
             line = buffer[:index]
 
             obj = json.loads(line)
-            _handle_event(obj)
+            event_kind = obj['event']
+            event_handler = _event_handlers.get(event_kind, None)
+            if event_handler:
+                event_handler(obj)
+            else:
+                print("No handler for event %s." % event_kind)
 
             buffer = buffer[index + 1:]
             index = buffer.find(b'\n')
@@ -119,37 +129,35 @@ def disconnect():
             print("Disconnected from server.")
 
 
-def send_build_command():
+def _send_command(command):
     with _socket_lock:
         if _socket:
-            _socket.send(b'{"command":"build"}\n')
-
-
-def send_get_blender_api_path_command():
-    with _socket_lock:
-        if _socket:
-            _socket.send(b'{"command":"get-blender-api-path"}\n')
-
-
-def send_set_build_executable_command(build_executable):
-    with _socket_lock:
-        if _socket:
-            message = {
-                "command": "set-build-executable",
-                "build-executable": build_executable,
-            }
-            message_as_bytes = str.encode(json.dumps(message))
-            _socket.send(message_as_bytes)
+            message = str.encode(json.dumps(command))
+            _socket.send(message)
             _socket.send(b'\n')
+
+
+def send_build_command(mode, target):
+    _send_command({
+        'command': 'build',
+        'mode': mode,
+        'target': target,
+    })
+
+
+def send_set_build_mode_on_change_command(executable, library):
+    command = {
+        'command': 'set-build-mode-on-change',
+    }
+    if executable:
+        command['executable'] = executable
+    if library:
+        command['library'] = library
+    _send_command(command)
 
 
 def send_set_project_directory_command(path):
-    with _socket_lock:
-        if _socket:
-            message = {
-                "command": "set-project-directory",
-                "path": path,
-            }
-            message_as_bytes = str.encode(json.dumps(message))
-            _socket.send(message_as_bytes)
-            _socket.send(b'\n')
+    _send_command({
+        'command': 'set-project-directory',
+        'path': path,
+    })

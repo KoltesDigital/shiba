@@ -1,13 +1,12 @@
 mod settings;
 
-pub use self::settings::Settings;
+pub use self::settings::OidosSettings;
+use super::AudioSynthesizer;
 use crate::code_map::CodeMap;
-use crate::configuration::Configuration;
 use crate::paths::TEMP_DIRECTORY;
-use crate::traits;
-use crate::types::CompilationDescriptor;
+use crate::types::{CompilationDescriptor, ProjectDescriptor};
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use tera::Tera;
 
@@ -22,34 +21,37 @@ template_enum! {
 #[derive(Serialize)]
 struct Context {}
 
-pub struct AudioSynthesizer<'a> {
+pub struct OidosAudioSynthesizer<'a> {
+	project_descriptor: &'a ProjectDescriptor<'a>,
+	settings: &'a OidosSettings,
+
 	nasm_path: PathBuf,
 	oidos_path: PathBuf,
-	project_directory: &'a Path,
 	python2_path: PathBuf,
-	settings: &'a Settings,
 	tera: Tera,
 }
 
-impl<'a> AudioSynthesizer<'a> {
+impl<'a> OidosAudioSynthesizer<'a> {
 	pub fn new(
-		project_directory: &'a Path,
-		settings: &'a Settings,
-		configuration: &Configuration,
+		project_descriptor: &'a ProjectDescriptor,
+		settings: &'a OidosSettings,
 	) -> Result<Self, String> {
-		let nasm_path = configuration
+		let nasm_path = project_descriptor
+			.configuration
 			.paths
 			.get("nasm")
 			.cloned()
 			.unwrap_or_else(|| PathBuf::from("nasm"));
 
-		let oidos_path = configuration
+		let oidos_path = project_descriptor
+			.configuration
 			.paths
 			.get("oidos")
-			.ok_or("Please set configuration key paths.oidos.")?
+			.ok_or("Please set project_descriptor.configuration key paths.oidos.")?
 			.clone();
 
-		let python2_path = configuration
+		let python2_path = project_descriptor
+			.configuration
 			.paths
 			.get("python2")
 			.cloned()
@@ -60,18 +62,19 @@ impl<'a> AudioSynthesizer<'a> {
 		tera.add_raw_templates(Template::as_array())
 			.map_err(|err| err.to_string())?;
 
-		Ok(AudioSynthesizer {
+		Ok(OidosAudioSynthesizer {
+			project_descriptor,
+			settings,
+
 			nasm_path,
 			oidos_path,
-			project_directory,
 			python2_path,
 			tera,
-			settings,
 		})
 	}
 }
 
-impl<'a> traits::AudioSynthesizer for AudioSynthesizer<'a> {
+impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 	fn integrate(
 		&self,
 		compilation_descriptor: &mut CompilationDescriptor,
@@ -85,7 +88,9 @@ impl<'a> traits::AudioSynthesizer for AudioSynthesizer<'a> {
 					.as_ref(),
 			)
 			.arg(
-				self.project_directory
+				self.project_descriptor
+					.build_options
+					.project_directory
 					.join(self.settings.filename.as_str())
 					.to_string_lossy()
 					.as_ref(),
@@ -107,7 +112,14 @@ impl<'a> traits::AudioSynthesizer for AudioSynthesizer<'a> {
 				.args(vec!["-f", "win32", "-i"])
 				.arg(&*TEMP_DIRECTORY)
 				.arg("-i")
-				.arg(&self.project_directory.to_string_lossy().as_ref())
+				.arg(
+					&self
+						.project_descriptor
+						.build_options
+						.project_directory
+						.to_string_lossy()
+						.as_ref(),
+				)
 				.arg("-o")
 				.arg(output)
 				.arg(

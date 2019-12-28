@@ -1,12 +1,12 @@
 mod settings;
 
-pub use self::settings::Settings;
+pub use self::settings::MsvcSettings;
+use super::LibraryCompiler;
 use crate::code_map::CodeMap;
-use crate::configuration::Configuration;
+use crate::compiler::{CompileOptions, Compiler};
 use crate::generator_utils::cpp;
 use crate::paths::TEMP_DIRECTORY;
-use crate::traits;
-use crate::types::{CompilationDescriptor, ShaderDescriptor};
+use crate::types::{ProjectDescriptor, ShaderDescriptor};
 use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
@@ -21,18 +21,24 @@ struct Context<'a> {
 	shader_descriptor: &'a ShaderDescriptor,
 }
 
-pub struct Generator<'a> {
+pub struct MsvcCompiler<'a> {
+	project_descriptor: &'a ProjectDescriptor<'a>,
+	settings: &'a MsvcSettings,
+
 	cpp_template_renderer: cpp::TemplateRenderer,
 	glew_path: PathBuf,
 	msvc_command_generator: cpp::msvc::CommandGenerator,
-	settings: &'a Settings,
 	tera: Tera,
 }
 
-impl<'a> Generator<'a> {
-	pub fn new(settings: &'a Settings, configuration: &'a Configuration) -> Result<Self, String> {
-		let cpp_template_renderer = cpp::TemplateRenderer::new(configuration)?;
-		let glew_path = configuration
+impl<'a> MsvcCompiler<'a> {
+	pub fn new(
+		project_descriptor: &'a ProjectDescriptor,
+		settings: &'a MsvcSettings,
+	) -> Result<Self, String> {
+		let cpp_template_renderer = cpp::TemplateRenderer::new(&project_descriptor.configuration)?;
+		let glew_path = project_descriptor
+			.configuration
 			.paths
 			.get("glew")
 			.ok_or("Please set configuration key paths.glew.")?
@@ -44,46 +50,38 @@ impl<'a> Generator<'a> {
 		tera.add_raw_template("template", include_str!("template.tera"))
 			.map_err(|err| err.to_string())?;
 
-		Ok(Generator {
+		Ok(MsvcCompiler {
+			project_descriptor,
+			settings,
+
 			cpp_template_renderer,
 			glew_path,
 			msvc_command_generator,
-			settings,
 			tera,
 		})
 	}
-
-	pub fn get_path() -> PathBuf {
-		TEMP_DIRECTORY.join("blender_api.dll")
-	}
 }
 
-impl<'a> traits::Generator for Generator<'a> {
-	fn generate(
-		&self,
-		_audio_codes: &CodeMap,
-		compilation_descriptor: &CompilationDescriptor,
-		project_codes: &CodeMap,
-		shader_descriptor: &ShaderDescriptor,
-	) -> Result<(), String> {
+impl<'a> Compiler for MsvcCompiler<'a> {
+	fn compile(&self, options: &CompileOptions) -> Result<PathBuf, String> {
 		let contents = self.cpp_template_renderer.render(
-			project_codes,
-			shader_descriptor,
-			self.get_development(),
-			"blender_api",
+			options.project_codes,
+			options.shader_descriptor,
+			self.project_descriptor.development,
+			"library",
 		)?;
 
 		let context = Context {
 			cpp_contents: &contents,
-			project_codes: &project_codes,
-			shader_descriptor: &shader_descriptor,
+			project_codes: &options.project_codes,
+			shader_descriptor: &options.shader_descriptor,
 		};
 		let contents = self
 			.tera
 			.render("template", &context)
 			.map_err(|_| "Failed to render template.")?;
 
-		fs::write(TEMP_DIRECTORY.join("blender_api.cpp"), contents.as_bytes())
+		fs::write(TEMP_DIRECTORY.join("library.cpp"), contents.as_bytes())
 			.map_err(|_| "Failed to write to file.")?;
 
 		let mut compilation = self
@@ -93,18 +91,18 @@ impl<'a> traits::Generator for Generator<'a> {
 			.arg("/c")
 			.arg("/EHsc")
 			.arg("/FA")
-			.arg("/Fablender_api.asm")
-			.arg("/Foblender_api.obj")
+			.arg("/Falibrary.asm")
+			.arg("/Folibrary.obj")
 			.arg(format!(
 				"/I{}",
 				self.glew_path.join("include").to_string_lossy(),
 			))
-			.args(&compilation_descriptor.cl.args)
-			.arg("blender_api.cpp")
+			.args(&options.compilation_descriptor.cl.args)
+			.arg("library.cpp")
 			.arg("&&")
 			.arg("link")
 			.arg("/DLL")
-			.arg("/OUT:blender_api.dll")
+			.arg("/OUT:library.dll")
 			.args(&self.settings.link.args)
 			.arg(
 				self.glew_path
@@ -115,8 +113,8 @@ impl<'a> traits::Generator for Generator<'a> {
 					.to_string_lossy()
 					.as_ref(),
 			)
-			.args(&compilation_descriptor.link.args)
-			.arg("blender_api.obj")
+			.args(&options.compilation_descriptor.link.args)
+			.arg("library.obj")
 			.current_dir(&*TEMP_DIRECTORY)
 			.spawn()
 			.map_err(|err| err.to_string())?;
@@ -126,14 +124,8 @@ impl<'a> traits::Generator for Generator<'a> {
 			return Err("Failed to compile.".to_string());
 		}
 
-		Ok(())
-	}
-
-	fn get_development(&self) -> bool {
-		true
-	}
-
-	fn get_path(&self) -> PathBuf {
-		Generator::get_path()
+		Ok(TEMP_DIRECTORY.join("library.dll"))
 	}
 }
+
+impl LibraryCompiler for MsvcCompiler<'_> {}
