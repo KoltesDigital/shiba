@@ -1,16 +1,20 @@
 import bpy
 from bpy.props import BoolProperty, PointerProperty, StringProperty
 from bpy.types import PropertyGroup
-from shiba import server_utils
+from shiba import instrumentation, server_connection_utils
 from shiba.uniforms import Uniforms
 
 
 def _build_executable_on_change_update(_self, _context):
-    server_utils.update_build_on_change()
+    with instrumentation.server.get_server_connection() as server_connection:
+        if server_connection:
+            server_connection_utils.update_build_on_change(server_connection)
 
 
 def _project_directory_update(_self, _context):
-    server_utils.update_project_directory()
+    with instrumentation.server.get_server_connection() as server_connection:
+        if server_connection:
+            server_connection_utils.update_project_directory(server_connection)
 
 
 class RenderSettings(PropertyGroup):

@@ -1,7 +1,10 @@
-from shiba import addon_preferences, paths
-from shiba.locked_file import LockedFile
+from shiba.instrumentation.server.desired_state import desired_state
+from shiba.instrumentation.locked_file import LockedFile
 import subprocess
-from threading import Lock, Thread
+from threading import Thread
+
+_process = None
+_process_thread = None
 
 
 def _run_process_thread():
@@ -23,12 +26,12 @@ def _start_process(path):
 
     print("Starting CLI server.")
 
-    preferences = addon_preferences.get()
     _process = subprocess.Popen(
         [
-            path, 'server',
-            '--ip', preferences.server_ip,
-            '--port', str(preferences.server_port),
+            path,
+            'server',
+            '--ip', desired_state.ip,
+            '--port', str(desired_state.port),
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -64,24 +67,4 @@ def _end_process():
     print("CLI server stopped.")
 
 
-_process = None
-_process_thread = None
-
-_locked_file = LockedFile(_start_process, _end_process)
-_lock = Lock()
-
-
-def start():
-    update_cli_path()
-    with _lock:
-        _locked_file.open()
-
-
-def stop():
-    with _lock:
-        _locked_file.close()
-
-
-def update_cli_path():
-    with _lock:
-        _locked_file.set_path(paths.cli())
+locked_file = LockedFile(_start_process, _end_process)

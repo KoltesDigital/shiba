@@ -14,9 +14,9 @@ def _run_thread():
 
 
 def _clean():
-    with instrumentation.state() as state:
-        state.api_loaded = False
-        state.server_started = False
+    with instrumentation.update_state() as state:
+        state.library.loaded = False
+        state.server.started = False
 
 
 _thread = Thread(

@@ -1,0 +1,2 @@
+class StateMatchFailure(Exception):
+    pass

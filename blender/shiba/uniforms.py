@@ -1,7 +1,7 @@
 import bpy
 import ctypes
 from dataclasses import dataclass, field
-from shiba import api, callback_lists
+from shiba import callback_lists, library_definitions
 from typing import List, Optional
 
 
@@ -53,7 +53,7 @@ class UniformAnnotationControlCheckboxDescriptor(UniformAnnotationControlDescrip
         layout.prop(uniforms, self.property_name)
 
     def to_api_uniform_value(self, uniforms):
-        return api.UniformValue(
+        return library_definitions.UniformValue(
             as_int=getattr(uniforms, self.property_name),
         )
 
@@ -61,7 +61,7 @@ class UniformAnnotationControlCheckboxDescriptor(UniformAnnotationControlDescrip
 @dataclass
 class UniformAnnotationControlObjectDescriptor(UniformAnnotationControlDescriptor):
     def to_api_uniform_value(self, uniforms):
-        return api.UniformValue()
+        return library_definitions.UniformValue()
 
 
 @dataclass
@@ -71,7 +71,7 @@ class UniformAnnotationControlSliderDescriptor(UniformAnnotationControlDescripto
     max: Optional[float] = None
 
     def to_api_uniform_value(self, uniforms):
-        return api.UniformValue()
+        return library_definitions.UniformValue()
 
 
 @dataclass
@@ -105,20 +105,20 @@ def set_api_active_uniform_descriptors(api_active_uniform_count, api_active_unif
     def make_annotation(api_descriptor_pointer, name):
         api_descriptor = ctypes.cast(
             api_descriptor_pointer,
-            ctypes.POINTER(api.UniformAnnotationDescriptor)
+            ctypes.POINTER(library_definitions.UniformAnnotationDescriptor)
         ).contents
-        if api_descriptor.kind == api.UNIFORM_ANNOTATION_KIND_CONTROL:
+        if api_descriptor.kind == library_definitions.UNIFORM_ANNOTATION_KIND_CONTROL:
             api_descriptor = ctypes.cast(
                 api_descriptor_pointer,
-                ctypes.POINTER(api.UniformAnnotationControlDescriptor)
+                ctypes.POINTER(library_definitions.UniformAnnotationControlDescriptor)
             ).contents
-            if api_descriptor.control_kind == api.UNIFORM_ANNOTATION_CONTROL_KIND_CHECKBOX:
+            if api_descriptor.control_kind == library_definitions.UNIFORM_ANNOTATION_CONTROL_KIND_CHECKBOX:
                 return UniformAnnotationControlCheckboxDescriptor(
                     name=name,
                 )
-            if api_descriptor.control_kind == api.UNIFORM_ANNOTATION_CONTROL_KIND_OBJECT:
+            if api_descriptor.control_kind == library_definitions.UNIFORM_ANNOTATION_CONTROL_KIND_OBJECT:
                 return UniformAnnotationControlObjectDescriptor()
-            if api_descriptor.control_kind == api.UNIFORM_ANNOTATION_CONTROL_KIND_SLIDER:
+            if api_descriptor.control_kind == library_definitions.UNIFORM_ANNOTATION_CONTROL_KIND_SLIDER:
                 return UniformAnnotationControlSliderDescriptor()
         raise NotImplementedError()
 
@@ -149,9 +149,9 @@ def get_api_uniform_values(uniforms):
             UniformAnnotationControlDescriptor)
         if annotation_control is not None:
             return annotation_control.to_api_uniform_value(uniforms)
-        return api.UniformValue()
+        return library_definitions.UniformValue()
 
-    UniformValueArray = api.UniformValue * len(_active_uniform_descriptors)
+    UniformValueArray = library_definitions.UniformValue * len(_active_uniform_descriptors)
     array = [
         to_api_uniform_value(uniform_descriptor)
         for uniform_descriptor in _active_uniform_descriptors

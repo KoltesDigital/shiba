@@ -1,5 +1,5 @@
 import bpy
-from shiba import api, uniforms
+from shiba import instrumentation, uniforms
 
 
 class _Panel:
@@ -13,7 +13,7 @@ class SHIBA_PT_Status(_Panel, bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        if api.is_loaded():
+        if instrumentation.current_state.library.loaded:
             layout.label(text='API loaded.')
         else:
             layout.label(text='API not loaded.')

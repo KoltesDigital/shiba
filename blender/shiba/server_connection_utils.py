@@ -1,7 +1,7 @@
 import bpy
 from bpy.app.handlers import persistent
 import os.path
-from shiba import server_connection
+from shiba import instrumentation
 
 
 def _get_project_directory():
@@ -10,39 +10,41 @@ def _get_project_directory():
     return path
 
 
-def _send_build_commands(library_mode):
+def _send_build_commands(server_connection, library_mode):
     server_connection.send_build_command(library_mode, 'library')
     if bpy.context.scene.shiba.build_executable_on_change:
         server_connection.send_build_command('full', 'executable')
 
 
-def bootstrap():
+def bootstrap(server_connection):
     server_connection.send_set_build_mode_on_change_command(
         'full' if bpy.context.scene.shiba.build_executable_on_change else None,
         'updates',
     )
     server_connection.send_set_project_directory_command(
         _get_project_directory())
-    _send_build_commands('full')
+    _send_build_commands(server_connection, 'full')
 
 
-def update_build_on_change():
+def update_build_on_change(server_connection):
     server_connection.send_set_build_mode_on_change_command(
         'full' if bpy.context.scene.shiba.build_executable_on_change else None,
         'updates',
     )
-    _send_build_commands('updates')
+    _send_build_commands(server_connection, 'updates')
 
 
-def update_project_directory():
+def update_project_directory(server_connection):
     server_connection.send_set_project_directory_command(
         _get_project_directory())
-    _send_build_commands('updates')
+    _send_build_commands(server_connection, 'updates')
 
 
 @persistent
 def load_handler(_dummy):
-    update_project_directory()
+    with instrumentation.server.get_server_connection() as server_connection:
+        if server_connection:
+            update_project_directory(server_connection)
 
 
 bpy.app.handlers.load_post.append(load_handler)
