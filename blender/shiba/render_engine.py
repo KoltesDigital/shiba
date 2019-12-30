@@ -14,7 +14,7 @@ class RenderEngine(bpy.types.RenderEngine):
         callback_lists.viewport_update.add(self.__update_viewport)
         with instrumentation.update_state() as state:
             state.library.loaded = True
-            state.server.started = True
+            state.server.connected = True
 
     @staticmethod
     def _get_time(depsgraph):

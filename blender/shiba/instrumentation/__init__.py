@@ -50,8 +50,7 @@ class _DesiredState:
         self.server = server.desired_state
 
 
-@property
-def current_state():
+def get_current_state():
     return _CurrentState()
 
 

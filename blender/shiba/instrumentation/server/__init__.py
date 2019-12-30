@@ -20,7 +20,7 @@ class _CurrentState:
     port: int = None
 
     @property
-    def started(self):
+    def connected(self):
         return _socket
 
 
@@ -116,12 +116,12 @@ def match_states():
         if not server_options_mismatch and current_state.location == 'CUSTOM_CLI':
             server_options_mismatch = current_state.custom_cli_path != desired_state.custom_cli_path
 
-        if _socket and (not desired_state.started or server_options_mismatch):
+        if _socket and (not desired_state.connected or server_options_mismatch):
             if current_state.location != 'EXTERNAL':
                 cli_server.locked_file.close()
             _disconnect()
 
-        if desired_state.started and not _socket:
+        if desired_state.connected and not _socket:
             if desired_state.location != 'EXTERNAL':
                 if current_state.location == 'CUSTOM_CLI':
                     cli_server.locked_file.set_path(desired_state.custom_cli_path)

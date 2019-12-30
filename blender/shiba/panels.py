@@ -13,10 +13,17 @@ class SHIBA_PT_Status(_Panel, bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        if instrumentation.current_state.library.loaded:
-            layout.label(text='API loaded.')
+        current_state = instrumentation.get_current_state()
+
+        if current_state.server.connected:
+            layout.label(text="Connected to server.")
         else:
-            layout.label(text='API not loaded.')
+            layout.label(text="Not connected to server.")
+
+        if current_state.library.loaded:
+            layout.label(text="Library loaded.")
+        else:
+            layout.label(text="Library not loaded.")
 
 
 class SHIBA_PT_Uniforms(_Panel, bpy.types.Panel):
