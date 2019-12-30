@@ -15,7 +15,10 @@ def _handle_event_build_ended(obj):
         if _building_count == 0:
             notifications.remove(_building_notification)
 
-    print("Build duration: %fs." % obj['duration'])
+    if obj['successful']:
+        print("Build succeeded, duration: %fs." % obj['duration'])
+    else:
+        print('Build failed.')
 
 
 def _handle_event_build_started(obj):

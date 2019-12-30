@@ -43,12 +43,24 @@ struct Command {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "event")]
 enum EventKind<'a> {
-	BuildEnded { duration: f32 },
+	BuildEnded {
+		duration: Option<f32>,
+		successful: bool,
+	},
 	BuildStarted,
-	ExecutableCompiled { path: &'a str, size: u64 },
-	Error { message: &'a str },
-	LibraryCompiled { path: &'a str },
-	ShaderPassesGenerated { passes: &'a Vec<Pass> },
+	ExecutableCompiled {
+		path: &'a str,
+		size: u64,
+	},
+	Error {
+		message: &'a str,
+	},
+	LibraryCompiled {
+		path: &'a str,
+	},
+	ShaderPassesGenerated {
+		passes: &'a Vec<Pass>,
+	},
 }
 
 #[derive(Debug, Serialize)]
@@ -169,7 +181,8 @@ pub fn execute(options: &Options) -> Result<(), String> {
 									command_state.broadcast(&Event {
 										id: &command.id,
 										kind: EventKind::BuildEnded {
-											duration: duration.as_secs_f32(),
+											duration: Some(duration.as_secs_f32()),
+											successful: true,
 										},
 									});
 								}
@@ -179,6 +192,13 @@ pub fn execute(options: &Options) -> Result<(), String> {
 									command_state.broadcast(&Event {
 										id: &command.id,
 										kind: EventKind::Error { message: &err },
+									});
+									command_state.broadcast(&Event {
+										id: &command.id,
+										kind: EventKind::BuildEnded {
+											duration: None,
+											successful: false,
+										},
 									});
 								}
 							};
