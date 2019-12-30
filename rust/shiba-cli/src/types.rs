@@ -2,16 +2,16 @@ use crate::build::{BuildOptions, BuildTarget};
 use crate::compiler::CompilerKind;
 use crate::configuration::Configuration;
 use crate::settings::Settings;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
-#[derive(Clone, Debug, Default, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub struct Pass {
 	pub fragment: Option<String>,
 	pub vertex: Option<String>,
 }
 
-#[derive(Debug, Default, Hash, PartialEq, Serialize)]
+#[derive(Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub struct Sections {
 	pub attributes: Option<String>,
 	pub common: Option<String>,
@@ -19,30 +19,30 @@ pub struct Sections {
 	pub varyings: Option<String>,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub struct ConstVariable {
 	pub value: String,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub struct UniformAnnotationControlDescriptor {
 	pub control_kind: String,
 	pub control_parameters: Option<String>,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UniformAnnotationKind {
 	Control(UniformAnnotationControlDescriptor),
 	Time,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub struct UniformVariable {
 	pub annotations: Vec<UniformAnnotationKind>,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum VariableKind {
 	Const(ConstVariable),
@@ -50,7 +50,7 @@ pub enum VariableKind {
 	Uniform(UniformVariable),
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub struct Variable {
 	pub kind: VariableKind,
 
@@ -61,7 +61,7 @@ pub struct Variable {
 	pub type_name: String,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub struct UniformArray {
 	pub name: String,
 	pub minified_name: Option<String>,
@@ -69,7 +69,7 @@ pub struct UniformArray {
 	pub type_name: String,
 }
 
-#[derive(Debug, Default, Hash, PartialEq, Serialize)]
+#[derive(Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub struct ShaderDescriptor {
 	pub glsl_version: Option<String>,
 	pub sections: Sections,
@@ -121,22 +121,22 @@ impl<'a> ProjectDescriptor<'a> {
 	}
 }
 
-#[derive(Default)]
+#[derive(Clone, Default, Deserialize, Hash, Serialize)]
 pub struct ClCompilationDescriptor {
 	pub args: Vec<String>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default, Deserialize, Hash, Serialize)]
 pub struct CrinklerCompilationDescriptor {
 	pub args: Vec<String>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default, Deserialize, Hash, Serialize)]
 pub struct LinkCompilationDescriptor {
 	pub args: Vec<String>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default, Deserialize, Hash, Serialize)]
 pub struct CompilationDescriptor {
 	pub cl: ClCompilationDescriptor,
 	pub crinkler: CrinklerCompilationDescriptor,

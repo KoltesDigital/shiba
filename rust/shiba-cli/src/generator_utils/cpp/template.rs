@@ -1,3 +1,4 @@
+use crate::build::BuildTarget;
 use crate::code_map::CodeMap;
 use crate::configuration::Configuration;
 use crate::shader_codes::ShaderCodes;
@@ -52,7 +53,7 @@ struct OpenGLExtFunction {
 struct APIContext<'a> {
 	development: bool,
 	passes: &'a [Pass],
-	target: &'a str,
+	target: BuildTarget,
 }
 
 #[derive(Serialize)]
@@ -72,13 +73,13 @@ struct OpenGLLoadingContext<'a> {
 #[derive(Serialize)]
 struct RenderContext<'a> {
 	project_codes: &'a CodeMap,
-	target: &'a str,
+	target: BuildTarget,
 }
 
 #[derive(Serialize)]
 struct SetActiveUniformValuesContext<'a> {
 	active_uniforms: &'a [UniformDescriptor<'a>],
-	target: &'a str,
+	target: BuildTarget,
 }
 
 #[derive(Serialize)]
@@ -86,7 +87,7 @@ struct ShaderDeclarationContext<'a> {
 	active_uniforms: &'a [UniformDescriptor<'a>],
 	passes: &'a [Pass],
 	shader_codes: &'a ShaderCodes,
-	target: &'a str,
+	target: BuildTarget,
 	uniform_arrays: &'a [UniformArrayExt<'a>],
 }
 
@@ -95,7 +96,7 @@ struct ShaderLoadingContext<'a> {
 	development: bool,
 	passes: &'a [Pass],
 	shader_codes: &'a ShaderCodes,
-	target: &'a str,
+	target: BuildTarget,
 	uniform_arrays: &'a [UniformArrayExt<'a>],
 }
 
@@ -110,12 +111,17 @@ pub struct Contents {
 	pub shader_loading: String,
 }
 
-pub struct TemplateRenderer {
+#[derive(Hash)]
+pub struct RendererInputs<'a> {
+	pub glew_path: &'a Option<PathBuf>,
+}
+
+pub struct Renderer {
 	glew_path: Option<PathBuf>,
 	tera: Tera,
 }
 
-impl TemplateRenderer {
+impl Renderer {
 	pub fn new(configuration: &Configuration) -> Result<Self, String> {
 		let glew_path = configuration.paths.get("glew").cloned();
 
@@ -141,7 +147,13 @@ impl TemplateRenderer {
 			_ => Err(tera::Error::from("string_literal expects a string")),
 		});
 
-		Ok(TemplateRenderer { glew_path, tera })
+		Ok(Renderer { glew_path, tera })
+	}
+
+	pub fn get_inputs(&self) -> RendererInputs {
+		RendererInputs {
+			glew_path: &self.glew_path,
+		}
 	}
 
 	pub fn render(
@@ -149,7 +161,7 @@ impl TemplateRenderer {
 		project_codes: &CodeMap,
 		shader_descriptor: &ShaderDescriptor,
 		development: bool,
-		target: &str,
+		target: BuildTarget,
 	) -> Result<Contents, String> {
 		let shader_codes = ShaderCodes::load(shader_descriptor);
 

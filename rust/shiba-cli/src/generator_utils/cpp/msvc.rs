@@ -24,6 +24,11 @@ pub enum Platform {
 	X64,
 }
 
+#[derive(Hash)]
+pub struct CommandGeneratorInputs<'a> {
+	pub installation_path: &'a String,
+}
+
 pub struct CommandGenerator {
 	installation_path: String,
 }
@@ -49,6 +54,12 @@ impl CommandGenerator {
 			.clone();
 
 		Ok(CommandGenerator { installation_path })
+	}
+
+	pub fn get_inputs(&self) -> CommandGeneratorInputs {
+		CommandGeneratorInputs {
+			installation_path: &self.installation_path,
+		}
 	}
 
 	pub fn command(&self, platform: Platform) -> Command {

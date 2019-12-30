@@ -1,4 +1,4 @@
-use crate::build::{self, BuildEvent, BuildMode, BuildOptions, BuildTarget};
+use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
 use crate::types::Pass;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,7 @@ use std::thread::spawn;
 use std::time::Duration;
 
 pub struct Options<'a> {
+	pub debounce_delay: Duration,
 	pub ip: IpAddr,
 	pub port: u16,
 	pub project_directory: &'a Path,
@@ -19,12 +20,12 @@ pub struct Options<'a> {
 #[serde(rename_all = "kebab-case", tag = "command")]
 enum CommandKind {
 	Build {
-		mode: BuildMode,
+		force: Option<bool>,
 		target: BuildTarget,
 	},
-	SetBuildModeOnChange {
-		executable: Option<BuildMode>,
-		library: Option<BuildMode>,
+	SetBuildOnChange {
+		executable: bool,
+		library: bool,
 	},
 	SetProjectDirectory {
 		path: String,
@@ -60,8 +61,8 @@ struct Event<'a> {
 
 #[derive(Default)]
 struct State {
-	executable_build_mode_on_change: Option<BuildMode>,
-	library_build_mode_on_change: Option<BuildMode>,
+	executable_build_on_change: bool,
+	library_build_on_change: bool,
 	streams: Vec<TcpStream>,
 }
 
@@ -91,7 +92,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 	let mut command_project_directory = options.project_directory.to_path_buf();
 	spawn(move || {
 		let mut watcher: RecommendedWatcher =
-			Watcher::new(tx_watcher, Duration::from_secs_f32(0.1))
+			Watcher::new(tx_watcher, Duration::from_secs_f32(0.3))
 				.expect("Failed to create watcher.");
 		watcher
 			.watch(command_project_directory.clone(), RecursiveMode::Recursive)
@@ -102,7 +103,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 				Ok(command) => {
 					let command_id = command.id.clone();
 					match command.kind {
-						CommandKind::Build { mode, target } => {
+						CommandKind::Build { force, target } => {
 							{
 								let mut command_state = command_state.write().unwrap();
 								command_state.broadcast(&Event {
@@ -157,7 +158,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 
 							let result = build::build_duration(&BuildOptions {
 								event_listener: &event_listener,
-								mode,
+								force: force.unwrap_or(false),
 								project_directory: &command_project_directory,
 								target,
 							});
@@ -183,14 +184,14 @@ pub fn execute(options: &Options) -> Result<(), String> {
 							};
 						}
 
-						CommandKind::SetBuildModeOnChange {
+						CommandKind::SetBuildOnChange {
 							executable,
 							library,
 						} => {
 							let mut command_state = command_state.write().unwrap();
 
-							command_state.executable_build_mode_on_change = executable;
-							command_state.library_build_mode_on_change = library;
+							command_state.executable_build_on_change = executable;
+							command_state.library_build_on_change = library;
 						}
 
 						CommandKind::SetProjectDirectory { path } => {
@@ -223,21 +224,21 @@ pub fn execute(options: &Options) -> Result<(), String> {
 				| DebouncedEvent::Write(_) => {
 					let watcher_state = watcher_state.read().unwrap();
 
-					if let Some(mode) = &watcher_state.executable_build_mode_on_change {
+					if watcher_state.executable_build_on_change {
 						let _ = watcher_tx_command.send(Command {
 							id: None,
 							kind: CommandKind::Build {
-								mode: *mode,
+								force: None,
 								target: BuildTarget::Executable,
 							},
 						});
 					}
 
-					if let Some(mode) = &watcher_state.library_build_mode_on_change {
+					if watcher_state.library_build_on_change {
 						let _ = watcher_tx_command.send(Command {
 							id: None,
 							kind: CommandKind::Build {
-								mode: *mode,
+								force: None,
 								target: BuildTarget::Library,
 							},
 						});

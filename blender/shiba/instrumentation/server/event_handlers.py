@@ -30,6 +30,7 @@ def _handle_event_build_started(obj):
 
 
 def _handle_event_executable_compiled(obj):
+    print("Executable compiled at %s." % obj['path'])
     size = obj['size']
     notifications.add(Notification("Executable size: %d." % size, 5))
 
@@ -39,6 +40,7 @@ def _handle_event_error(obj):
 
 
 def _handle_event_library_compiled(obj):
+    print("Library compiled at %s." % obj['path'])
     with instrumentation.update_state() as state:
         state.library.path = obj['path']
 

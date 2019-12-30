@@ -5,20 +5,17 @@ mod types;
 pub use self::settings::ShibaSettings;
 use self::types::*;
 use super::ShaderProvider;
+use crate::hash_extra;
 use crate::parsers::glsl;
 use crate::types::{
 	ConstVariable, Pass, ProjectDescriptor, ShaderDescriptor, UniformArray, VariableKind,
 };
 use regex::Regex;
 use serde::Serialize;
+use serde_json;
 use std::cell::Cell;
 use std::fs;
 use tera::Tera;
-
-#[derive(Serialize)]
-struct Context {
-	development: bool,
-}
 
 pub struct ShibaShaderProvider<'a> {
 	project_descriptor: &'a ProjectDescriptor<'a>,
@@ -137,8 +134,35 @@ fn parse(code: &str, development: bool) -> Result<ShaderDescriptor, String> {
 	Ok(shader_descriptor)
 }
 
+const OUTPUT_FILENAME: &str = "shader-descriptor.json";
+
+#[derive(Hash)]
+struct Inputs<'a> {
+	development: bool,
+	shader_contents: &'a String,
+}
+
+#[derive(Serialize)]
+struct Context {
+	development: bool,
+}
+
 impl ShaderProvider for ShibaShaderProvider<'_> {
 	fn provide(&self) -> Result<ShaderDescriptor, String> {
+		let inputs = Inputs {
+			development: self.project_descriptor.development,
+			shader_contents: &self.shader_contents,
+		};
+		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
+		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
+
+		if build_cache_path.exists() {
+			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
+			let shader_descriptor =
+				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;
+			return Ok(shader_descriptor);
+		}
+
 		let mut shader_descriptor =
 			parse(&self.shader_contents, self.project_descriptor.development)?;
 
@@ -257,6 +281,9 @@ impl ShaderProvider for ShibaShaderProvider<'_> {
 				}
 			}
 		}
+
+		let json = serde_json::to_string(&shader_descriptor).map_err(|_| "Failed to dump JSON.")?;
+		fs::write(build_cache_path, json).map_err(|err| err.to_string())?;
 
 		Ok(shader_descriptor)
 	}

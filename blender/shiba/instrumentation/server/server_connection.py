@@ -17,15 +17,12 @@ class ServerConnection:
             'target': target,
         })
 
-    def send_set_build_mode_on_change_command(self, executable, library):
-        command = {
-            'command': 'set-build-mode-on-change',
-        }
-        if executable:
-            command['executable'] = executable
-        if library:
-            command['library'] = library
-        self._send_command(command)
+    def send_set_build_on_change_command(self, executable, library):
+        self._send_command({
+            'command': 'set-build-on-change',
+            'executable': bool(executable),
+            'library': bool(library),
+        })
 
     def send_set_project_directory_command(self, path):
         self._send_command({

@@ -2,30 +2,24 @@ mod settings;
 
 pub use self::settings::MsvcSettings;
 use super::LibraryCompiler;
+use crate::build::BuildTarget;
 use crate::code_map::CodeMap;
 use crate::compiler::{CompileOptions, Compiler};
 use crate::generator_utils::cpp;
-use crate::paths::TEMP_DIRECTORY;
+use crate::hash_extra;
+use crate::paths::BUILD_ROOT_DIRECTORY;
 use crate::types::{ProjectDescriptor, ShaderDescriptor};
 use serde::Serialize;
 use std::fs;
-use std::path::PathBuf;
+use std::hash::Hash;
+use std::path::{Path, PathBuf};
 use tera::Tera;
-
-#[derive(Serialize)]
-struct Context<'a> {
-	#[serde(flatten)]
-	cpp_contents: &'a cpp::TemplateContents,
-	project_codes: &'a CodeMap,
-	#[serde(flatten)]
-	shader_descriptor: &'a ShaderDescriptor,
-}
 
 pub struct MsvcCompiler<'a> {
 	project_descriptor: &'a ProjectDescriptor<'a>,
 	settings: &'a MsvcSettings,
 
-	cpp_template_renderer: cpp::TemplateRenderer,
+	cpp_template_renderer: cpp::template::Renderer,
 	glew_path: PathBuf,
 	msvc_command_generator: cpp::msvc::CommandGenerator,
 	tera: Tera,
@@ -36,7 +30,8 @@ impl<'a> MsvcCompiler<'a> {
 		project_descriptor: &'a ProjectDescriptor,
 		settings: &'a MsvcSettings,
 	) -> Result<Self, String> {
-		let cpp_template_renderer = cpp::TemplateRenderer::new(&project_descriptor.configuration)?;
+		let cpp_template_renderer =
+			cpp::template::Renderer::new(&project_descriptor.configuration)?;
 		let glew_path = project_descriptor
 			.configuration
 			.paths
@@ -62,13 +57,49 @@ impl<'a> MsvcCompiler<'a> {
 	}
 }
 
+const OUTPUT_FILENAME: &str = "msvc.dll";
+
+#[derive(Hash)]
+struct Inputs<'a> {
+	cpp_template_renderer: cpp::template::RendererInputs<'a>,
+	development: bool,
+	glew_path: &'a Path,
+	msvc_command_generator: cpp::msvc::CommandGeneratorInputs<'a>,
+	options: &'a CompileOptions<'a>,
+	settings: &'a MsvcSettings,
+}
+
+#[derive(Serialize)]
+struct Context<'a> {
+	#[serde(flatten)]
+	cpp_contents: &'a cpp::template::Contents,
+	project_codes: &'a CodeMap,
+	#[serde(flatten)]
+	shader_descriptor: &'a ShaderDescriptor,
+}
+
 impl<'a> Compiler for MsvcCompiler<'a> {
 	fn compile(&self, options: &CompileOptions) -> Result<PathBuf, String> {
+		let inputs = Inputs {
+			cpp_template_renderer: self.cpp_template_renderer.get_inputs(),
+			development: self.project_descriptor.development,
+			glew_path: &self.glew_path,
+			msvc_command_generator: self.msvc_command_generator.get_inputs(),
+			options,
+			settings: self.settings,
+		};
+		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
+		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
+
+		if build_cache_path.exists() {
+			return Ok(build_cache_path);
+		}
+
 		let contents = self.cpp_template_renderer.render(
 			options.project_codes,
 			options.shader_descriptor,
 			self.project_descriptor.development,
-			"library",
+			BuildTarget::Library,
 		)?;
 
 		let context = Context {
@@ -81,8 +112,11 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 			.render("template", &context)
 			.map_err(|_| "Failed to render template.")?;
 
-		fs::write(TEMP_DIRECTORY.join("library.cpp"), contents.as_bytes())
-			.map_err(|_| "Failed to write to file.")?;
+		let build_directory = BUILD_ROOT_DIRECTORY.join("library-compilers").join("msvc");
+		fs::create_dir_all(&build_directory).map_err(|err| err.to_string())?;
+
+		let source_path = build_directory.join("library.cpp");
+		fs::write(&source_path, contents.as_bytes()).map_err(|_| "Failed to write to file.")?;
 
 		let mut compilation = self
 			.msvc_command_generator
@@ -115,7 +149,7 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 			)
 			.args(&options.compilation_descriptor.link.args)
 			.arg("library.obj")
-			.current_dir(&*TEMP_DIRECTORY)
+			.current_dir(&*build_directory)
 			.spawn()
 			.map_err(|err| err.to_string())?;
 
@@ -124,7 +158,10 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 			return Err("Failed to compile.".to_string());
 		}
 
-		Ok(TEMP_DIRECTORY.join("library.dll"))
+		fs::copy(build_directory.join("library.dll"), &build_cache_path)
+			.map_err(|err| err.to_string())?;
+
+		Ok(build_cache_path)
 	}
 }
 

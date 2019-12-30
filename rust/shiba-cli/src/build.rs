@@ -34,31 +34,6 @@ pub enum BuildEvent {
 	ShaderPassesGenerated(ShaderPassesGeneratedEvent),
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum BuildMode {
-	/// Always build everything.
-	Force,
-	/// If something changed, build everything.
-	Full,
-	/// If something changed, build that only.
-	Updates,
-}
-
-impl BuildMode {
-	pub fn for_command(force: bool) -> Self {
-		if force {
-			BuildMode::Force
-		} else {
-			BuildMode::Full
-		}
-	}
-
-	pub fn should_emit_compiled_events(self) -> bool {
-		self == BuildMode::Force || self == BuildMode::Full
-	}
-}
-
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BuildTarget {
@@ -68,7 +43,7 @@ pub enum BuildTarget {
 
 pub struct BuildOptions<'a> {
 	pub event_listener: &'a dyn Fn(BuildEvent) -> (),
-	pub mode: BuildMode,
+	pub force: bool,
 	pub project_directory: &'a Path,
 	pub target: BuildTarget,
 }
@@ -97,25 +72,12 @@ pub fn build(options: &BuildOptions) -> Result<(), String> {
 
 	let project_codes =
 		code_map::load_project_codes(options.project_directory, project_descriptor.development)?;
-	/*
-	let build_hash_path = LOCAL_DATA_DIRECTORY.join("executable.build.hash");
-	let mut build_hash = StoredHash::new(&build_hash_path);
 
-	{
-		let mut updater = build_hash.get_updater();
-		updater.add(&project_descriptor);
-		updater.add(&project_codes);
-		// -updater.add(&shader_provider);
-	}
+	let compilation_descriptor = CompilationDescriptor::default();
 
-	let must_build = options.mode == BuildMode::Force
-		|| build_hash.has_changed()
-		|| !options.compiler.get_path().exists();
-	if must_build {
-		*/
-	let mut compilation_descriptor = CompilationDescriptor::default();
-
-	let audio_codes = audio_synthesizer.integrate(&mut compilation_descriptor)?;
+	let integration_result = audio_synthesizer.integrate(&compilation_descriptor)?;
+	let audio_codes = integration_result.codes;
+	let compilation_descriptor = integration_result.compilation_descriptor;
 
 	let mut shader_descriptor = shader_provider.provide()?;
 
@@ -140,32 +102,18 @@ pub fn build(options: &BuildOptions) -> Result<(), String> {
 		CompilerKind::Executable(compiler) => {
 			let path = compiler.compile(&compile_options)?;
 
-			if project_descriptor
-				.build_options
-				.mode
-				.should_emit_compiled_events()
-			{
-				(project_descriptor.build_options.event_listener)(BuildEvent::ExecutableCompiled(
-					ExecutableCompiledEvent { path },
-				));
-			}
+			(project_descriptor.build_options.event_listener)(BuildEvent::ExecutableCompiled(
+				ExecutableCompiledEvent { path },
+			));
 		}
 		CompilerKind::Library(compiler) => {
 			let path = compiler.compile(&compile_options)?;
 
-			if project_descriptor
-				.build_options
-				.mode
-				.should_emit_compiled_events()
-			{
-				(project_descriptor.build_options.event_listener)(BuildEvent::LibraryCompiled(
-					LibraryCompiledEvent { path },
-				));
-			}
+			(project_descriptor.build_options.event_listener)(BuildEvent::LibraryCompiled(
+				LibraryCompiledEvent { path },
+			));
 		}
 	};
-
-	//let _ = build_hash.store();
 
 	Ok(())
 }

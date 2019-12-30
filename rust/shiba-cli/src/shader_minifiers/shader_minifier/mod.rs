@@ -3,11 +3,13 @@ mod types;
 
 use self::types::*;
 use super::ShaderMinifier;
+use crate::hash_extra;
 use crate::parsers::glsl;
-use crate::paths::TEMP_DIRECTORY;
+use crate::paths::BUILD_ROOT_DIRECTORY;
 use crate::types::{Pass, ProjectDescriptor, Sections, ShaderDescriptor, Variable, VariableKind};
 use regex::Regex;
 use serde::Serialize;
+use serde_json;
 use std::cell::Cell;
 use std::fs;
 use std::path::PathBuf;
@@ -38,6 +40,13 @@ impl ShaderMinifierShaderMinifier {
 	}
 }
 
+const OUTPUT_FILENAME: &str = "shader-descriptor.json";
+
+#[derive(Hash)]
+struct Inputs<'a> {
+	original_shader_descriptor: &'a ShaderDescriptor,
+}
+
 #[derive(Serialize)]
 struct Context<'a> {
 	pub non_uniform_variables: &'a Vec<&'a mut Variable>,
@@ -49,6 +58,19 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 		&self,
 		original_shader_descriptor: &ShaderDescriptor,
 	) -> Result<ShaderDescriptor, String> {
+		let inputs = Inputs {
+			original_shader_descriptor,
+		};
+		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
+		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
+
+		if build_cache_path.exists() {
+			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
+			let shader_descriptor =
+				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;
+			return Ok(shader_descriptor);
+		}
+
 		let glsl_version = original_shader_descriptor.glsl_version.clone();
 		let mut passes = original_shader_descriptor
 			.passes
@@ -80,8 +102,13 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 			.render("template", &context)
 			.map_err(|_| "Failed to render template.")?;
 
-		let input_path = TEMP_DIRECTORY.join("shader.glsl");
-		let output_path = TEMP_DIRECTORY.join("shader.min.glsl");
+		let build_directory = BUILD_ROOT_DIRECTORY
+			.join("shader-minifiers")
+			.join("shader-minifier");
+		fs::create_dir_all(&build_directory).map_err(|err| err.to_string())?;
+
+		let input_path = build_directory.join("shader.glsl");
+		let output_path = build_directory.join("shader.min.glsl");
 
 		fs::write(&input_path, shader).map_err(|_| "Failed to write shader.")?;
 
@@ -90,7 +117,7 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 			.arg(&output_path)
 			.args(vec!["-v", "--"])
 			.arg(&input_path)
-			.current_dir(&*TEMP_DIRECTORY)
+			.current_dir(&*build_directory)
 			.stdout(Stdio::inherit())
 			.stderr(Stdio::inherit())
 			.spawn()
@@ -190,6 +217,10 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 			uniform_arrays,
 			variables,
 		};
+
+		let json = serde_json::to_string(&shader_descriptor).map_err(|_| "Failed to dump JSON.")?;
+		fs::write(build_cache_path, json).map_err(|err| err.to_string())?;
+
 		Ok(shader_descriptor)
 	}
 }

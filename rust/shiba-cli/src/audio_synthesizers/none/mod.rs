@@ -1,7 +1,7 @@
 mod settings;
 
 pub use self::settings::NoneSettings;
-use super::AudioSynthesizer;
+use super::{AudioSynthesizer, IntegrationResult};
 use crate::code_map::CodeMap;
 use crate::types::{CompilationDescriptor, ProjectDescriptor};
 use ordered_float::OrderedFloat;
@@ -44,8 +44,8 @@ impl<'a> NoneAudioSynthesizer<'a> {
 impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 	fn integrate(
 		&self,
-		_compilation_descriptor: &mut CompilationDescriptor,
-	) -> Result<CodeMap, String> {
+		compilation_descriptor: &CompilationDescriptor,
+	) -> Result<IntegrationResult, String> {
 		let context = Context {
 			speed: self.settings.speed,
 		};
@@ -59,6 +59,9 @@ impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 			codes.insert(name.to_string(), s);
 		}
 
-		Ok(codes)
+		Ok(IntegrationResult {
+			codes,
+			compilation_descriptor: compilation_descriptor.clone(),
+		})
 	}
 }

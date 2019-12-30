@@ -4,10 +4,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+pub type ConfigurationPaths = HashMap<String, PathBuf>;
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Configuration {
-	pub paths: HashMap<String, PathBuf>,
+	pub paths: ConfigurationPaths,
 }
 
 impl Configuration {

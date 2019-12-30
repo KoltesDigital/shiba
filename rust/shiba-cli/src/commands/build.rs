@@ -1,4 +1,4 @@
-use crate::build::{self, BuildEvent, BuildMode, BuildOptions, BuildTarget};
+use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
 use std::path::Path;
 
 pub struct Options<'a> {
@@ -30,7 +30,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 
 	let duration = build::build_duration(&BuildOptions {
 		event_listener: &event_listener,
-		mode: BuildMode::for_command(options.force),
+		force: options.force,
 		project_directory: &options.project_directory,
 		target: options.target,
 	})?;

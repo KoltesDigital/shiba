@@ -4,6 +4,7 @@ use crate::library_compilers::LibraryCompiler;
 use crate::types::{CompilationDescriptor, ShaderDescriptor};
 use std::path::PathBuf;
 
+#[derive(Hash)]
 pub struct CompileOptions<'a> {
 	pub audio_codes: &'a CodeMap,
 	pub compilation_descriptor: &'a CompilationDescriptor,

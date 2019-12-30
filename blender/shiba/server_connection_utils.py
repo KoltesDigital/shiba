@@ -17,9 +17,9 @@ def _send_build_commands(server_connection, library_mode):
 
 
 def bootstrap(server_connection):
-    server_connection.send_set_build_mode_on_change_command(
-        'full' if bpy.context.scene.shiba.build_executable_on_change else None,
-        'updates',
+    server_connection.send_set_build_on_change_command(
+        bpy.context.scene.shiba.build_executable_on_change,
+        True,
     )
     server_connection.send_set_project_directory_command(
         _get_project_directory())
@@ -27,9 +27,9 @@ def bootstrap(server_connection):
 
 
 def update_build_on_change(server_connection):
-    server_connection.send_set_build_mode_on_change_command(
-        'full' if bpy.context.scene.shiba.build_executable_on_change else None,
-        'updates',
+    server_connection.send_set_build_on_change_command(
+        bpy.context.scene.shiba.build_executable_on_change,
+        True,
     )
     _send_build_commands(server_connection, 'updates')
 

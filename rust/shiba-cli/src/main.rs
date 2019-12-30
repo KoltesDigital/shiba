@@ -33,6 +33,7 @@ mod build;
 mod code_map;
 mod commands {
 	pub mod build;
+	pub mod clean;
 	pub mod server;
 }
 mod compiler;
@@ -42,6 +43,7 @@ mod generator_utils {
 	pub mod cpp;
 	pub mod settings;
 }
+mod hash_extra;
 mod library_compilers;
 mod parsers;
 mod paths;
@@ -54,6 +56,7 @@ mod types;
 use crate::build::BuildTarget;
 use std::net::IpAddr;
 use std::path::PathBuf;
+use std::time::Duration;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -68,9 +71,13 @@ enum Command {
 		#[structopt(short, long)]
 		force: bool,
 	},
+	/// Removes build artifacts, build cache.
+	Clean,
 	/// Starts a server.
 	Server {
-		#[structopt(long, default_value = "127.0.0.1")]
+		#[structopt(short, long, default_value = "0.3")]
+		debounce_delay: f32,
+		#[structopt(short, long, default_value = "127.0.0.1")]
 		ip: IpAddr,
 		#[structopt(short, long, default_value = "5184")]
 		port: u16,
@@ -104,13 +111,22 @@ fn main() -> Result<(), String> {
 			target: BuildTarget::Executable,
 		})
 		.map(|_| ()),
+
 		Command::BuildLibrary { force } => commands::build::execute(&commands::build::Options {
 			force,
 			project_directory: &args.project_directory,
 			target: BuildTarget::Library,
 		})
 		.map(|_| ()),
-		Command::Server { ip, port } => commands::server::execute(&commands::server::Options {
+
+		Command::Clean => commands::clean::execute().map(|_| ()),
+
+		Command::Server {
+			debounce_delay,
+			ip,
+			port,
+		} => commands::server::execute(&commands::server::Options {
+			debounce_delay: Duration::from_secs_f32(debounce_delay),
 			ip,
 			port,
 			project_directory: &args.project_directory,
