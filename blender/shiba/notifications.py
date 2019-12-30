@@ -31,6 +31,11 @@ def _draw():
     font_size = preferences.server_notification_size
     padding = 20
 
+    blf.color(font_id, 1, 1, 1, 1)
+    blf.enable(font_id, blf.SHADOW)
+    blf.shadow(font_id, 0, 0, 0, 0, 1)
+    blf.shadow_offset(font_id, 4, 4)
+
     y = padding
     blf.size(font_id, font_size, 72)
     with _notifications_lock:
