@@ -1,39 +1,31 @@
 import ctypes
 
 
-UNIFORM_ANNOTATION_KIND_CONTROL = 0
+Matrix = ctypes.c_float * 16
 
 
-class UniformAnnotationDescriptor(ctypes.Structure):
-    _fields_ = [
-        ('kind', ctypes.c_int),
-    ]
+def to_c_matrix(matrix):
+    return Matrix(
+        matrix[0][0],
+        matrix[1][0],
+        matrix[2][0],
+        matrix[3][0],
+        matrix[0][1],
+        matrix[1][1],
+        matrix[2][1],
+        matrix[3][1],
+        matrix[0][2],
+        matrix[1][2],
+        matrix[2][2],
+        matrix[3][2],
+        matrix[0][3],
+        matrix[1][3],
+        matrix[2][3],
+        matrix[3][3],
+    )
 
 
-UNIFORM_ANNOTATION_CONTROL_KIND_CHECKBOX = 0
-UNIFORM_ANNOTATION_CONTROL_KIND_OBJECT = 1
-UNIFORM_ANNOTATION_CONTROL_KIND_SLIDER = 2
-
-
-class UniformAnnotationControlDescriptor(ctypes.Structure):
-    _fields_ = [
-        ('kind', ctypes.c_int),
-        ('control_kind', ctypes.c_int),
-        ('control_parameters', ctypes.c_char_p),
-    ]
-
-
-class UniformDescriptor(ctypes.Structure):
-    _fields_ = [
-        ('annotation_count', ctypes.c_int),
-        ('annotations', ctypes.POINTER(
-            ctypes.POINTER(UniformAnnotationDescriptor))),
-        ('name', ctypes.c_char_p),
-        ('type_name', ctypes.c_char_p),
-    ]
-
-
-class UniformValue(ctypes.Union):
+class UniformValue(ctypes.Structure):
     _fields_ = [
         ('as_float', ctypes.c_float),
         ('as_int', ctypes.c_int),

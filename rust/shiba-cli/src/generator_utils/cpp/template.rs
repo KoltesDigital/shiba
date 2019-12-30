@@ -24,7 +24,7 @@ struct UniformDescriptor<'a> {
 	#[serde(flatten)]
 	variable: &'a Variable,
 
-	opengl_type_name: &'static str,
+	as_value_name: &'static str,
 }
 
 #[derive(Serialize)]
@@ -171,9 +171,9 @@ impl Renderer {
 			.filter_map(|variable| {
 				if variable.active {
 					if let VariableKind::Uniform(_) = &variable.kind {
-						let opengl_type_name = to_opengl_type_name(variable.type_name.as_str());
+						let as_value_name = to_as_value_name(variable.type_name.as_str());
 						return Some(UniformDescriptor {
-							opengl_type_name,
+							as_value_name,
 							variable,
 						});
 					}
@@ -375,5 +375,18 @@ fn to_opengl_type_name(type_name: &str) -> &'static str {
 		"mat4" => "ShibaMat4",
 		"uint" => "GLuint",
 		_ => "GLint",
+	}
+}
+
+fn to_as_value_name(type_name: &str) -> &'static str {
+	match type_name {
+		"bool" => "int",
+		"int" => "int",
+		"float" => "float",
+		"mat2" => "mat2",
+		"mat3" => "mat3",
+		"mat4" => "mat4",
+		"uint" => "uint",
+		_ => "int",
 	}
 }

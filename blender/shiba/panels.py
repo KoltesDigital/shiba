@@ -35,8 +35,6 @@ class SHIBA_PT_Uniforms(_Panel, bpy.types.Panel):
         render_settings = scene.shiba
 
         for uniform_descriptor in uniforms.get_active_uniform_descriptors():
-            annotation_control = uniform_descriptor.get_annotation(
-                uniforms.UniformAnnotationControlDescriptor)
-            if annotation_control is not None:
-                annotation_control.draw_property(
-                    render_settings.uniforms, layout)
+            control_annotation = uniform_descriptor.get_annotation(uniforms.UniformControlAnnotationDescriptor)
+            if control_annotation is not None:
+                control_annotation.draw_property(render_settings.uniforms, layout)

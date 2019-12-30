@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import ctypes
 from dataclasses import dataclass
 import os.path
-from shiba import callback_lists, uniforms
+from shiba import callback_lists
 from shiba.instrumentation.error import StateMatchFailure
 from shiba.instrumentation.library.desired_state import desired_state
 from shiba.instrumentation.library.library_wrapper import LibraryWrapper
@@ -38,8 +38,6 @@ def _load_library(path):
     _library = ctypes.CDLL(path)
 
     _library_wrapper = LibraryWrapper(_library)
-    count, descriptors = _library_wrapper.get_active_uniform_descriptors()
-    uniforms.set_api_active_uniform_descriptors(count, descriptors)
 
     callback_lists.viewport_update.trigger()
 

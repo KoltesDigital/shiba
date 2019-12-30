@@ -1,18 +1,6 @@
 {% if project_codes.rendering %}
 	{{ project_codes.rendering }}
 {% else %}
-	#ifdef time
-		time = shibaTime;
-	#endif
-
-	#ifdef resolutionWidth
-		resolutionWidth = shibaResolutionWidth;
-	#endif
-
-	#ifdef resolutionHeight
-		resolutionHeight = shibaResolutionHeight;
-	#endif
-
 	{% if target == "library" %}
 		glUseProgram(shibaProgram);
 		shibaCheckGlError();

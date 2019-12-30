@@ -18,7 +18,7 @@
 
 #define _SHIBA_EXPORT extern "C" __declspec(dllexport)
 
-static void _shibaCommonUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+static void _shibaCommonUpdate(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
 }
 
@@ -28,14 +28,12 @@ static void _shibaCommonInitialize(int32_t shibaResolutionWidth, int32_t shibaRe
 
 	{{ shader_loading }}
 
-	_shibaObjectMatrices.reset(new std::map<std::string, ShibaMat4>{});
-
 	{% if project_codes.initialization %}
 		{{ project_codes.initialization }}
 	{% endif %}
 }
 
-static void _shibaCommonRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+static void _shibaCommonRender(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
 	glViewport(0, 0, shibaResolutionWidth, shibaResolutionHeight);
 	shibaCheckGlError();
@@ -43,9 +41,9 @@ static void _shibaCommonRender(float shibaTime, int32_t shibaResolutionWidth, in
 	{{ render }}
 }
 
-_SHIBA_EXPORT void _shibaUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+_SHIBA_EXPORT void _shibaUpdate(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
-	_shibaCommonUpdate(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
+	_shibaCommonUpdate(shibaResolutionWidth, shibaResolutionHeight);
 }
 
 _SHIBA_EXPORT void _shibaEnsureIsInitialized(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
@@ -105,9 +103,9 @@ _SHIBA_EXPORT void _shibaEnsureIsInitialized(int32_t shibaResolutionWidth, int32
 	}
 }
 
-_SHIBA_EXPORT void _shibaRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
+_SHIBA_EXPORT void _shibaRender(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
 {
-	_shibaCommonRender(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
+	_shibaCommonRender(shibaResolutionWidth, shibaResolutionHeight);
 
 	glReadBuffer(GL_COLOR_ATTACHMENT0);
 	shibaCheckGlError();
@@ -115,9 +113,9 @@ _SHIBA_EXPORT void _shibaRender(float shibaTime, int32_t shibaResolutionWidth, i
 	shibaCheckGlError();
 }
 
-_SHIBA_EXPORT void _shibaViewportUpdate(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+_SHIBA_EXPORT void _shibaViewportUpdate(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
-	_shibaCommonUpdate(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
+	_shibaCommonUpdate(shibaResolutionWidth, shibaResolutionHeight);
 }
 
 _SHIBA_EXPORT void _shibaViewportEnsureIsInitialized(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
@@ -144,18 +142,13 @@ _SHIBA_EXPORT void _shibaViewportEnsureIsInitialized(int32_t shibaResolutionWidt
 	}
 }
 
-_SHIBA_EXPORT void _shibaViewportRender(float shibaTime, int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+_SHIBA_EXPORT void _shibaViewportRender(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
 {
 	// Viewport sets a different default clear color.
 	glClearColor(0.f, 0.f, 0.f, 0.f);
 	shibaCheckGlError();
 
-	_shibaCommonRender(shibaTime, shibaResolutionWidth, shibaResolutionHeight);
-}
-
-_SHIBA_EXPORT void _shibaUpdateObject(const char *name, ShibaMat4 worldMatrix)
-{
-	shibaObjectMatrices[name] = worldMatrix;
+	_shibaCommonRender(shibaResolutionWidth, shibaResolutionHeight);
 }
 
 struct _ShibaShaderPasses
@@ -217,23 +210,6 @@ _SHIBA_EXPORT void _shibaUpdateShaderPasses(int count, _ShibaShaderPasses *passe
 		{% endfor %}
 		shibaLog();
 	}
-}
-
-_SHIBA_EXPORT void _shibaSetOverrideMatrices(
-	ShibaMat4 viewMatrix, ShibaMat4 invViewMatrix,
-	ShibaMat4 projectionMatrix, ShibaMat4 invProjectionMatrix
-)
-{
-	shibaOverrideViewMatrix = viewMatrix;
-	shibaOverrideInvViewMatrix = invViewMatrix;
-	shibaOverrideProjectionMatrix = projectionMatrix;
-	shibaOverrideInvProjectionMatrix = invProjectionMatrix;
-}
-
-_SHIBA_EXPORT void _shibaGetActiveUniformDescriptors(int &activeUniformCount, const _ShibaUniformDescriptor *&uniformDescriptors)
-{
-	activeUniformCount = sizeof(_shibaActiveUniformDescriptors) / sizeof(_shibaActiveUniformDescriptors[0]);
-	uniformDescriptors = _shibaActiveUniformDescriptors;
 }
 
 _SHIBA_EXPORT void _shibaSetActiveUniformValues(_ShibaUniformValue *_shibaArgValues)

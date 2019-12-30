@@ -10,10 +10,10 @@ def _get_project_directory():
     return path
 
 
-def _send_build_commands(server_connection, library_mode):
-    server_connection.send_build_command(library_mode, 'library')
+def _send_build_commands(server_connection):
+    server_connection.send_build_command('library')
     if bpy.context.scene.shiba.build_executable_on_change:
-        server_connection.send_build_command('full', 'executable')
+        server_connection.send_build_command('executable')
 
 
 def bootstrap(server_connection):
@@ -23,7 +23,7 @@ def bootstrap(server_connection):
     )
     server_connection.send_set_project_directory_command(
         _get_project_directory())
-    _send_build_commands(server_connection, 'full')
+    _send_build_commands(server_connection)
 
 
 def update_build_on_change(server_connection):
@@ -31,13 +31,13 @@ def update_build_on_change(server_connection):
         bpy.context.scene.shiba.build_executable_on_change,
         True,
     )
-    _send_build_commands(server_connection, 'updates')
+    _send_build_commands(server_connection)
 
 
 def update_project_directory(server_connection):
     server_connection.send_set_project_directory_command(
         _get_project_directory())
-    _send_build_commands(server_connection, 'updates')
+    _send_build_commands(server_connection)
 
 
 @persistent

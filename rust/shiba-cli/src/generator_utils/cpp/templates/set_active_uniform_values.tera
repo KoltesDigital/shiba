@@ -1,9 +1,19 @@
 {% if target == "library" %}
 	{% for variable in active_uniforms %}
 		{% set variable_index = loop.index0 %}
-		{% for annotation in variable.kind.uniform.annotations %}
-			{% if annotation.control %}
-				{{ variable.name }} = _shibaArgValues[{{ variable_index }}].as_{{ variable.opengl_type_name }};
+		{% for annotation in variable.annotations %}
+			{%
+				if annotation.kind == 'control'
+				or annotation.kind == 'inverse-projection'
+				or annotation.kind == 'inverse-view'
+				or annotation.kind == 'projection'
+				or annotation.kind == 'resolution-height'
+				or annotation.kind == 'resolution-width'
+				or annotation.kind == 'time'
+				or annotation.kind == 'view'
+			%}
+				{{ variable.name }} = _shibaArgValues[{{ variable_index }}].as_{{ variable.as_value_name }};
+				{% break %}
 			{% endif %}
 		{% endfor %}
 	{% endfor %}

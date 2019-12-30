@@ -97,7 +97,7 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
 
-		if build_cache_path.exists() {
+		if !self.project_descriptor.build_options.force && build_cache_path.exists() {
 			return Ok(build_cache_path);
 		}
 

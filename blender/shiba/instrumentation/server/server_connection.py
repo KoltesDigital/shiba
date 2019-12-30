@@ -10,10 +10,9 @@ class ServerConnection:
         self.__socket.send(message)
         self.__socket.send(b'\n')
 
-    def send_build_command(self, mode, target):
+    def send_build_command(self, target):
         self._send_command({
             'command': 'build',
-            'mode': mode,
             'target': target,
         })
 

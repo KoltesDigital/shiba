@@ -116,18 +116,27 @@ pub fn uniform_annotation<'a>(input: &'a str) -> IResult<&'a str, UniformAnnotat
 			)),
 			|(_, _, control_kind, control_parameters): (_, _, _, Option<&'a str>)| {
 				UniformAnnotationKind::Control(UniformAnnotationControlDescriptor {
-					control_kind: match control_kind {
-						"checkbox" => "Checkbox",
-						"object" => "Object",
-						"slider" => "Slider",
-						_ => "Unknown",
-					}
-					.to_string(),
+					control_kind: control_kind.to_string(),
 					control_parameters: control_parameters.map(|value| value.to_string()),
 				})
 			},
 		),
+		value(
+			UniformAnnotationKind::InverseProjection,
+			tag("inverse-projection"),
+		),
+		value(UniformAnnotationKind::InverseView, tag("inverse-view")),
+		value(UniformAnnotationKind::Projection, tag("projection")),
+		value(
+			UniformAnnotationKind::ResolutionHeight,
+			tag("resolution-height"),
+		),
+		value(
+			UniformAnnotationKind::ResolutionWidth,
+			tag("resolution-width"),
+		),
 		value(UniformAnnotationKind::Time, tag("time")),
+		value(UniformAnnotationKind::View, tag("view")),
 	))(input)
 }
 

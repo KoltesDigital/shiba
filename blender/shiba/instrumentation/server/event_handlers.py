@@ -1,4 +1,4 @@
-from shiba import instrumentation, notifications
+from shiba import instrumentation, notifications, uniforms
 from shiba.notifications import Notification
 from threading import Lock
 
@@ -16,9 +16,12 @@ def _handle_event_build_ended(obj):
             notifications.remove(_building_notification)
 
     if obj['successful']:
-        print("Build succeeded, duration: %fs." % obj['duration'])
+        str = "Build '%s' succeeded, duration: %fs." % (obj['target'], obj['duration'])
     else:
-        print('Build failed.')
+        str = "Build '%s' failed." % obj['target']
+
+    print(str)
+    notifications.add(Notification(str, 3))
 
 
 def _handle_event_build_started(obj):
@@ -48,10 +51,12 @@ def _handle_event_library_compiled(obj):
         state.library.path = obj['path']
 
 
-def _handle_event_shader_passes_generated(obj):
-    with instrumentation.library.get_library_wrapper() as library_wrapper:
-        if library_wrapper:
-            library_wrapper.set_shader_passes(obj['passes'])
+def _handle_event_shader_provided(obj):
+    if obj['target'] == 'library':
+        with instrumentation.library.get_library_wrapper() as library_wrapper:
+            if library_wrapper:
+                library_wrapper.set_shader_passes(obj['passes'])
+        uniforms.set_shader_variables(obj['variables'])
 
 
 event_handlers = {
@@ -60,5 +65,5 @@ event_handlers = {
     'executable-compiled': _handle_event_executable_compiled,
     'error': _handle_event_error,
     'library-compiled': _handle_event_library_compiled,
-    'shader-passes-generated': _handle_event_shader_passes_generated,
+    'shader-provided': _handle_event_shader_provided,
 }

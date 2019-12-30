@@ -32,7 +32,7 @@ class RenderEngine(bpy.types.RenderEngine):
 
     def __common_update(self, library_wrapper, depsgraph):
         if self.__first_time_update or depsgraph.id_type_updated('OBJECT'):
-            library_wrapper.set_object_instances(depsgraph.object_instances)
+            pass  # TODO
         self.__first_time_update = False
 
     def update(self, data, depsgraph):
@@ -73,14 +73,21 @@ class RenderEngine(bpy.types.RenderEngine):
                         scale_x=self.render.pixel_aspect_x,
                         scale_y=self.render.pixel_aspect_y,
                     )
-                    library_wrapper.set_override_matrices(
-                        camera_matrix.inverted(),
-                        camera_matrix,
-                        projection_matrix,
+
+                    context_values = uniforms.ContextValues(
+                        inverse_projection=projection_matrix.inverted(),
+                        inverse_view=camera_matrix,
+                        projection=projection_matrix,
+                        resolution_height=self.resolution_y,
+                        resolution_width=self.resolution_x,
+                        time=time,
+                        view=camera_matrix.inverted(),
                     )
 
+                    values = uniforms.get_api_uniform_values(context_values, scene.shiba.uniforms)
+                    library_wrapper.set_uniform_values(values)
+
                     frame = library_wrapper.render(
-                        time,
                         self.resolution_x,
                         self.resolution_y,
                         self.is_preview,
@@ -103,25 +110,29 @@ class RenderEngine(bpy.types.RenderEngine):
             if library_wrapper:
                 self.__common_update(library_wrapper, depsgraph)
 
-                time = RenderEngine._get_time(depsgraph)
                 width, height = RenderEngine._get_view_resolution(context)
-                library_wrapper.viewport_update(time, width, height)
+                library_wrapper.viewport_update(width, height)
 
     def view_draw(self, context, depsgraph):
         with instrumentation.library.get_library_wrapper() as library_wrapper:
             if library_wrapper:
-                library_wrapper.set_override_matrices(
-                    context.region_data.view_matrix,
-                    context.region_data.view_matrix.inverted(),
-                    context.region_data.window_matrix,
-                )
-
-                values = uniforms.get_api_uniform_values(context.scene.shiba.uniforms)
-                library_wrapper.set_uniform_values(values)
-
                 time = RenderEngine._get_time(depsgraph)
                 width, height = RenderEngine._get_view_resolution(context)
-                library_wrapper.viewport_render(time, width, height)
+
+                context_values = uniforms.ContextValues(
+                    inverse_projection=context.region_data.window_matrix.inverted(),
+                    inverse_view=context.region_data.view_matrix.inverted(),
+                    projection=context.region_data.window_matrix,
+                    resolution_height=height,
+                    resolution_width=width,
+                    time=time,
+                    view=context.region_data.view_matrix,
+                )
+
+                values = uniforms.get_api_uniform_values(context_values, context.scene.shiba.uniforms)
+                library_wrapper.set_uniform_values(values)
+
+                library_wrapper.viewport_render(width, height)
 
 
 def get_panels():

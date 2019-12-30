@@ -1,26 +1,57 @@
+#include <cstring>
+
+template <int Columns, int Rows>
+struct _ShibaMatrix
+{
+	float data[Columns * Rows];
+
+	_ShibaMatrix()
+	{
+		std::memset(data, 0, sizeof(float) * Columns * Rows);
+	}
+
+	_ShibaMatrix(const _ShibaMatrix &other)
+	{
+		std::memcpy(data, other.data, sizeof(float) * Columns * Rows);
+	}
+
+	_ShibaMatrix &operator=(const _ShibaMatrix &other)
+	{
+		std::memcpy(data, other.data, sizeof(float) * Columns * Rows);
+		return *this;
+	}
+};
+
+using ShibaMat2 = _ShibaMatrix<2, 2>;
+using ShibaMat3 = _ShibaMatrix<3, 3>;
+using ShibaMat4 = _ShibaMatrix<4, 4>;
+
 class _ShibaNoLogger
 {
 public:
-	_ShibaNoLogger& operator<< (bool) { return *this; }
-	_ShibaNoLogger& operator<< (short) { return *this; }
-	_ShibaNoLogger& operator<< (unsigned short) { return *this; }
-	_ShibaNoLogger& operator<< (int) { return *this; }
-	_ShibaNoLogger& operator<< (unsigned int) { return *this; }
-	_ShibaNoLogger& operator<< (long) { return *this; }
-	_ShibaNoLogger& operator<< (unsigned long) { return *this; }
-	_ShibaNoLogger& operator<< (long long) { return *this; }
-	_ShibaNoLogger& operator<< (unsigned long long) { return *this; }
-	_ShibaNoLogger& operator<< (float) { return *this; }
-	_ShibaNoLogger& operator<< (double) { return *this; }
-	_ShibaNoLogger& operator<< (long double) { return *this; }
-	_ShibaNoLogger& operator<< (void*) { return *this; }
+	_ShibaNoLogger & operator<< (bool) { return *this; }
+	_ShibaNoLogger & operator<< (short) { return *this; }
+	_ShibaNoLogger & operator<< (unsigned short) { return *this; }
+	_ShibaNoLogger & operator<< (int) { return *this; }
+	_ShibaNoLogger & operator<< (unsigned int) { return *this; }
+	_ShibaNoLogger & operator<< (long) { return *this; }
+	_ShibaNoLogger & operator<< (unsigned long) { return *this; }
+	_ShibaNoLogger & operator<< (long long) { return *this; }
+	_ShibaNoLogger & operator<< (unsigned long long) { return *this; }
+	_ShibaNoLogger & operator<< (float) { return *this; }
+	_ShibaNoLogger & operator<< (double) { return *this; }
+	_ShibaNoLogger & operator<< (long double) { return *this; }
+	_ShibaNoLogger & operator<< (void*) { return *this; }
+
+	_ShibaNoLogger & operator<< (const ShibaMat2 &) { return *this; }
+	_ShibaNoLogger & operator<< (const ShibaMat3 &) { return *this; }
+	_ShibaNoLogger & operator<< (const ShibaMat4 &) { return *this; }
 };
 
 #define SHIBA_CONST static const constexpr
 
 {% if development %}
 
-	#include <cstring>
 	#include <iostream>
 	#include <map>
 	#include <memory>
@@ -44,6 +75,56 @@ public:
 	private:
 		std::ostream &os;
 	};
+
+	std::ostream & operator<< (std::ostream &os, const ShibaMat2 &matrix)
+	{
+		return os
+			<< "mat2("
+			<< matrix.data[0] << ", "
+			<< matrix.data[1] << ", "
+			<< matrix.data[2] << ", "
+			<< matrix.data[3]
+			<< ")";
+	}
+
+	std::ostream & operator<< (std::ostream &os, const ShibaMat3 &matrix)
+	{
+		return os
+			<< "mat3("
+			<< matrix.data[0] << ", "
+			<< matrix.data[1] << ", "
+			<< matrix.data[2] << ", "
+			<< matrix.data[3] << ", "
+			<< matrix.data[4] << ", "
+			<< matrix.data[5] << ", "
+			<< matrix.data[6] << ", "
+			<< matrix.data[7] << ", "
+			<< matrix.data[8]
+			<< ")";
+	}
+
+	std::ostream & operator<< (std::ostream &os, const ShibaMat4 &matrix)
+	{
+		return os
+			<< "mat4("
+			<< matrix.data[0] << ", "
+			<< matrix.data[1] << ", "
+			<< matrix.data[2] << ", "
+			<< matrix.data[3] << ", "
+			<< matrix.data[4] << ", "
+			<< matrix.data[5] << ", "
+			<< matrix.data[6] << ", "
+			<< matrix.data[7] << ", "
+			<< matrix.data[8] << ", "
+			<< matrix.data[9] << ", "
+			<< matrix.data[10] << ", "
+			<< matrix.data[11] << ", "
+			<< matrix.data[12] << ", "
+			<< matrix.data[13] << ", "
+			<< matrix.data[14] << ", "
+			<< matrix.data[15]
+			<< ")";
+	}
 
 	#define shibaLog() _ShibaLogger{ std::cout }
 	#define shibaError() _ShibaLogger{ std::cerr }
@@ -149,83 +230,8 @@ public:
 
 	#define SHIBA_VARIABLE static thread_local
 
-	template <int Columns, int Rows>
-	class _ShibaMatrix
-	{
-	public:
-		_ShibaMatrix()
-		{
-			std::memset(data, 0, sizeof(float) * Columns * Rows);
-		}
-
-		_ShibaMatrix(const _ShibaMatrix &other)
-		{
-			std::memcpy(data, other.data, sizeof(float) * Columns * Rows);
-		}
-
-		_ShibaMatrix &operator=(const _ShibaMatrix &other)
-		{
-			std::memcpy(data, other.data, sizeof(float) * Columns * Rows);
-			return *this;
-		}
-
-	private:
-		float data[Columns * Rows];
-	};
-
-	using ShibaMat2 = _ShibaMatrix<2, 2>;
-	using ShibaMat3 = _ShibaMatrix<3, 3>;
-	using ShibaMat4 = _ShibaMatrix<4, 4>;
-
 	SHIBA_VARIABLE GLint _shibaFragmentShaders[{{ passes | length }}];
 	SHIBA_VARIABLE GLint _shibaVertexShaders[{{ passes | length }}];
-
-	enum class _ShibaUniformAnnotationKind
-	{
-		Control,
-	};
-
-	struct _ShibaUniformAnnotationDescriptor
-	{
-		_ShibaUniformAnnotationKind kind;
-	};
-
-	enum class _ShibaUniformAnnotationControlKind
-	{
-		Checkbox,
-		Object,
-		Slider,
-	};
-
-	struct _ShibaUniformAnnotationControlDescriptor : _ShibaUniformAnnotationDescriptor
-	{
-		_ShibaUniformAnnotationControlKind controlKind;
-		const char *controlParameters;
-
-		_ShibaUniformAnnotationControlDescriptor(_ShibaUniformAnnotationControlKind controlKind, const char *controlParameters)
-			: _ShibaUniformAnnotationDescriptor{ _ShibaUniformAnnotationKind::Control }
-			, controlKind{ controlKind }
-			, controlParameters{ controlParameters }
-		{}
-	};
-
-	struct _ShibaUniformDescriptor
-	{
-		int annotationCount;
-		_ShibaUniformAnnotationDescriptor **annotations;
-		const char *name;
-		const char *typeName;
-	};
-
-	union _ShibaUniformValue
-	{
-		float as_GLfloat;
-		GLint as_GLint;
-		ShibaMat2 as_ShibaMat2;
-		ShibaMat3 as_ShibaMat3;
-		ShibaMat4 as_ShibaMat4;
-		GLuint as_GLuint;
-	};
 
 {% else %}
 
@@ -423,18 +429,21 @@ void main() {\n\
 
 	SHIBA_VARIABLE bool _shibaIsInitialized;
 
-	SHIBA_VARIABLE std::unique_ptr<std::map<std::string, ShibaMat4>> _shibaObjectMatrices;
-	#define shibaObjectMatrices (*_shibaObjectMatrices)
-
 	SHIBA_VARIABLE bool shibaIsViewport;
-	SHIBA_VARIABLE ShibaMat4 shibaOverrideViewMatrix;
-	SHIBA_VARIABLE ShibaMat4 shibaOverrideInvViewMatrix;
-	SHIBA_VARIABLE ShibaMat4 shibaOverrideProjectionMatrix;
-	SHIBA_VARIABLE ShibaMat4 shibaOverrideInvProjectionMatrix;
 
 	SHIBA_VARIABLE _ShibaContext _shibaStandaloneContext;
 	SHIBA_VARIABLE GLuint _shibaFinalFramebufferId;
 	SHIBA_VARIABLE GLuint _shibaFinalFramebufferTextureId;
+
+	struct _ShibaUniformValue
+	{
+		float as_float;
+		GLint as_int;
+		ShibaMat2 as_mat2;
+		ShibaMat3 as_mat3;
+		ShibaMat4 as_mat4;
+		GLuint as_uint;
+	};
 
 {% else %}
 

@@ -25,16 +25,23 @@ pub struct ConstVariable {
 }
 
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct UniformAnnotationControlDescriptor {
 	pub control_kind: String,
 	pub control_parameters: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case", tag = "kind")]
 pub enum UniformAnnotationKind {
 	Control(UniformAnnotationControlDescriptor),
+	InverseProjection,
+	InverseView,
+	Projection,
+	ResolutionHeight,
+	ResolutionWidth,
 	Time,
+	View,
 }
 
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
@@ -43,7 +50,7 @@ pub struct UniformVariable {
 }
 
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", tag = "kind")]
 pub enum VariableKind {
 	Const(ConstVariable),
 	Regular,
@@ -51,7 +58,9 @@ pub enum VariableKind {
 }
 
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Variable {
+	#[serde(flatten)]
 	pub kind: VariableKind,
 
 	pub active: bool,

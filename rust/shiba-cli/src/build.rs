@@ -1,7 +1,7 @@
 use crate::code_map;
 use crate::compiler::{CompileOptions, CompilerKind};
 use crate::shader_codes::to_standalone_passes;
-use crate::types::{CompilationDescriptor, Pass, ProjectDescriptor};
+use crate::types::{CompilationDescriptor, Pass, ProjectDescriptor, Variable};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -24,14 +24,16 @@ pub struct LibraryCompiledEvent {
 	pub path: PathBuf,
 }
 
-pub struct ShaderPassesGeneratedEvent {
+pub struct ShaderProvidedEvent<'a> {
 	pub passes: Vec<Pass>,
+	pub target: BuildTarget,
+	pub variables: &'a Vec<Variable>,
 }
 
-pub enum BuildEvent {
+pub enum BuildEvent<'a> {
 	ExecutableCompiled(ExecutableCompiledEvent),
 	LibraryCompiled(LibraryCompiledEvent),
-	ShaderPassesGenerated(ShaderPassesGeneratedEvent),
+	ShaderProvided(ShaderProvidedEvent<'a>),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -85,9 +87,11 @@ pub fn build(options: &BuildOptions) -> Result<(), String> {
 		shader_descriptor = shader_minifier.minify(&shader_descriptor)?;
 	}
 
-	(project_descriptor.build_options.event_listener)(BuildEvent::ShaderPassesGenerated(
-		ShaderPassesGeneratedEvent {
+	(project_descriptor.build_options.event_listener)(BuildEvent::ShaderProvided(
+		ShaderProvidedEvent {
 			passes: to_standalone_passes(&shader_descriptor),
+			target: options.target,
+			variables: &shader_descriptor.variables,
 		},
 	));
 

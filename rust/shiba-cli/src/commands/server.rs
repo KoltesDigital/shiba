@@ -1,5 +1,5 @@
 use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
-use crate::types::Pass;
+use crate::types::{Pass, Variable};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
@@ -45,6 +45,7 @@ struct Command {
 enum EventKind<'a> {
 	BuildEnded {
 		duration: Option<f32>,
+		target: BuildTarget,
 		successful: bool,
 	},
 	BuildStarted,
@@ -58,8 +59,10 @@ enum EventKind<'a> {
 	LibraryCompiled {
 		path: &'a str,
 	},
-	ShaderPassesGenerated {
+	ShaderProvided {
 		passes: &'a Vec<Pass>,
+		target: BuildTarget,
+		variables: &'a Vec<Variable>,
 	},
 }
 
@@ -157,12 +160,14 @@ pub fn execute(options: &Options) -> Result<(), String> {
 									});
 								}
 
-								BuildEvent::ShaderPassesGenerated(event) => {
+								BuildEvent::ShaderProvided(event) => {
 									let mut command_state = command_state.write().unwrap();
 									command_state.broadcast(&Event {
 										id: &command_id,
-										kind: EventKind::ShaderPassesGenerated {
+										kind: EventKind::ShaderProvided {
 											passes: &event.passes,
+											target: event.target,
+											variables: &event.variables,
 										},
 									});
 								}
@@ -182,6 +187,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 										id: &command.id,
 										kind: EventKind::BuildEnded {
 											duration: Some(duration.as_secs_f32()),
+											target,
 											successful: true,
 										},
 									});
@@ -197,6 +203,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 										id: &command.id,
 										kind: EventKind::BuildEnded {
 											duration: None,
+											target,
 											successful: false,
 										},
 									});
@@ -244,22 +251,22 @@ pub fn execute(options: &Options) -> Result<(), String> {
 				| DebouncedEvent::Write(_) => {
 					let watcher_state = watcher_state.read().unwrap();
 
-					if watcher_state.executable_build_on_change {
-						let _ = watcher_tx_command.send(Command {
-							id: None,
-							kind: CommandKind::Build {
-								force: None,
-								target: BuildTarget::Executable,
-							},
-						});
-					}
-
 					if watcher_state.library_build_on_change {
 						let _ = watcher_tx_command.send(Command {
 							id: None,
 							kind: CommandKind::Build {
 								force: None,
 								target: BuildTarget::Library,
+							},
+						});
+					}
+
+					if watcher_state.executable_build_on_change {
+						let _ = watcher_tx_command.send(Command {
+							id: None,
+							kind: CommandKind::Build {
+								force: None,
+								target: BuildTarget::Executable,
 							},
 						});
 					}

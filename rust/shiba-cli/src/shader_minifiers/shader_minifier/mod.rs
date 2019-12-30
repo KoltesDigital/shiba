@@ -17,13 +17,15 @@ use std::process::{Command, Stdio};
 use std::str;
 use tera::Tera;
 
-pub struct ShaderMinifierShaderMinifier {
+pub struct ShaderMinifierShaderMinifier<'a> {
+	project_descriptor: &'a ProjectDescriptor<'a>,
+
 	exe_path: PathBuf,
 	tera: Tera,
 }
 
-impl ShaderMinifierShaderMinifier {
-	pub fn new(project_descriptor: &ProjectDescriptor) -> Result<Self, String> {
+impl<'a> ShaderMinifierShaderMinifier<'a> {
+	pub fn new(project_descriptor: &'a ProjectDescriptor) -> Result<Self, String> {
 		let exe_path = project_descriptor
 			.configuration
 			.paths
@@ -36,7 +38,11 @@ impl ShaderMinifierShaderMinifier {
 		tera.add_raw_template("template", include_str!("template.tera"))
 			.map_err(|err| err.to_string())?;
 
-		Ok(ShaderMinifierShaderMinifier { exe_path, tera })
+		Ok(ShaderMinifierShaderMinifier {
+			exe_path,
+			project_descriptor,
+			tera,
+		})
 	}
 }
 
@@ -53,7 +59,7 @@ struct Context<'a> {
 	pub shader_descriptor: &'a ShaderDescriptor,
 }
 
-impl ShaderMinifier for ShaderMinifierShaderMinifier {
+impl ShaderMinifier for ShaderMinifierShaderMinifier<'_> {
 	fn minify(
 		&self,
 		original_shader_descriptor: &ShaderDescriptor,
@@ -64,7 +70,7 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
 
-		if build_cache_path.exists() {
+		if !self.project_descriptor.build_options.force && build_cache_path.exists() {
 			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
 			let shader_descriptor =
 				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;

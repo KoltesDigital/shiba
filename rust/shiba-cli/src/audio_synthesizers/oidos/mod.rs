@@ -104,7 +104,7 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
 
-		if build_cache_path.exists() {
+		if !self.project_descriptor.build_options.force && build_cache_path.exists() {
 			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
 			let integration_result =
 				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;
