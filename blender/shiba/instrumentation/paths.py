@@ -1,8 +1,8 @@
 import json
 import os
+from shiba import addon
 
-# Should be 'shiba'.
-module_name = __name__.split('.')[0]
+module_name = addon.name()
 
 # For development purpose, change paths to use paths from the project itself.
 _project_path = None
@@ -19,7 +19,7 @@ if addons_to_load is not None:
 if _project_path is not None:
     _shiba_cli_path = os.path.join(_project_path, 'rust', 'target', 'debug', 'shiba-cli.exe')
 else:
-    _shiba_cli_path = os.path.join(os.path.dirname(__file__), 'shiba-cli.exe')
+    _shiba_cli_path = os.path.join(os.path.dirname(__file__), '..', 'shiba-cli.exe')
 
 
 def cli():

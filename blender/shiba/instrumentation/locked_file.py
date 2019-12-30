@@ -1,8 +1,9 @@
 import os
 import tempfile
 import shutil
+from shiba import addon
 
-_temp_dir = os.path.join(tempfile.gettempdir(), __package__)
+_temp_dir = os.path.join(tempfile.gettempdir(), addon.name())
 if not os.path.exists(_temp_dir):
     os.makedirs(_temp_dir)
 

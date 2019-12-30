@@ -1,6 +1,6 @@
 import bpy
 from bpy.props import EnumProperty, IntProperty, StringProperty
-from shiba import instrumentation
+from shiba import addon, instrumentation
 
 
 def _update_instrumentation(_self, _context):
@@ -8,7 +8,7 @@ def _update_instrumentation(_self, _context):
 
 
 class AddonPreferences(bpy.types.AddonPreferences):
-    bl_idname = __package__
+    bl_idname = addon.name()
 
     server_custom_cli_path: StringProperty(
         name="Path to custom CLI",
@@ -74,6 +74,6 @@ class AddonPreferences(bpy.types.AddonPreferences):
 
 
 def get():
-    addon = bpy.context.preferences.addons.get(__package__, None)
-    preferences = addon.preferences if addon else None
+    addon_descriptor = bpy.context.preferences.addons.get(addon.name(), None)
+    preferences = addon_descriptor.preferences if addon_descriptor else None
     return preferences
