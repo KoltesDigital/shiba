@@ -1,7 +1,9 @@
 use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
+use crate::run::{self, RunOptions};
 use crate::types::{Pass, Variable};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
+use std::cell::Cell;
 use std::io::{BufRead, BufReader, Write};
 use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -23,6 +25,7 @@ enum CommandKind {
 		force: Option<bool>,
 		target: BuildTarget,
 	},
+	Run,
 	SetBuildOnChange {
 		executable: bool,
 		library: bool,
@@ -58,6 +61,9 @@ enum EventKind<'a> {
 	},
 	LibraryCompiled {
 		path: &'a str,
+	},
+	Run {
+		duration: f32,
 	},
 	ShaderProvided {
 		passes: &'a Vec<Pass>,
@@ -113,6 +119,8 @@ pub fn execute(options: &Options) -> Result<(), String> {
 			.watch(command_project_directory.clone(), RecursiveMode::Recursive)
 			.expect("Failed to watch project directory");
 
+		let executable_path = Cell::new(None);
+
 		loop {
 			match rx_command.recv() {
 				Ok(command) => {
@@ -130,16 +138,19 @@ pub fn execute(options: &Options) -> Result<(), String> {
 							let event_listener = |event: BuildEvent| match event {
 								BuildEvent::ExecutableCompiled(event) => match event.get_size() {
 									Ok(size) => {
-										let path = event.path.to_string_lossy();
+										{
+											let path = event.path.to_string_lossy();
 
-										let mut command_state = command_state.write().unwrap();
-										command_state.broadcast(&Event {
-											id: &command_id,
-											kind: EventKind::ExecutableCompiled {
-												path: &path,
-												size,
-											},
-										});
+											let mut command_state = command_state.write().unwrap();
+											command_state.broadcast(&Event {
+												id: &command_id,
+												kind: EventKind::ExecutableCompiled {
+													path: &path,
+													size,
+												},
+											});
+										}
+										executable_path.set(Some(event.path));
 									}
 									Err(err) => {
 										let mut command_state = command_state.write().unwrap();
@@ -209,6 +220,33 @@ pub fn execute(options: &Options) -> Result<(), String> {
 									});
 								}
 							};
+						}
+
+						CommandKind::Run => {
+							if let Some(executable_path_value) = executable_path.take() {
+								match run::run_duration(&RunOptions {
+									executable_path: &executable_path_value,
+									project_directory: &command_project_directory,
+								}) {
+									Ok(duration) => {
+										let mut command_state = command_state.write().unwrap();
+										command_state.broadcast(&Event {
+											id: &command.id,
+											kind: EventKind::Run {
+												duration: duration.as_secs_f32(),
+											},
+										});
+									}
+									Err(err) => {
+										let mut command_state = command_state.write().unwrap();
+										command_state.broadcast(&Event {
+											id: &command.id,
+											kind: EventKind::Error { message: &err },
+										});
+									}
+								};
+								executable_path.set(Some(executable_path_value));
+							}
 						}
 
 						CommandKind::SetBuildOnChange {

@@ -160,7 +160,7 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 			.args(&self.settings.crinkler.args)
 			.args(&options.compilation_descriptor.crinkler.args)
 			.arg("executable.obj")
-			.current_dir(&*build_directory)
+			.current_dir(&build_directory)
 			.spawn()
 			.map_err(|err| err.to_string())?;
 
@@ -169,7 +169,7 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 			return Err("Failed to compile.".to_string());
 		}
 
-		fs::copy(build_directory.join("executable.exe"), &build_cache_path)
+		fs::copy(&build_directory.join("executable.exe"), &build_cache_path)
 			.map_err(|err| err.to_string())?;
 
 		Ok(build_cache_path)

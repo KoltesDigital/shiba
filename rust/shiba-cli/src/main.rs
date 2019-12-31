@@ -34,6 +34,7 @@ mod code_map;
 mod commands {
 	pub mod build;
 	pub mod clean;
+	pub mod run;
 	pub mod server;
 }
 mod compiler;
@@ -47,6 +48,7 @@ mod hash_extra;
 mod library_compilers;
 mod parsers;
 mod paths;
+mod run;
 mod settings;
 mod shader_codes;
 mod shader_minifiers;
@@ -61,7 +63,7 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 enum Command {
-	/// Builds the project as executable (default).
+	/// Builds the project as executable.
 	BuildExecutable {
 		#[structopt(short, long)]
 		force: bool,
@@ -73,6 +75,8 @@ enum Command {
 	},
 	/// Removes build artifacts, build cache.
 	Clean,
+	/// Builds and executes the project (default).
+	Run,
 	/// Starts a server.
 	Server {
 		#[structopt(short, long, default_value = "0.3")]
@@ -86,7 +90,7 @@ enum Command {
 
 impl Default for Command {
 	fn default() -> Self {
-		Command::BuildExecutable { force: false }
+		Command::Run
 	}
 }
 
@@ -120,6 +124,11 @@ fn main() -> Result<(), String> {
 		.map(|_| ()),
 
 		Command::Clean => commands::clean::execute().map(|_| ()),
+
+		Command::Run => commands::run::execute(&commands::run::Options {
+			project_directory: &args.project_directory,
+		})
+		.map(|_| ()),
 
 		Command::Server {
 			debounce_delay,

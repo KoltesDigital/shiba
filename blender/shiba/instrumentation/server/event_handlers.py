@@ -6,7 +6,7 @@ _building_lock = Lock()
 _building_count = 0
 
 
-def _handle_event_build_ended(obj):
+def _handle_build_ended_event(obj):
     global _building_count
     global _building_notification
 
@@ -16,15 +16,15 @@ def _handle_event_build_ended(obj):
             notifications.remove(_building_notification)
 
     if obj['successful']:
-        str = "Build '%s' succeeded, duration: %fs." % (obj['target'], obj['duration'])
+        message = "Build '%s' succeeded, duration: %fs." % (obj['target'], obj['duration'])
     else:
-        str = "Build '%s' failed." % obj['target']
+        message = "Build '%s' failed." % obj['target']
 
-    print(str)
-    notifications.add(Notification(str, 3))
+    print(message)
+    notifications.add(Notification(message, 3))
 
 
-def _handle_event_build_started(obj):
+def _handle_build_started_event(obj):
     global _building_count
     global _building_notification
 
@@ -35,23 +35,28 @@ def _handle_event_build_started(obj):
         _building_count += 1
 
 
-def _handle_event_executable_compiled(obj):
+def _handle_executable_compiled_event(obj):
     print("Executable compiled at %s." % obj['path'])
     size = obj['size']
     notifications.add(Notification("Executable size: %d." % size, 5))
 
 
-def _handle_event_error(obj):
+def _handle_error_event(obj):
     print("Server error: %s" % obj['message'])
 
 
-def _handle_event_library_compiled(obj):
+def _handle_library_compiled_event(obj):
     print("Library compiled at %s." % obj['path'])
     with instrumentation.update_state() as state:
         state.library.path = obj['path']
 
 
-def _handle_event_shader_provided(obj):
+def _handle_run_event(obj):
+    message = "Run duration: %fs." % obj['duration']
+    notifications.add(Notification(message, 3))
+
+
+def _handle_shader_provided_event(obj):
     if obj['target'] == 'library':
         with instrumentation.library.get_library_wrapper() as library_wrapper:
             if library_wrapper:
@@ -60,10 +65,11 @@ def _handle_event_shader_provided(obj):
 
 
 event_handlers = {
-    'build-ended': _handle_event_build_ended,
-    'build-started': _handle_event_build_started,
-    'executable-compiled': _handle_event_executable_compiled,
-    'error': _handle_event_error,
-    'library-compiled': _handle_event_library_compiled,
-    'shader-provided': _handle_event_shader_provided,
+    'build-ended': _handle_build_ended_event,
+    'build-started': _handle_build_started_event,
+    'executable-compiled': _handle_executable_compiled_event,
+    'error': _handle_error_event,
+    'library-compiled': _handle_library_compiled_event,
+    'run': _handle_run_event,
+    'shader-provided': _handle_shader_provided_event,
 }

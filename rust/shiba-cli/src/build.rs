@@ -128,6 +128,5 @@ pub fn build_duration(options: &BuildOptions) -> Result<Duration, String> {
 	build(options)?;
 
 	let duration = start.elapsed();
-
 	Ok(duration)
 }

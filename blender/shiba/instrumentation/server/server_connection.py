@@ -16,6 +16,11 @@ class ServerConnection:
             'target': target,
         })
 
+    def send_run_command(self):
+        self._send_command({
+            'command': 'run',
+        })
+
     def send_set_build_on_change_command(self, executable, library):
         self._send_command({
             'command': 'set-build-on-change',

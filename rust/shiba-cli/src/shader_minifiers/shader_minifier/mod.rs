@@ -123,7 +123,7 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier<'_> {
 			.arg(&output_path)
 			.args(vec!["-v", "--"])
 			.arg(&input_path)
-			.current_dir(&*build_directory)
+			.current_dir(&build_directory)
 			.stdout(Stdio::inherit())
 			.stderr(Stdio::inherit())
 			.spawn()

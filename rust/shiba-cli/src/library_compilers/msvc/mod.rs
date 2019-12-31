@@ -149,7 +149,7 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 			)
 			.args(&options.compilation_descriptor.link.args)
 			.arg("library.obj")
-			.current_dir(&*build_directory)
+			.current_dir(&build_directory)
 			.spawn()
 			.map_err(|err| err.to_string())?;
 
@@ -158,7 +158,7 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 			return Err("Failed to compile.".to_string());
 		}
 
-		fs::copy(build_directory.join("library.dll"), &build_cache_path)
+		fs::copy(&build_directory.join("library.dll"), &build_cache_path)
 			.map_err(|err| err.to_string())?;
 
 		Ok(build_cache_path)

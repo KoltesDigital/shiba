@@ -147,7 +147,7 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 		] {
 			let mut compilation = Command::new(&self.nasm_path)
 				.args(vec!["-f", "win32", "-i"])
-				.arg(&*build_directory)
+				.arg(&build_directory)
 				.arg("-i")
 				.arg(
 					&self
@@ -166,7 +166,7 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 						.to_string_lossy()
 						.as_ref(),
 				)
-				.current_dir(&*build_directory)
+				.current_dir(&build_directory)
 				.spawn()
 				.map_err(|err| err.to_string())?;
 

@@ -1,6 +1,6 @@
 from bl_ui.utils import PresetPanel
 from bpy.types import Panel
-from shiba import instrumentation
+from shiba import instrumentation, operators
 from shiba.render_engine import RenderEngine
 from shiba.presets import AddProjectPreset
 
@@ -41,6 +41,8 @@ class SHIBA_RENDER_PT_project(_Panel, Panel):
 
         layout.prop(render_settings, 'project_directory')
         layout.prop(render_settings, 'build_executable_on_change')
+
+        layout.operator(operators.build_and_run.BuildAndRunOperator.bl_idname)
 
 
 class SHIBA_PT_Status(_Panel, Panel):
