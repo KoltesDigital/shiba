@@ -153,6 +153,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 										executable_path.set(Some(event.path));
 									}
 									Err(err) => {
+										executable_path.set(None);
 										let mut command_state = command_state.write().unwrap();
 										command_state.broadcast(&Event {
 											id: &command_id,
@@ -246,6 +247,14 @@ pub fn execute(options: &Options) -> Result<(), String> {
 									}
 								};
 								executable_path.set(Some(executable_path_value));
+							} else {
+								let mut command_state = command_state.write().unwrap();
+								command_state.broadcast(&Event {
+									id: &command_id,
+									kind: EventKind::Error {
+										message: "Executable has not been built.",
+									},
+								});
 							}
 						}
 
