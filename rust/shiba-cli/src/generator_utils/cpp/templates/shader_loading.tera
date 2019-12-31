@@ -87,6 +87,9 @@
 			{% endfor %}
 			shibaLog();
 		{% endif %}
+
+		glUseProgram(shibaProgram);
+		shibaCheckGlError();
 	}
 
 {% else %}
