@@ -5,6 +5,7 @@ mod types;
 pub use self::settings::ShibaSettings;
 use self::types::*;
 use super::ShaderProvider;
+use crate::build::BuildTarget;
 use crate::hash_extra;
 use crate::parsers::glsl;
 use crate::types::{
@@ -16,6 +17,12 @@ use serde_json;
 use std::cell::Cell;
 use std::fs;
 use tera::Tera;
+
+#[derive(Serialize)]
+struct Context {
+	development: bool,
+	target: BuildTarget,
+}
 
 pub struct ShibaShaderProvider<'a> {
 	project_descriptor: &'a ProjectDescriptor<'a>,
@@ -45,6 +52,24 @@ impl<'a> ShibaShaderProvider<'a> {
 			shader_contents,
 		})
 	}
+
+	fn render(&self, code: &str) -> Result<String, String> {
+		let mut tera = Tera::default();
+
+		tera.add_raw_template("template", code)
+			.map_err(|err| err.to_string())?;
+
+		let context = Context {
+			development: self.project_descriptor.development,
+			target: self.project_descriptor.build_options.target,
+		};
+
+		let code = tera
+			.render("template", &context)
+			.map_err(|_| "Failed to render template.")?;
+
+		Ok(code)
+	}
 }
 
 fn ensure_passes_has_index(shader_descriptor: &mut ShaderDescriptor, index: usize) {
@@ -55,20 +80,9 @@ fn ensure_passes_has_index(shader_descriptor: &mut ShaderDescriptor, index: usiz
 	}
 }
 
-fn parse(code: &str, development: bool) -> Result<ShaderDescriptor, String> {
-	let mut tera = Tera::default();
-
-	tera.add_raw_template("template", code)
-		.map_err(|err| err.to_string())?;
-
-	let context = Context { development };
-
-	let code = tera
-		.render("template", &context)
-		.map_err(|_| "Failed to render template.")?;
-
+fn parse(code: &str) -> Result<ShaderDescriptor, String> {
 	let (input, (glsl_version, sections)) =
-		parsers::contents(code.as_str()).map_err(|_| "Parsing error.".to_string())?;
+		parsers::contents(code).map_err(|_| "Parsing error.".to_string())?;
 
 	let mut shader_descriptor = ShaderDescriptor {
 		glsl_version: glsl_version.map(|s| s.to_owned()),
@@ -140,11 +154,7 @@ const OUTPUT_FILENAME: &str = "shader-descriptor.json";
 struct Inputs<'a> {
 	development: bool,
 	shader_contents: &'a String,
-}
-
-#[derive(Serialize)]
-struct Context {
-	development: bool,
+	target: BuildTarget,
 }
 
 impl ShaderProvider for ShibaShaderProvider<'_> {
@@ -152,6 +162,7 @@ impl ShaderProvider for ShibaShaderProvider<'_> {
 		let inputs = Inputs {
 			development: self.project_descriptor.development,
 			shader_contents: &self.shader_contents,
+			target: self.project_descriptor.build_options.target,
 		};
 		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
@@ -163,8 +174,9 @@ impl ShaderProvider for ShibaShaderProvider<'_> {
 			return Ok(shader_descriptor);
 		}
 
-		let mut shader_descriptor =
-			parse(&self.shader_contents, self.project_descriptor.development)?;
+		let shader_contents = self.render(&self.shader_contents)?;
+
+		let mut shader_descriptor = parse(&shader_contents)?;
 
 		if shader_descriptor.passes.is_empty() {
 			return Err("Shader should define at least one pass.".to_string());
@@ -312,7 +324,6 @@ vertex code
 #pragma shiba fragment 0
 fragment code
 "#,
-			false,
 		)
 		.unwrap();
 

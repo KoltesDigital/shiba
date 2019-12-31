@@ -81,6 +81,7 @@ struct Context<'a> {
 	settings: &'a CrinklerSettings,
 	shader_declarations: &'a String,
 	shader_loading: &'a String,
+	target: BuildTarget,
 	uniform_arrays: &'a [UniformArray],
 }
 
@@ -120,6 +121,7 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 			settings: self.settings,
 			shader_declarations: &contents.shader_declarations,
 			shader_loading: &contents.shader_loading,
+			target: self.project_descriptor.build_options.target,
 			uniform_arrays: &options.shader_descriptor.uniform_arrays,
 		};
 		let contents = self

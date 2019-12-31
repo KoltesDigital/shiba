@@ -1,3 +1,4 @@
+use crate::build::BuildTarget;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
@@ -10,10 +11,18 @@ pub type CodeMap = BTreeMap<String, String>;
 #[derive(Serialize)]
 struct Context {
 	development: bool,
+	target: BuildTarget,
 }
 
-pub fn load_project_codes(project_directory: &Path, development: bool) -> Result<CodeMap, String> {
-	let context = Context { development };
+pub fn load_project_codes(
+	project_directory: &Path,
+	development: bool,
+	target: BuildTarget,
+) -> Result<CodeMap, String> {
+	let context = Context {
+		development,
+		target,
+	};
 
 	let codes = fs::read_dir(&project_directory)
 		.map_err(|_| "Failed to read directory.")?

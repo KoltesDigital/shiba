@@ -36,7 +36,7 @@ pub enum BuildEvent<'a> {
 	ShaderProvided(ShaderProvidedEvent<'a>),
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BuildTarget {
 	Executable,
@@ -72,8 +72,11 @@ pub fn build(options: &BuildOptions) -> Result<(), String> {
 
 	let compiler = project_descriptor.instantiate_compiler()?;
 
-	let project_codes =
-		code_map::load_project_codes(options.project_directory, project_descriptor.development)?;
+	let project_codes = code_map::load_project_codes(
+		options.project_directory,
+		project_descriptor.development,
+		project_descriptor.build_options.target,
+	)?;
 
 	let compilation_descriptor = CompilationDescriptor::default();
 
