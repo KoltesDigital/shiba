@@ -74,6 +74,7 @@ struct OpenGLLoadingContext<'a> {
 struct RenderContext<'a> {
 	project_codes: &'a CodeMap,
 	target: BuildTarget,
+	variables: &'a [Variable],
 }
 
 #[derive(Serialize)]
@@ -211,6 +212,7 @@ impl Renderer {
 		let render_context = RenderContext {
 			project_codes: &project_codes,
 			target,
+			variables: &shader_descriptor.variables,
 		};
 		let render = self.render_template(Template::Render, &render_context)?;
 
