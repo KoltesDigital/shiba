@@ -3,9 +3,9 @@ mod settings;
 pub use self::settings::OidosSettings;
 use super::{AudioSynthesizer, IntegrationResult};
 use crate::build::BuildOptions;
-use crate::code_map::CodeMap;
 use crate::hash_extra;
 use crate::paths::BUILD_ROOT_DIRECTORY;
+use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
 use crate::types::{CompilationDescriptor, ProjectDescriptor};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -27,6 +27,7 @@ pub struct OidosAudioSynthesizer<'a> {
 
 	nasm_path: PathBuf,
 	oidos_path: PathBuf,
+	path: PathBuf,
 	python2_path: PathBuf,
 	tera: Tera,
 }
@@ -62,11 +63,16 @@ impl<'a> OidosAudioSynthesizer<'a> {
 		tera.add_raw_templates(Template::as_array())
 			.map_err(|err| err.to_string())?;
 
+		let path = project_descriptor
+			.directory
+			.join(settings.filename.as_str());
+
 		Ok(OidosAudioSynthesizer {
 			settings,
 
 			nasm_path,
 			oidos_path,
+			path,
 			python2_path,
 			tera,
 		})
@@ -124,14 +130,7 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 					.to_string_lossy()
 					.as_ref(),
 			)
-			.arg(
-				build_options
-					.project_descriptor
-					.directory
-					.join(self.settings.filename.as_str())
-					.to_string_lossy()
-					.as_ref(),
-			)
+			.arg(self.path.to_string_lossy().as_ref())
 			.arg(build_directory.join("music.asm").to_string_lossy().as_ref())
 			.spawn()
 			.map_err(|err| err.to_string())?;
@@ -215,5 +214,11 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 		fs::write(build_cache_path, json).map_err(|err| err.to_string())?;
 
 		Ok(integration_result)
+	}
+}
+
+impl FileConsumer for OidosAudioSynthesizer<'_> {
+	fn get_is_path_handled<'b, 'a: 'b>(&'a self) -> IsPathHandled<'b> {
+		Box::new(move |path| path == self.path)
 	}
 }

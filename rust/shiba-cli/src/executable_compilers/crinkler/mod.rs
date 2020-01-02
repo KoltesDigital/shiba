@@ -3,11 +3,11 @@ mod settings;
 pub use self::settings::CrinklerSettings;
 use super::ExecutableCompiler;
 use crate::build::{BuildOptions, BuildTarget};
-use crate::code_map::CodeMap;
 use crate::compiler::{CompileOptions, Compiler};
 use crate::generator_utils::cpp;
 use crate::hash_extra;
 use crate::paths::BUILD_ROOT_DIRECTORY;
+use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
 use crate::types::{Pass, ProjectDescriptor, UniformArray};
 use serde::Serialize;
 use std::fs;
@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use tera::Tera;
 
 pub struct CrinklerCompiler<'a> {
-	project_descriptor: &'a ProjectDescriptor<'a>,
+	project_descriptor: &'a ProjectDescriptor,
 	settings: &'a CrinklerSettings,
 
 	cpp_template_renderer: cpp::template::Renderer,
@@ -184,4 +184,17 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 	}
 }
 
-impl ExecutableCompiler for CrinklerCompiler<'_> {}
+impl<'a> ExecutableCompiler for CrinklerCompiler<'a> {}
+
+impl FileConsumer for CrinklerCompiler<'_> {
+	fn get_is_path_handled<'b, 'a: 'b>(&'a self) -> IsPathHandled<'b> {
+		Box::new(|path| {
+			if let Some(extension) = path.extension() {
+				if extension.to_string_lossy() == "cpp" {
+					return true;
+				}
+			}
+			false
+		})
+	}
+}

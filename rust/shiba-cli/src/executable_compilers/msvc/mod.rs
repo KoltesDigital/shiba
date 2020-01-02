@@ -3,11 +3,11 @@ mod settings;
 pub use self::settings::MsvcSettings;
 use super::ExecutableCompiler;
 use crate::build::{BuildOptions, BuildTarget};
-use crate::code_map::CodeMap;
 use crate::compiler::{CompileOptions, Compiler};
 use crate::generator_utils::cpp;
 use crate::hash_extra;
 use crate::paths::BUILD_ROOT_DIRECTORY;
+use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
 use crate::types::{Pass, ProjectDescriptor, UniformArray};
 use serde::Serialize;
 use std::fs;
@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use tera::Tera;
 
 pub struct MsvcCompiler<'a> {
-	project_descriptor: &'a ProjectDescriptor<'a>,
+	project_descriptor: &'a ProjectDescriptor,
 	settings: &'a MsvcSettings,
 
 	cpp_template_renderer: cpp::template::Renderer,
@@ -86,7 +86,7 @@ struct Context<'a> {
 	uniform_arrays: &'a [UniformArray],
 }
 
-impl Compiler for MsvcCompiler<'_> {
+impl<'a> Compiler for MsvcCompiler<'a> {
 	fn compile(
 		&self,
 		build_options: &BuildOptions,
@@ -188,4 +188,17 @@ impl Compiler for MsvcCompiler<'_> {
 	}
 }
 
-impl ExecutableCompiler for MsvcCompiler<'_> {}
+impl<'a> ExecutableCompiler for MsvcCompiler<'a> {}
+
+impl FileConsumer for MsvcCompiler<'_> {
+	fn get_is_path_handled<'b, 'a: 'b>(&'a self) -> IsPathHandled<'b> {
+		Box::new(|path| {
+			if let Some(extension) = path.extension() {
+				if extension.to_string_lossy() == "cpp" {
+					return true;
+				}
+			}
+			false
+		})
+	}
+}

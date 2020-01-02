@@ -4,7 +4,7 @@ use crate::configuration::Configuration;
 use crate::settings::Settings;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub struct Pass {
@@ -89,14 +89,14 @@ pub struct ShaderDescriptor {
 	pub variables: Vec<Variable>,
 }
 
-pub struct ProjectDescriptor<'a> {
+pub struct ProjectDescriptor {
 	pub configuration: Configuration,
 	pub development: bool,
-	pub directory: &'a Path,
+	pub directory: PathBuf,
 	pub settings: Settings,
 }
 
-impl<'a> ProjectDescriptor<'a> {
+impl<'a> ProjectDescriptor {
 	pub fn load(directory: &'a Path, target: BuildTarget) -> Result<Self, String> {
 		let configuration = Configuration::load()?;
 
@@ -113,7 +113,7 @@ impl<'a> ProjectDescriptor<'a> {
 		Ok(ProjectDescriptor {
 			configuration,
 			development,
-			directory,
+			directory: PathBuf::from(directory),
 			settings,
 		})
 	}

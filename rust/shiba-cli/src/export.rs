@@ -32,7 +32,8 @@ pub struct ExportOptions<'a> {
 	pub build_path: &'a Path,
 	pub directory: &'a Path,
 	pub output: ExportOutput,
-	pub project_descriptor: &'a ProjectDescriptor<'a>,
+	pub project_descriptor: &'a ProjectDescriptor,
+	pub static_files: &'a [PathBuf],
 }
 
 pub fn export(options: &ExportOptions) -> Result<PathBuf, String> {
@@ -71,12 +72,18 @@ pub fn export(options: &ExportOptions) -> Result<PathBuf, String> {
 		target_filename.push_str(&extension.to_string_lossy());
 	}
 
-	// Windows only.
 	fs::copy(
 		&options.build_path,
 		&temp_named_directory.join(target_filename),
 	)
 	.map_err(|err| err.to_string())?;
+
+	for static_file in options.static_files {
+		if let Some(file_name) = static_file.file_name() {
+			fs::copy(&static_file, &temp_named_directory.join(&file_name))
+				.map_err(|err| err.to_string())?;
+		}
+	}
 
 	let output_path = match options.output {
 		ExportOutput::Directory => {

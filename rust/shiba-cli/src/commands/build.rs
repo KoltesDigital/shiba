@@ -11,7 +11,7 @@ pub struct Options<'a> {
 pub fn execute(options: &Options) -> Result<(), String> {
 	let project_descriptor = ProjectDescriptor::load(options.project_directory, options.target)?;
 
-	let event_listener = |event: BuildEvent| match event {
+	let mut event_listener = |event: BuildEvent| match event {
 		BuildEvent::ExecutableCompiled(event) => match event.get_size() {
 			Ok(size) => {
 				println!("Executable compiled:");
@@ -31,12 +31,14 @@ pub fn execute(options: &Options) -> Result<(), String> {
 		_ => {}
 	};
 
-	let duration = build::build_duration(&BuildOptions {
-		event_listener: &event_listener,
-		force: options.force,
-		project_descriptor: &project_descriptor,
-		target: options.target,
-	})?;
+	let duration = build::build_duration(
+		&BuildOptions {
+			force: options.force,
+			project_descriptor: &project_descriptor,
+			target: options.target,
+		},
+		&mut event_listener,
+	)?;
 
 	println!("Build duration: {:?}.", duration);
 	Ok(())

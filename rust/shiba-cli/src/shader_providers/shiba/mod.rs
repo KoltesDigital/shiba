@@ -8,6 +8,7 @@ use super::ShaderProvider;
 use crate::build::{BuildOptions, BuildTarget};
 use crate::hash_extra;
 use crate::parsers::glsl;
+use crate::project_files::{FileConsumer, IsPathHandled};
 use crate::types::{
 	ConstVariable, Pass, ProjectDescriptor, ShaderDescriptor, UniformArray, VariableKind,
 };
@@ -16,6 +17,7 @@ use serde::Serialize;
 use serde_json;
 use std::cell::Cell;
 use std::fs;
+use std::path::PathBuf;
 use tera::Tera;
 
 #[derive(Serialize)]
@@ -25,9 +27,10 @@ struct Context {
 }
 
 pub struct ShibaShaderProvider<'a> {
-	project_descriptor: &'a ProjectDescriptor<'a>,
+	project_descriptor: &'a ProjectDescriptor,
 
-	shader_contents: String,
+	contents: String,
+	path: PathBuf,
 }
 
 impl<'a> ShibaShaderProvider<'a> {
@@ -36,7 +39,7 @@ impl<'a> ShibaShaderProvider<'a> {
 		settings: &'a ShibaSettings,
 	) -> Result<Self, String> {
 		let path = project_descriptor.directory.join(&settings.filename);
-		let shader_contents = fs::read_to_string(&path).map_err(|err| {
+		let contents = fs::read_to_string(&path).map_err(|err| {
 			format!(
 				"Failed to read shader at {}: {}",
 				path.to_string_lossy(),
@@ -46,7 +49,8 @@ impl<'a> ShibaShaderProvider<'a> {
 
 		Ok(ShibaShaderProvider {
 			project_descriptor,
-			shader_contents,
+			contents,
+			path,
 		})
 	}
 
@@ -150,15 +154,15 @@ const OUTPUT_FILENAME: &str = "shader-descriptor.json";
 #[derive(Hash)]
 struct Inputs<'a> {
 	development: bool,
-	shader_contents: &'a String,
+	contents: &'a String,
 	target: BuildTarget,
 }
 
-impl ShaderProvider for ShibaShaderProvider<'_> {
+impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 	fn provide(&self, build_options: &BuildOptions) -> Result<ShaderDescriptor, String> {
 		let inputs = Inputs {
 			development: self.project_descriptor.development,
-			shader_contents: &self.shader_contents,
+			contents: &self.contents,
 			target: build_options.target,
 		};
 		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
@@ -171,9 +175,9 @@ impl ShaderProvider for ShibaShaderProvider<'_> {
 			return Ok(shader_descriptor);
 		}
 
-		let shader_contents = self.render(build_options, &self.shader_contents)?;
+		let contents = self.render(build_options, &self.contents)?;
 
-		let mut shader_descriptor = parse(&shader_contents)?;
+		let mut shader_descriptor = parse(&contents)?;
 
 		if shader_descriptor.passes.is_empty() {
 			return Err("Shader should define at least one pass.".to_string());
@@ -397,5 +401,11 @@ fragment code
 				..Default::default()
 			}
 		);
+	}
+}
+
+impl FileConsumer for ShibaShaderProvider<'_> {
+	fn get_is_path_handled<'b, 'a: 'b>(&'a self) -> IsPathHandled<'b> {
+		Box::new(move |path| path == self.path)
 	}
 }

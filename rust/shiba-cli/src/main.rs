@@ -30,7 +30,6 @@ macro_rules! template_enum {
 
 mod audio_synthesizers;
 mod build;
-mod code_map;
 mod commands {
 	pub mod build;
 	pub mod clean;
@@ -50,6 +49,7 @@ mod hash_extra;
 mod library_compilers;
 mod parsers;
 mod paths;
+mod project_files;
 mod run;
 mod settings;
 mod shader_codes;

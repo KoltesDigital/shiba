@@ -3,7 +3,7 @@ mod settings;
 pub use self::settings::NoneSettings;
 use super::{AudioSynthesizer, IntegrationResult};
 use crate::build::BuildOptions;
-use crate::code_map::CodeMap;
+use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
 use crate::types::{CompilationDescriptor, ProjectDescriptor};
 use ordered_float::OrderedFloat;
 use serde::Serialize;
@@ -65,5 +65,11 @@ impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 			codes,
 			compilation_descriptor: compilation_descriptor.clone(),
 		})
+	}
+}
+
+impl FileConsumer for NoneAudioSynthesizer<'_> {
+	fn get_is_path_handled<'b, 'a: 'b>(&'a self) -> IsPathHandled<'b> {
+		Box::new(|_path| false)
 	}
 }

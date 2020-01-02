@@ -3,7 +3,8 @@ pub mod oidos;
 mod settings;
 
 use crate::build::BuildOptions;
-use crate::code_map::CodeMap;
+use crate::project_files::CodeMap;
+use crate::project_files::FileConsumer;
 use crate::types::CompilationDescriptor;
 use serde::{Deserialize, Serialize};
 pub use settings::Settings;
@@ -14,7 +15,7 @@ pub struct IntegrationResult {
 	pub compilation_descriptor: CompilationDescriptor,
 }
 
-pub trait AudioSynthesizer {
+pub trait AudioSynthesizer: FileConsumer {
 	fn integrate(
 		&self,
 		build_options: &BuildOptions,

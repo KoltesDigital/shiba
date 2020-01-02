@@ -1,7 +1,8 @@
 use crate::build::BuildOptions;
-use crate::code_map::CodeMap;
 use crate::executable_compilers::ExecutableCompiler;
 use crate::library_compilers::LibraryCompiler;
+use crate::project_files::CodeMap;
+use crate::project_files::FileConsumer;
 use crate::types::{CompilationDescriptor, ShaderDescriptor};
 use std::path::PathBuf;
 
@@ -13,7 +14,7 @@ pub struct CompileOptions<'a> {
 	pub shader_descriptor: &'a ShaderDescriptor,
 }
 
-pub trait Compiler {
+pub trait Compiler: FileConsumer {
 	fn compile(
 		&self,
 		build_options: &BuildOptions,

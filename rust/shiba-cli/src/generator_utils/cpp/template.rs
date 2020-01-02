@@ -1,6 +1,6 @@
 use crate::build::BuildTarget;
-use crate::code_map::CodeMap;
 use crate::configuration::Configuration;
+use crate::project_files::CodeMap;
 use crate::shader_codes::ShaderCodes;
 use crate::types::{Pass, ShaderDescriptor, UniformArray, Variable, VariableKind};
 use regex::Regex;

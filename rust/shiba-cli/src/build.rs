@@ -1,5 +1,5 @@
-use crate::code_map;
 use crate::compiler::{CompileOptions, CompilerKind};
+use crate::project_files::{self, ProjectFiles};
 use crate::shader_codes::to_standalone_passes;
 use crate::types::{CompilationDescriptor, Pass, ProjectDescriptor, Variable};
 use serde::{Deserialize, Serialize};
@@ -27,14 +27,18 @@ pub struct LibraryCompiledEvent {
 
 pub struct ShaderProvidedEvent<'a> {
 	pub passes: Vec<Pass>,
-	pub target: BuildTarget,
 	pub variables: &'a Vec<Variable>,
+}
+
+pub struct StaticFilesProvidedEvent<'a> {
+	pub paths: &'a Vec<PathBuf>,
 }
 
 pub enum BuildEvent<'a> {
 	ExecutableCompiled(ExecutableCompiledEvent),
 	LibraryCompiled(LibraryCompiledEvent),
 	ShaderProvided(ShaderProvidedEvent<'a>),
+	StaticFilesProvided(StaticFilesProvidedEvent<'a>),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Hash, Serialize)]
@@ -57,13 +61,15 @@ impl FromStr for BuildTarget {
 }
 
 pub struct BuildOptions<'a> {
-	pub event_listener: &'a dyn Fn(BuildEvent) -> (),
 	pub force: bool,
-	pub project_descriptor: &'a ProjectDescriptor<'a>,
+	pub project_descriptor: &'a ProjectDescriptor,
 	pub target: BuildTarget,
 }
 
-pub fn build(options: &BuildOptions) -> Result<(), String> {
+pub fn build(
+	options: &BuildOptions,
+	event_listener: &mut dyn FnMut(BuildEvent) -> (),
+) -> Result<(), String> {
 	let audio_synthesizer = options
 		.project_descriptor
 		.settings
@@ -88,11 +94,38 @@ pub fn build(options: &BuildOptions) -> Result<(), String> {
 		.project_descriptor
 		.instantiate_compiler(options.target)?;
 
-	let project_codes = code_map::load_project_codes(
-		options.project_descriptor.directory,
-		options.project_descriptor.development,
-		options.target,
+	let project_files = ProjectFiles::load(
+		&options.project_descriptor.directory,
+		&project_files::LoadOptions {
+			compiler_paths: &[match compiler {
+				CompilerKind::Executable(ref compiler) => compiler.get_is_path_handled(),
+				CompilerKind::Library(ref compiler) => compiler.get_is_path_handled(),
+			}],
+			ignore_paths: &[
+				Box::new(|path| {
+					if let Some(file_name) = path.file_name() {
+						let file_name = file_name.to_string_lossy();
+						if file_name.starts_with('.') {
+							return true;
+						}
+						if file_name == "shiba.yml" {
+							return true;
+						}
+					}
+					false
+				}),
+				audio_synthesizer.get_is_path_handled(),
+				shader_provider.get_is_path_handled(),
+			],
+		},
 	)?;
+
+	event_listener(BuildEvent::StaticFilesProvided(StaticFilesProvidedEvent {
+		paths: project_files.get_static_files(),
+	}));
+
+	let project_codes =
+		project_files.get_compiler_codes(options.project_descriptor.development, options.target)?;
 
 	let compilation_descriptor = CompilationDescriptor::default();
 
@@ -106,9 +139,8 @@ pub fn build(options: &BuildOptions) -> Result<(), String> {
 		shader_descriptor = shader_minifier.minify(options, &shader_descriptor)?;
 	}
 
-	(options.event_listener)(BuildEvent::ShaderProvided(ShaderProvidedEvent {
+	event_listener(BuildEvent::ShaderProvided(ShaderProvidedEvent {
 		passes: to_standalone_passes(&shader_descriptor),
-		target: options.target,
 		variables: &shader_descriptor.variables,
 	}));
 
@@ -120,27 +152,30 @@ pub fn build(options: &BuildOptions) -> Result<(), String> {
 	};
 
 	match compiler {
-		CompilerKind::Executable(compiler) => {
+		CompilerKind::Executable(ref compiler) => {
 			let path = compiler.compile(options, &compile_options)?;
 
-			(options.event_listener)(BuildEvent::ExecutableCompiled(ExecutableCompiledEvent {
+			event_listener(BuildEvent::ExecutableCompiled(ExecutableCompiledEvent {
 				path,
 			}));
 		}
-		CompilerKind::Library(compiler) => {
+		CompilerKind::Library(ref compiler) => {
 			let path = compiler.compile(options, &compile_options)?;
 
-			(options.event_listener)(BuildEvent::LibraryCompiled(LibraryCompiledEvent { path }));
+			event_listener(BuildEvent::LibraryCompiled(LibraryCompiledEvent { path }));
 		}
 	};
 
 	Ok(())
 }
 
-pub fn build_duration(options: &BuildOptions) -> Result<Duration, String> {
+pub fn build_duration(
+	options: &BuildOptions,
+	event_listener: &mut dyn FnMut(BuildEvent) -> (),
+) -> Result<Duration, String> {
 	let start = Instant::now();
 
-	build(options)?;
+	build(options, event_listener)?;
 
 	let duration = start.elapsed();
 	Ok(duration)
