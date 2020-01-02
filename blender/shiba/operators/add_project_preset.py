@@ -1,8 +1,8 @@
 from bl_operators.presets import AddPresetBase
-from bpy.types import Operator
+import bpy
 
 
-class AddProjectPreset(AddPresetBase, Operator):
+class AddProjectPreset(AddPresetBase, bpy.types.Operator):
     '''Add a Project Preset'''
     bl_idname = "render.shiba_project_preset_add"
     bl_label = "Add Project Preset"

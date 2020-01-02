@@ -1,5 +1,4 @@
 import bpy
-from bpy.props import EnumProperty, IntProperty, StringProperty
 from shiba import addon, instrumentation
 
 
@@ -10,21 +9,21 @@ def _update_instrumentation(_self, _context):
 class AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = addon.name()
 
-    server_custom_cli_path: StringProperty(
+    server_custom_cli_path: bpy.props.StringProperty(
         name="Path to custom CLI",
         description="Full path including the executable filename",
         subtype='FILE_PATH',
         update=_update_instrumentation,
     )
 
-    server_ip: StringProperty(
+    server_ip: bpy.props.StringProperty(
         name="Server IP",
         description="Both for internal and external servers",
         default="127.0.0.1",
         update=_update_instrumentation,
     )
 
-    server_location: EnumProperty(
+    server_location: bpy.props.EnumProperty(
         name="Server location",
         items=[
             (
@@ -47,13 +46,13 @@ class AddonPreferences(bpy.types.AddonPreferences):
         update=_update_instrumentation,
     )
 
-    server_notification_size: IntProperty(
+    server_notification_size: bpy.props.IntProperty(
         name="Server notification size",
         default=50,
         min=0,
     )
 
-    server_port: IntProperty(
+    server_port: bpy.props.IntProperty(
         name="Server port",
         description="Both for internal and external servers",
         default=5184,

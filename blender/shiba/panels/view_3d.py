@@ -1,4 +1,4 @@
-from bpy.types import Panel
+import bpy
 from shiba import uniforms
 
 
@@ -8,7 +8,7 @@ class _Panel:
     bl_space_type = 'VIEW_3D'
 
 
-class SHIBA_PT_Uniforms(_Panel, Panel):
+class SHIBA_PT_Uniforms(_Panel, bpy.types.Panel):
     bl_label = "Uniforms"
 
     def draw(self, context):

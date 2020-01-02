@@ -1,8 +1,8 @@
 from bl_ui.utils import PresetPanel
-from bpy.types import Panel
+import bpy
 from shiba import instrumentation, operators
 from shiba.render_engine import RenderEngine
-from shiba.presets import AddProjectPreset
+from shiba.operators.add_project_preset import AddProjectPreset
 
 
 class _Panel:
@@ -16,7 +16,7 @@ class _Panel:
         return context.engine in cls.COMPAT_ENGINES
 
 
-class SHIBA_RENDER_PT_export(_Panel, Panel):
+class SHIBA_RENDER_PT_export(_Panel, bpy.types.Panel):
     bl_label = "Export"
 
     def draw_header_preset(self, context):
@@ -34,7 +34,7 @@ class SHIBA_RENDER_PT_export(_Panel, Panel):
         layout.operator(operators.build_and_export.BuildAndExportOperator.bl_idname)
 
 
-class SHIBA_PT_project_presets(PresetPanel, Panel):
+class SHIBA_PT_project_presets(PresetPanel, bpy.types.Panel):
     bl_label = "Project Presets"
     preset_subdir = AddProjectPreset.preset_subdir
     preset_operator = "script.execute_preset"
@@ -42,7 +42,7 @@ class SHIBA_PT_project_presets(PresetPanel, Panel):
     COMPAT_ENGINES = {RenderEngine.bl_idname}
 
 
-class SHIBA_RENDER_PT_project(_Panel, Panel):
+class SHIBA_RENDER_PT_project(_Panel, bpy.types.Panel):
     bl_label = "Project"
 
     def draw_header_preset(self, context):
@@ -63,7 +63,7 @@ class SHIBA_RENDER_PT_project(_Panel, Panel):
         layout.operator(operators.build_and_run.BuildAndRunOperator.bl_idname)
 
 
-class SHIBA_PT_Status(_Panel, Panel):
+class SHIBA_PT_Status(_Panel, bpy.types.Panel):
     bl_label = "Status"
 
     def draw(self, context):

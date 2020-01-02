@@ -1,6 +1,4 @@
 import bpy
-from bpy.props import BoolProperty, EnumProperty, PointerProperty, StringProperty
-from bpy.types import PropertyGroup
 from shiba import instrumentation, server_connection_utils
 from shiba.uniforms import Uniforms
 
@@ -17,22 +15,22 @@ def _project_directory_update(_self, _context):
             server_connection_utils.update_project_directory(server_connection)
 
 
-class Settings(PropertyGroup):
-    build_executable_on_change: BoolProperty(
+class Settings(bpy.types.PropertyGroup):
+    build_executable_on_change: bpy.props.BoolProperty(
         name="Build Executable On Change",
         description="Automatically build executable when a file is modified",
         default=True,
         update=_build_executable_on_change_update
     )
 
-    export_directory: StringProperty(
+    export_directory: bpy.props.StringProperty(
         default='//export',
         description="Path to a directory which will contain the exported build",
         name="Export Directory",
         subtype='DIR_PATH',
     )
 
-    export_output: EnumProperty(
+    export_output: bpy.props.EnumProperty(
         default='directory',
         items=[
             (
@@ -54,7 +52,7 @@ class Settings(PropertyGroup):
         name="Export Output",
     )
 
-    project_directory: StringProperty(
+    project_directory: bpy.props.StringProperty(
         name="Project Directory",
         description="Path to a directory which contains shiba.yml",
         subtype='DIR_PATH',
@@ -65,7 +63,7 @@ class Settings(PropertyGroup):
 
     @classmethod
     def register(cls):
-        bpy.types.Scene.shiba = PointerProperty(
+        bpy.types.Scene.shiba = bpy.props.PointerProperty(
             name="Shiba Settings",
             description="Shiba settings",
             type=cls,
