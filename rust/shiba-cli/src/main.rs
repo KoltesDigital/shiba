@@ -34,12 +34,14 @@ mod code_map;
 mod commands {
 	pub mod build;
 	pub mod clean;
+	pub mod export;
 	pub mod run;
 	pub mod server;
 }
 mod compiler;
 mod configuration;
 mod executable_compilers;
+mod export;
 mod generator_utils {
 	pub mod cpp;
 	pub mod settings;
@@ -56,6 +58,7 @@ mod shader_providers;
 mod types;
 
 use crate::build::BuildTarget;
+use crate::export::ExportOutput;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -63,18 +66,26 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 enum Command {
-	/// Builds the project as executable.
-	BuildExecutable {
+	/// Builds the project.
+	Build {
 		#[structopt(short, long)]
 		force: bool,
-	},
-	/// Builds the project as library.
-	BuildLibrary {
-		#[structopt(short, long)]
-		force: bool,
+		#[structopt(short, long, default_value = "executable")]
+		target: BuildTarget,
 	},
 	/// Removes build artifacts, build cache.
 	Clean,
+	/// Builds and exports the project.
+	Export {
+		#[structopt(short, long, default_value = "export")]
+		export_directory: PathBuf,
+		#[structopt(short, long)]
+		force: bool,
+		#[structopt(short, long, default_value = "directory")]
+		output: ExportOutput,
+		#[structopt(short, long, default_value = "executable")]
+		target: BuildTarget,
+	},
 	/// Builds and executes the project (default).
 	Run,
 	/// Starts a server.
@@ -109,21 +120,28 @@ fn main() -> Result<(), String> {
 
 	let command = args.command.unwrap_or_else(Command::default);
 	match command {
-		Command::BuildExecutable { force } => commands::build::execute(&commands::build::Options {
+		Command::Build { force, target } => commands::build::execute(&commands::build::Options {
 			force,
 			project_directory: &args.project_directory,
-			target: BuildTarget::Executable,
-		})
-		.map(|_| ()),
-
-		Command::BuildLibrary { force } => commands::build::execute(&commands::build::Options {
-			force,
-			project_directory: &args.project_directory,
-			target: BuildTarget::Library,
+			target,
 		})
 		.map(|_| ()),
 
 		Command::Clean => commands::clean::execute().map(|_| ()),
+
+		Command::Export {
+			export_directory,
+			force,
+			output,
+			target,
+		} => commands::export::execute(&commands::export::Options {
+			export_directory: &export_directory,
+			force,
+			output,
+			project_directory: &args.project_directory,
+			target,
+		})
+		.map(|_| ()),
 
 		Command::Run => commands::run::execute(&commands::run::Options {
 			project_directory: &args.project_directory,

@@ -1,6 +1,7 @@
 use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
+use crate::export::{self, ExportOptions, ExportOutput};
 use crate::run::{self, RunOptions};
-use crate::types::{Pass, Variable};
+use crate::types::{Pass, ProjectDescriptor, Variable};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
@@ -23,6 +24,11 @@ pub struct Options<'a> {
 enum CommandKind {
 	Build {
 		force: Option<bool>,
+		target: BuildTarget,
+	},
+	Export {
+		directory: String,
+		output: ExportOutput,
 		target: BuildTarget,
 	},
 	Run,
@@ -55,6 +61,9 @@ enum EventKind<'a> {
 	ExecutableCompiled {
 		path: &'a str,
 		size: u64,
+	},
+	Exported {
+		path: &'a str,
 	},
 	Error {
 		message: &'a str,
@@ -120,6 +129,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 			.expect("Failed to watch project directory");
 
 		let executable_path = Cell::new(None);
+		let library_path = Cell::new(None);
 
 		loop {
 			match rx_command.recv() {
@@ -135,74 +145,104 @@ pub fn execute(options: &Options) -> Result<(), String> {
 								});
 							}
 
-							let event_listener = |event: BuildEvent| match event {
-								BuildEvent::ExecutableCompiled(event) => match event.get_size() {
-									Ok(size) => {
-										{
-											let path = event.path.to_string_lossy();
+							match ProjectDescriptor::load(&command_project_directory, target) {
+								Ok(project_descriptor) => {
+									let event_listener = |event: BuildEvent| match event {
+										BuildEvent::ExecutableCompiled(event) => {
+											match event.get_size() {
+												Ok(size) => {
+													{
+														let path = event.path.to_string_lossy();
 
+														let mut command_state =
+															command_state.write().unwrap();
+														command_state.broadcast(&Event {
+															id: &command_id,
+															kind: EventKind::ExecutableCompiled {
+																path: &path,
+																size,
+															},
+														});
+													}
+													executable_path.set(Some(event.path));
+												}
+												Err(err) => {
+													executable_path.set(None);
+													let mut command_state =
+														command_state.write().unwrap();
+													command_state.broadcast(&Event {
+														id: &command_id,
+														kind: EventKind::Error { message: &err },
+													});
+												}
+											}
+										}
+
+										BuildEvent::LibraryCompiled(event) => {
+											{
+												let path = event.path.to_string_lossy();
+
+												let mut command_state =
+													command_state.write().unwrap();
+												command_state.broadcast(&Event {
+													id: &command_id,
+													kind: EventKind::LibraryCompiled {
+														path: &path,
+													},
+												});
+											}
+											library_path.set(Some(event.path));
+										}
+
+										BuildEvent::ShaderProvided(event) => {
 											let mut command_state = command_state.write().unwrap();
 											command_state.broadcast(&Event {
 												id: &command_id,
-												kind: EventKind::ExecutableCompiled {
-													path: &path,
-													size,
+												kind: EventKind::ShaderProvided {
+													passes: &event.passes,
+													target: event.target,
+													variables: &event.variables,
 												},
 											});
 										}
-										executable_path.set(Some(event.path));
-									}
-									Err(err) => {
-										executable_path.set(None);
-										let mut command_state = command_state.write().unwrap();
-										command_state.broadcast(&Event {
-											id: &command_id,
-											kind: EventKind::Error { message: &err },
-										});
-									}
-								},
+									};
 
-								BuildEvent::LibraryCompiled(event) => {
-									let path = event.path.to_string_lossy();
-
-									let mut command_state = command_state.write().unwrap();
-									command_state.broadcast(&Event {
-										id: &command_id,
-										kind: EventKind::LibraryCompiled { path: &path },
+									let result = build::build_duration(&BuildOptions {
+										event_listener: &event_listener,
+										force: force.unwrap_or(false),
+										project_descriptor: &project_descriptor,
+										target,
 									});
-								}
 
-								BuildEvent::ShaderProvided(event) => {
-									let mut command_state = command_state.write().unwrap();
-									command_state.broadcast(&Event {
-										id: &command_id,
-										kind: EventKind::ShaderProvided {
-											passes: &event.passes,
-											target: event.target,
-											variables: &event.variables,
-										},
-									});
-								}
-							};
+									match result {
+										Ok(duration) => {
+											let mut command_state = command_state.write().unwrap();
+											command_state.broadcast(&Event {
+												id: &command.id,
+												kind: EventKind::BuildEnded {
+													duration: Some(duration.as_secs_f32()),
+													target,
+													successful: true,
+												},
+											});
+										}
 
-							let result = build::build_duration(&BuildOptions {
-								event_listener: &event_listener,
-								force: force.unwrap_or(false),
-								project_directory: &command_project_directory,
-								target,
-							});
-
-							match result {
-								Ok(duration) => {
-									let mut command_state = command_state.write().unwrap();
-									command_state.broadcast(&Event {
-										id: &command.id,
-										kind: EventKind::BuildEnded {
-											duration: Some(duration.as_secs_f32()),
-											target,
-											successful: true,
-										},
-									});
+										Err(err) => {
+											let mut command_state = command_state.write().unwrap();
+											command_state.broadcast(&Event {
+												id: &command.id,
+												kind: EventKind::Error { message: &err },
+											});
+											command_state.broadcast(&Event {
+												id: &command.id,
+												kind: EventKind::BuildEnded {
+													duration: None,
+													target,
+													successful: false,
+												},
+											});
+										}
+									};
 								}
 
 								Err(err) => {
@@ -221,6 +261,71 @@ pub fn execute(options: &Options) -> Result<(), String> {
 									});
 								}
 							};
+						}
+
+						CommandKind::Export {
+							directory,
+							output,
+							target,
+						} => {
+							let build_path = match target {
+								BuildTarget::Executable => &executable_path,
+								BuildTarget::Library => &library_path,
+							};
+							if let Some(build_path) = build_path.take() {
+								match ProjectDescriptor::load(&command_project_directory, target) {
+									Ok(project_descriptor) => {
+										match export::export(&ExportOptions {
+											build_path: &build_path,
+											directory: &PathBuf::from(directory),
+											project_descriptor: &project_descriptor,
+											output,
+										}) {
+											Ok(path) => {
+												let path = path.to_string_lossy();
+
+												let mut command_state =
+													command_state.write().unwrap();
+												command_state.broadcast(&Event {
+													id: &command.id,
+													kind: EventKind::Exported { path: &path },
+												});
+											}
+											Err(err) => {
+												let mut command_state =
+													command_state.write().unwrap();
+												command_state.broadcast(&Event {
+													id: &command.id,
+													kind: EventKind::Error { message: &err },
+												});
+											}
+										};
+									}
+
+									Err(err) => {
+										let mut command_state = command_state.write().unwrap();
+										command_state.broadcast(&Event {
+											id: &command.id,
+											kind: EventKind::Error { message: &err },
+										});
+									}
+								};
+
+								match target {
+									BuildTarget::Executable => {
+										executable_path.set(Some(build_path))
+									}
+									BuildTarget::Library => library_path.set(Some(build_path)),
+								};
+							} else {
+								let mut command_state = command_state.write().unwrap();
+								command_state.broadcast(&Event {
+									id: &command_id,
+									kind: EventKind::Error {
+										message: "Project has not been built.",
+									},
+								});
+							}
 						}
 
 						CommandKind::Run => {
@@ -252,7 +357,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 								command_state.broadcast(&Event {
 									id: &command_id,
 									kind: EventKind::Error {
-										message: "Executable has not been built.",
+										message: "Project has not been built.",
 									},
 								});
 							}

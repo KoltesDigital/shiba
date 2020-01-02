@@ -35,14 +35,20 @@ def _handle_build_started_event(obj):
         _building_count += 1
 
 
+def _handle_error_event(obj):
+    print("Server error: %s" % obj['message'])
+    notifications.add(Notification("Error, see system console.", 5))
+
+
 def _handle_executable_compiled_event(obj):
     print("Executable compiled at %s." % obj['path'])
     size = obj['size']
     notifications.add(Notification("Executable size: %d." % size, 5))
 
 
-def _handle_error_event(obj):
-    print("Server error: %s" % obj['message'])
+def _handle_exported_event(obj):
+    print("Exported at %s." % obj['path'])
+    notifications.add(Notification("Exported.", 5))
 
 
 def _handle_library_compiled_event(obj):
@@ -67,8 +73,9 @@ def _handle_shader_provided_event(obj):
 event_handlers = {
     'build-ended': _handle_build_ended_event,
     'build-started': _handle_build_started_event,
-    'executable-compiled': _handle_executable_compiled_event,
     'error': _handle_error_event,
+    'executable-compiled': _handle_executable_compiled_event,
+    'exported': _handle_exported_event,
     'library-compiled': _handle_library_compiled_event,
     'run': _handle_run_event,
     'shader-provided': _handle_shader_provided_event,

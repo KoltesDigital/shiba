@@ -3,6 +3,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 pub type ConfigurationPaths = HashMap<String, PathBuf>;
 
@@ -12,7 +13,7 @@ pub struct Configuration {
 	pub paths: ConfigurationPaths,
 }
 
-impl Configuration {
+impl<'a> Configuration {
 	pub fn load() -> Result<Self, String> {
 		let path = USER_SETTINGS_DIRECTORY.join("config.yml");
 
@@ -25,5 +26,12 @@ impl Configuration {
 		let configuration: Configuration =
 			serde_yaml::from_str(&contents).map_err(|err| format!("Failed to parse: {}.", err))?;
 		Ok(configuration)
+	}
+
+	pub fn get_path(&'a self, name: &'a str) -> PathBuf {
+		match self.paths.get(name) {
+			Some(path) => path.clone(),
+			None => PathBuf::from_str(name).unwrap(),
+		}
 	}
 }

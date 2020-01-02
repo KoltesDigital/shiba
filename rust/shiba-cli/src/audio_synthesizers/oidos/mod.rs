@@ -2,6 +2,7 @@ mod settings;
 
 pub use self::settings::OidosSettings;
 use super::{AudioSynthesizer, IntegrationResult};
+use crate::build::BuildOptions;
 use crate::code_map::CodeMap;
 use crate::hash_extra;
 use crate::paths::BUILD_ROOT_DIRECTORY;
@@ -22,7 +23,6 @@ template_enum! {
 }
 
 pub struct OidosAudioSynthesizer<'a> {
-	project_descriptor: &'a ProjectDescriptor<'a>,
 	settings: &'a OidosSettings,
 
 	nasm_path: PathBuf,
@@ -63,7 +63,6 @@ impl<'a> OidosAudioSynthesizer<'a> {
 			.map_err(|err| err.to_string())?;
 
 		Ok(OidosAudioSynthesizer {
-			project_descriptor,
 			settings,
 
 			nasm_path,
@@ -93,6 +92,7 @@ struct Context {}
 impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 	fn integrate(
 		&self,
+		build_options: &BuildOptions,
 		compilation_descriptor: &CompilationDescriptor,
 	) -> Result<IntegrationResult, String> {
 		let inputs = Inputs {
@@ -104,7 +104,7 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
 
-		if !self.project_descriptor.build_options.force && build_cache_path.exists() {
+		if !build_options.force && build_cache_path.exists() {
 			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
 			let integration_result =
 				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;
@@ -125,9 +125,9 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 					.as_ref(),
 			)
 			.arg(
-				self.project_descriptor
-					.build_options
-					.project_directory
+				build_options
+					.project_descriptor
+					.directory
 					.join(self.settings.filename.as_str())
 					.to_string_lossy()
 					.as_ref(),
@@ -150,10 +150,9 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 				.arg(&build_directory)
 				.arg("-i")
 				.arg(
-					&self
+					build_options
 						.project_descriptor
-						.build_options
-						.project_directory
+						.directory
 						.to_string_lossy()
 						.as_ref(),
 				)

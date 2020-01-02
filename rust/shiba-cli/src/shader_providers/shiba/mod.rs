@@ -5,7 +5,7 @@ mod types;
 pub use self::settings::ShibaSettings;
 use self::types::*;
 use super::ShaderProvider;
-use crate::build::BuildTarget;
+use crate::build::{BuildOptions, BuildTarget};
 use crate::hash_extra;
 use crate::parsers::glsl;
 use crate::types::{
@@ -35,10 +35,7 @@ impl<'a> ShibaShaderProvider<'a> {
 		project_descriptor: &'a ProjectDescriptor,
 		settings: &'a ShibaSettings,
 	) -> Result<Self, String> {
-		let path = project_descriptor
-			.build_options
-			.project_directory
-			.join(&settings.filename);
+		let path = project_descriptor.directory.join(&settings.filename);
 		let shader_contents = fs::read_to_string(&path).map_err(|err| {
 			format!(
 				"Failed to read shader at {}: {}",
@@ -53,7 +50,7 @@ impl<'a> ShibaShaderProvider<'a> {
 		})
 	}
 
-	fn render(&self, code: &str) -> Result<String, String> {
+	fn render(&self, build_options: &BuildOptions, code: &str) -> Result<String, String> {
 		let mut tera = Tera::default();
 
 		tera.add_raw_template("template", code)
@@ -61,7 +58,7 @@ impl<'a> ShibaShaderProvider<'a> {
 
 		let context = Context {
 			development: self.project_descriptor.development,
-			target: self.project_descriptor.build_options.target,
+			target: build_options.target,
 		};
 
 		let code = tera
@@ -158,23 +155,23 @@ struct Inputs<'a> {
 }
 
 impl ShaderProvider for ShibaShaderProvider<'_> {
-	fn provide(&self) -> Result<ShaderDescriptor, String> {
+	fn provide(&self, build_options: &BuildOptions) -> Result<ShaderDescriptor, String> {
 		let inputs = Inputs {
 			development: self.project_descriptor.development,
 			shader_contents: &self.shader_contents,
-			target: self.project_descriptor.build_options.target,
+			target: build_options.target,
 		};
 		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
 
-		if !self.project_descriptor.build_options.force && build_cache_path.exists() {
+		if !build_options.force && build_cache_path.exists() {
 			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
 			let shader_descriptor =
 				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;
 			return Ok(shader_descriptor);
 		}
 
-		let shader_contents = self.render(&self.shader_contents)?;
+		let shader_contents = self.render(build_options, &self.shader_contents)?;
 
 		let mut shader_descriptor = parse(&shader_contents)?;
 

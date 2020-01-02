@@ -1,5 +1,6 @@
 use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
 use crate::run::{self, RunOptions};
+use crate::types::ProjectDescriptor;
 use std::cell::Cell;
 use std::path::Path;
 
@@ -8,6 +9,9 @@ pub struct Options<'a> {
 }
 
 pub fn execute(options: &Options) -> Result<(), String> {
+	let project_descriptor =
+		ProjectDescriptor::load(options.project_directory, BuildTarget::Executable)?;
+
 	let executable_path = Cell::new(None);
 
 	let event_listener = |event: BuildEvent| {
@@ -19,7 +23,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 	build::build(&BuildOptions {
 		event_listener: &event_listener,
 		force: false,
-		project_directory: &options.project_directory,
+		project_descriptor: &project_descriptor,
 		target: BuildTarget::Executable,
 	})?;
 

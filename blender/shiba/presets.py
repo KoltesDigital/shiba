@@ -9,12 +9,12 @@ class AddProjectPreset(AddPresetBase, Operator):
     preset_menu = 'SHIBA_PT_project_presets'
 
     preset_defines = [
-        "render_settings = bpy.context.scene.shiba"
+        "settings = bpy.context.scene.shiba"
     ]
 
     preset_values = [
-        "render_settings.build_executable_on_change",
-        "render_settings.project_directory",
+        "settings.build_executable_on_change",
+        "settings.project_directory",
     ]
 
     preset_subdir = "shiba/project"

@@ -4,7 +4,8 @@ use crate::shader_codes::to_standalone_passes;
 use crate::types::{CompilationDescriptor, Pass, ProjectDescriptor, Variable};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 pub struct ExecutableCompiledEvent {
@@ -43,60 +44,73 @@ pub enum BuildTarget {
 	Library,
 }
 
+impl FromStr for BuildTarget {
+	type Err = &'static str;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		match s {
+			"executable" => Ok(BuildTarget::Executable),
+			"library" => Ok(BuildTarget::Library),
+			_ => Err("Invalid target variant."),
+		}
+	}
+}
+
 pub struct BuildOptions<'a> {
 	pub event_listener: &'a dyn Fn(BuildEvent) -> (),
 	pub force: bool,
-	pub project_directory: &'a Path,
+	pub project_descriptor: &'a ProjectDescriptor<'a>,
 	pub target: BuildTarget,
 }
 
 pub fn build(options: &BuildOptions) -> Result<(), String> {
-	let project_descriptor = ProjectDescriptor::load(options)?;
-
-	let audio_synthesizer = project_descriptor
+	let audio_synthesizer = options
+		.project_descriptor
 		.settings
 		.audio_synthesizer
-		.instantiate(&project_descriptor)?;
+		.instantiate(&options.project_descriptor)?;
 
-	let shader_minifier = project_descriptor
+	let shader_minifier = options
+		.project_descriptor
 		.settings
 		.shader_minifier
 		.as_ref()
-		.map(|shader_minifier| shader_minifier.instantiate(&project_descriptor))
+		.map(|shader_minifier| shader_minifier.instantiate(&options.project_descriptor))
 		.transpose()?;
 
-	let shader_provider = project_descriptor
+	let shader_provider = options
+		.project_descriptor
 		.settings
 		.shader_provider
-		.instantiate(&project_descriptor)?;
+		.instantiate(&options.project_descriptor)?;
 
-	let compiler = project_descriptor.instantiate_compiler()?;
+	let compiler = options
+		.project_descriptor
+		.instantiate_compiler(options.target)?;
 
 	let project_codes = code_map::load_project_codes(
-		options.project_directory,
-		project_descriptor.development,
-		project_descriptor.build_options.target,
+		options.project_descriptor.directory,
+		options.project_descriptor.development,
+		options.target,
 	)?;
 
 	let compilation_descriptor = CompilationDescriptor::default();
 
-	let integration_result = audio_synthesizer.integrate(&compilation_descriptor)?;
+	let integration_result = audio_synthesizer.integrate(options, &compilation_descriptor)?;
 	let audio_codes = integration_result.codes;
 	let compilation_descriptor = integration_result.compilation_descriptor;
 
-	let mut shader_descriptor = shader_provider.provide()?;
+	let mut shader_descriptor = shader_provider.provide(options)?;
 
 	if let Some(shader_minifier) = shader_minifier {
-		shader_descriptor = shader_minifier.minify(&shader_descriptor)?;
+		shader_descriptor = shader_minifier.minify(options, &shader_descriptor)?;
 	}
 
-	(project_descriptor.build_options.event_listener)(BuildEvent::ShaderProvided(
-		ShaderProvidedEvent {
-			passes: to_standalone_passes(&shader_descriptor),
-			target: options.target,
-			variables: &shader_descriptor.variables,
-		},
-	));
+	(options.event_listener)(BuildEvent::ShaderProvided(ShaderProvidedEvent {
+		passes: to_standalone_passes(&shader_descriptor),
+		target: options.target,
+		variables: &shader_descriptor.variables,
+	}));
 
 	let compile_options = CompileOptions {
 		audio_codes: &audio_codes,
@@ -107,18 +121,16 @@ pub fn build(options: &BuildOptions) -> Result<(), String> {
 
 	match compiler {
 		CompilerKind::Executable(compiler) => {
-			let path = compiler.compile(&compile_options)?;
+			let path = compiler.compile(options, &compile_options)?;
 
-			(project_descriptor.build_options.event_listener)(BuildEvent::ExecutableCompiled(
-				ExecutableCompiledEvent { path },
-			));
+			(options.event_listener)(BuildEvent::ExecutableCompiled(ExecutableCompiledEvent {
+				path,
+			}));
 		}
 		CompilerKind::Library(compiler) => {
-			let path = compiler.compile(&compile_options)?;
+			let path = compiler.compile(options, &compile_options)?;
 
-			(project_descriptor.build_options.event_listener)(BuildEvent::LibraryCompiled(
-				LibraryCompiledEvent { path },
-			));
+			(options.event_listener)(BuildEvent::LibraryCompiled(LibraryCompiledEvent { path }));
 		}
 	};
 

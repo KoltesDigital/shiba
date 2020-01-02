@@ -1,3 +1,4 @@
+use crate::build::BuildOptions;
 use crate::code_map::CodeMap;
 use crate::executable_compilers::ExecutableCompiler;
 use crate::library_compilers::LibraryCompiler;
@@ -13,7 +14,11 @@ pub struct CompileOptions<'a> {
 }
 
 pub trait Compiler {
-	fn compile(&self, options: &CompileOptions) -> Result<PathBuf, String>;
+	fn compile(
+		&self,
+		build_options: &BuildOptions,
+		options: &CompileOptions,
+	) -> Result<PathBuf, String>;
 }
 
 pub enum CompilerKind<'a> {

@@ -16,6 +16,24 @@ class _Panel:
         return context.engine in cls.COMPAT_ENGINES
 
 
+class SHIBA_RENDER_PT_export(_Panel, Panel):
+    bl_label = "Export"
+
+    def draw_header_preset(self, context):
+        SHIBA_PT_project_presets.draw_panel_header(self.layout)
+
+    def draw(self, context):
+        layout = self.layout
+
+        scene = context.scene
+        settings = scene.shiba
+
+        layout.prop(settings, 'export_directory', text="Directory")
+        layout.prop(settings, 'export_output', text="Output")
+
+        layout.operator(operators.build_and_export.BuildAndExportOperator.bl_idname)
+
+
 class SHIBA_PT_project_presets(PresetPanel, Panel):
     bl_label = "Project Presets"
     preset_subdir = AddProjectPreset.preset_subdir
@@ -34,13 +52,13 @@ class SHIBA_RENDER_PT_project(_Panel, Panel):
         layout = self.layout
 
         scene = context.scene
-        render_settings = scene.shiba
+        settings = scene.shiba
 
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        layout.prop(render_settings, 'project_directory')
-        layout.prop(render_settings, 'build_executable_on_change')
+        layout.prop(settings, 'project_directory', text="Directory")
+        layout.prop(settings, 'build_executable_on_change')
 
         layout.operator(operators.build_and_run.BuildAndRunOperator.bl_idname)
 

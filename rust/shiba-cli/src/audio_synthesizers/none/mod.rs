@@ -2,6 +2,7 @@ mod settings;
 
 pub use self::settings::NoneSettings;
 use super::{AudioSynthesizer, IntegrationResult};
+use crate::build::BuildOptions;
 use crate::code_map::CodeMap;
 use crate::types::{CompilationDescriptor, ProjectDescriptor};
 use ordered_float::OrderedFloat;
@@ -44,6 +45,7 @@ impl<'a> NoneAudioSynthesizer<'a> {
 impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 	fn integrate(
 		&self,
+		_build_options: &BuildOptions,
 		compilation_descriptor: &CompilationDescriptor,
 	) -> Result<IntegrationResult, String> {
 		let context = Context {

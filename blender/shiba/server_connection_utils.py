@@ -1,13 +1,10 @@
 import bpy
 from bpy.app.handlers import persistent
-import os.path
-from shiba import instrumentation
+from shiba import instrumentation, path
 
 
 def _get_project_directory():
-    path = bpy.context.scene.shiba.project_directory
-    path = os.path.realpath(bpy.path.abspath(path))
-    return path
+    return path.realpath(bpy.context.scene.shiba.project_directory)
 
 
 def _send_build_commands(server_connection):
@@ -21,8 +18,7 @@ def bootstrap(server_connection):
         bpy.context.scene.shiba.build_executable_on_change,
         True,
     )
-    server_connection.send_set_project_directory_command(
-        _get_project_directory())
+    server_connection.send_set_project_directory_command(_get_project_directory())
     _send_build_commands(server_connection)
 
 
@@ -35,8 +31,7 @@ def update_build_on_change(server_connection):
 
 
 def update_project_directory(server_connection):
-    server_connection.send_set_project_directory_command(
-        _get_project_directory())
+    server_connection.send_set_project_directory_command(_get_project_directory())
     _send_build_commands(server_connection)
 
 

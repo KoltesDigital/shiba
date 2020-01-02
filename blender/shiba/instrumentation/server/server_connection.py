@@ -16,6 +16,14 @@ class ServerConnection:
             'target': target,
         })
 
+    def send_export_command(self, directory, output, target):
+        self._send_command({
+            'command': 'export',
+            'directory': directory,
+            'output': output,
+            'target': target,
+        })
+
     def send_run_command(self):
         self._send_command({
             'command': 'run',

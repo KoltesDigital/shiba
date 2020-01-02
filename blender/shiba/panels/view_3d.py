@@ -14,9 +14,9 @@ class SHIBA_PT_Uniforms(_Panel, Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        render_settings = scene.shiba
+        settings = scene.shiba
 
         for uniform_descriptor in uniforms.get_active_uniform_descriptors():
             control_annotation = uniform_descriptor.get_annotation(uniforms.UniformControlAnnotationDescriptor)
             if control_annotation is not None:
-                control_annotation.draw_property(render_settings.uniforms, layout)
+                control_annotation.draw_property(settings.uniforms, layout)

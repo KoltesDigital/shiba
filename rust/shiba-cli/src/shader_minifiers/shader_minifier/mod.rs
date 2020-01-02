@@ -3,6 +3,7 @@ mod types;
 
 use self::types::*;
 use super::ShaderMinifier;
+use crate::build::BuildOptions;
 use crate::hash_extra;
 use crate::parsers::glsl;
 use crate::paths::BUILD_ROOT_DIRECTORY;
@@ -12,20 +13,18 @@ use serde::Serialize;
 use serde_json;
 use std::cell::Cell;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
 use tera::Tera;
 
-pub struct ShaderMinifierShaderMinifier<'a> {
-	project_descriptor: &'a ProjectDescriptor<'a>,
-
+pub struct ShaderMinifierShaderMinifier {
 	exe_path: PathBuf,
 	tera: Tera,
 }
 
-impl<'a> ShaderMinifierShaderMinifier<'a> {
-	pub fn new(project_descriptor: &'a ProjectDescriptor) -> Result<Self, String> {
+impl ShaderMinifierShaderMinifier {
+	pub fn new(project_descriptor: &ProjectDescriptor) -> Result<Self, String> {
 		let exe_path = project_descriptor
 			.configuration
 			.paths
@@ -38,11 +37,7 @@ impl<'a> ShaderMinifierShaderMinifier<'a> {
 		tera.add_raw_template("template", include_str!("template.tera"))
 			.map_err(|err| err.to_string())?;
 
-		Ok(ShaderMinifierShaderMinifier {
-			exe_path,
-			project_descriptor,
-			tera,
-		})
+		Ok(ShaderMinifierShaderMinifier { exe_path, tera })
 	}
 }
 
@@ -50,6 +45,7 @@ const OUTPUT_FILENAME: &str = "shader-descriptor.json";
 
 #[derive(Hash)]
 struct Inputs<'a> {
+	exe_path: &'a Path,
 	original_shader_descriptor: &'a ShaderDescriptor,
 }
 
@@ -59,18 +55,20 @@ struct Context<'a> {
 	pub shader_descriptor: &'a ShaderDescriptor,
 }
 
-impl ShaderMinifier for ShaderMinifierShaderMinifier<'_> {
+impl ShaderMinifier for ShaderMinifierShaderMinifier {
 	fn minify(
 		&self,
+		build_options: &BuildOptions,
 		original_shader_descriptor: &ShaderDescriptor,
 	) -> Result<ShaderDescriptor, String> {
 		let inputs = Inputs {
+			exe_path: &self.exe_path,
 			original_shader_descriptor,
 		};
 		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
 
-		if !self.project_descriptor.build_options.force && build_cache_path.exists() {
+		if !build_options.force && build_cache_path.exists() {
 			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
 			let shader_descriptor =
 				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;

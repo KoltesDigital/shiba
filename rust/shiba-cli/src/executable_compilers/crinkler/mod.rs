@@ -2,7 +2,7 @@ mod settings;
 
 pub use self::settings::CrinklerSettings;
 use super::ExecutableCompiler;
-use crate::build::BuildTarget;
+use crate::build::{BuildOptions, BuildTarget};
 use crate::code_map::CodeMap;
 use crate::compiler::{CompileOptions, Compiler};
 use crate::generator_utils::cpp;
@@ -66,6 +66,7 @@ struct Inputs<'a> {
 	msvc_command_generator: cpp::msvc::CommandGeneratorInputs<'a>,
 	options: &'a CompileOptions<'a>,
 	settings: &'a CrinklerSettings,
+	target: BuildTarget,
 }
 
 #[derive(Serialize)]
@@ -86,7 +87,11 @@ struct Context<'a> {
 }
 
 impl<'a> Compiler for CrinklerCompiler<'a> {
-	fn compile(&self, options: &CompileOptions) -> Result<PathBuf, String> {
+	fn compile(
+		&self,
+		build_options: &BuildOptions,
+		options: &CompileOptions,
+	) -> Result<PathBuf, String> {
 		let inputs = Inputs {
 			cpp_template_renderer: self.cpp_template_renderer.get_inputs(),
 			crinkler_path: &self.crinkler_path,
@@ -94,11 +99,12 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 			msvc_command_generator: self.msvc_command_generator.get_inputs(),
 			options,
 			settings: self.settings,
+			target: build_options.target,
 		};
 		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
 
-		if !self.project_descriptor.build_options.force && build_cache_path.exists() {
+		if !build_options.force && build_cache_path.exists() {
 			return Ok(build_cache_path);
 		}
 
@@ -121,7 +127,7 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 			settings: self.settings,
 			shader_declarations: &contents.shader_declarations,
 			shader_loading: &contents.shader_loading,
-			target: self.project_descriptor.build_options.target,
+			target: build_options.target,
 			uniform_arrays: &options.shader_descriptor.uniform_arrays,
 		};
 		let contents = self

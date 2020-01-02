@@ -1,9 +1,10 @@
-use crate::build::{BuildOptions, BuildTarget};
+use crate::build::BuildTarget;
 use crate::compiler::CompilerKind;
 use crate::configuration::Configuration;
 use crate::settings::Settings;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
+use std::path::Path;
 
 #[derive(Clone, Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub struct Pass {
@@ -89,36 +90,36 @@ pub struct ShaderDescriptor {
 }
 
 pub struct ProjectDescriptor<'a> {
-	pub build_options: &'a BuildOptions<'a>,
 	pub configuration: Configuration,
 	pub development: bool,
+	pub directory: &'a Path,
 	pub settings: Settings,
 }
 
 impl<'a> ProjectDescriptor<'a> {
-	pub fn load(build_options: &'a BuildOptions) -> Result<Self, String> {
+	pub fn load(directory: &'a Path, target: BuildTarget) -> Result<Self, String> {
 		let configuration = Configuration::load()?;
 
-		let settings = Settings::load(build_options.project_directory)?;
+		let settings = Settings::load(directory)?;
 
 		let development = match settings.development {
 			Some(development) => development,
-			None => match build_options.target {
+			None => match target {
 				BuildTarget::Executable => false,
 				BuildTarget::Library => true,
 			},
 		};
 
 		Ok(ProjectDescriptor {
-			build_options,
 			configuration,
 			development,
+			directory,
 			settings,
 		})
 	}
 
-	pub fn instantiate_compiler(&self) -> Result<CompilerKind, String> {
-		let compiler = match self.build_options.target {
+	pub fn instantiate_compiler(&self, target: BuildTarget) -> Result<CompilerKind, String> {
+		let compiler = match target {
 			BuildTarget::Executable => {
 				CompilerKind::Executable(self.settings.executable_compiler.instantiate(self)?)
 			}
