@@ -1,6 +1,6 @@
 use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
 use crate::export::{self, ExportOptions, ExportOutput};
-use crate::types::ProjectDescriptor;
+use crate::project_data::Project;
 use std::path::Path;
 
 pub struct Options<'a> {
@@ -12,7 +12,7 @@ pub struct Options<'a> {
 }
 
 pub fn execute(options: &Options) -> Result<(), String> {
-	let project_descriptor = ProjectDescriptor::load(options.project_directory, options.target)?;
+	let project = Project::load(options.project_directory, options.target)?;
 
 	let mut build_path = None;
 	let mut static_files = None;
@@ -36,7 +36,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 	build::build(
 		&BuildOptions {
 			force: options.force,
-			project_descriptor: &project_descriptor,
+			project: &project,
 			target: options.target,
 		},
 		&mut event_listener,
@@ -45,7 +45,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 	export::export(&ExportOptions {
 		build_path: &build_path.unwrap(),
 		directory: options.export_directory,
-		project_descriptor: &project_descriptor,
+		project: &project,
 		output: options.output,
 		static_files: &static_files.unwrap(),
 	})?;

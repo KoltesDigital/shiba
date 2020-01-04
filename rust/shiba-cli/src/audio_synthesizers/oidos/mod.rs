@@ -3,16 +3,17 @@ mod settings;
 pub use self::settings::OidosSettings;
 use super::{AudioSynthesizer, IntegrationResult};
 use crate::build::BuildOptions;
+use crate::compilation_data::Compilation;
 use crate::hash_extra;
 use crate::paths::BUILD_ROOT_DIRECTORY;
+use crate::project_data::Project;
 use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
-use crate::types::{CompilationDescriptor, ProjectDescriptor};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tera::Tera;
+use tera::{Context, Tera};
 
 template_enum! {
 	declarations: "declarations",
@@ -33,25 +34,22 @@ pub struct OidosAudioSynthesizer<'a> {
 }
 
 impl<'a> OidosAudioSynthesizer<'a> {
-	pub fn new(
-		project_descriptor: &'a ProjectDescriptor,
-		settings: &'a OidosSettings,
-	) -> Result<Self, String> {
-		let nasm_path = project_descriptor
+	pub fn new(project: &'a Project, settings: &'a OidosSettings) -> Result<Self, String> {
+		let nasm_path = project
 			.configuration
 			.paths
 			.get("nasm")
 			.cloned()
 			.unwrap_or_else(|| PathBuf::from("nasm"));
 
-		let oidos_path = project_descriptor
+		let oidos_path = project
 			.configuration
 			.paths
 			.get("oidos")
-			.ok_or("Please set project_descriptor.configuration key paths.oidos.")?
+			.ok_or("Please set project.configuration key paths.oidos.")?
 			.clone();
 
-		let python2_path = project_descriptor
+		let python2_path = project
 			.configuration
 			.paths
 			.get("python2")
@@ -63,9 +61,7 @@ impl<'a> OidosAudioSynthesizer<'a> {
 		tera.add_raw_templates(Template::as_array())
 			.map_err(|err| err.to_string())?;
 
-		let path = project_descriptor
-			.directory
-			.join(settings.filename.as_str());
+		let path = project.directory.join(settings.filename.as_str());
 
 		Ok(OidosAudioSynthesizer {
 			settings,
@@ -79,28 +75,23 @@ impl<'a> OidosAudioSynthesizer<'a> {
 	}
 }
 
-const OUTPUT_FILENAME: &str = "integration-result.json";
-
-#[derive(Hash)]
-struct Inputs<'a> {
-	nasm_path: &'a Path,
-	oidos_path: &'a Path,
-	python2_path: &'a Path,
-	settings: &'a OidosSettings,
-}
-
-#[derive(Deserialize)]
-struct Outputs {}
-
-#[derive(Serialize)]
-struct Context {}
-
 impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 	fn integrate(
 		&self,
 		build_options: &BuildOptions,
-		compilation_descriptor: &CompilationDescriptor,
+		compilation: &Compilation,
 	) -> Result<IntegrationResult, String> {
+		const OUTPUT_FILENAME: &str = "integration-result.json";
+
+		// TODO misses contents.
+		#[derive(Hash)]
+		struct Inputs<'a> {
+			nasm_path: &'a Path,
+			oidos_path: &'a Path,
+			python2_path: &'a Path,
+			settings: &'a OidosSettings,
+		}
+
 		let inputs = Inputs {
 			nasm_path: &self.nasm_path,
 			oidos_path: &self.oidos_path,
@@ -148,13 +139,7 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 				.args(vec!["-f", "win32", "-i"])
 				.arg(&build_directory)
 				.arg("-i")
-				.arg(
-					build_options
-						.project_descriptor
-						.directory
-						.to_string_lossy()
-						.as_ref(),
-				)
+				.arg(build_options.project.directory.to_string_lossy().as_ref())
 				.arg("-o")
 				.arg(output)
 				.arg(
@@ -174,40 +159,37 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 			}
 		}
 
-		let context = Context {};
+		#[derive(Serialize)]
+		struct OwnContext {}
+
+		let context = OwnContext {};
 
 		let mut codes = CodeMap::default();
 		for (name, _) in Template::as_array() {
 			let s = self
 				.tera
-				.render(name, &context)
-				.map_err(|_| format!("Failed to render {}.", name))?;
+				.render(
+					name,
+					&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+				)
+				.map_err(|err| err.to_string())?;
 			codes.insert(name.to_string(), s);
 		}
 
-		let mut compilation_descriptor = compilation_descriptor.clone();
+		let mut compilation = compilation.clone();
 
-		compilation_descriptor.cl.args.push(format!(
+		compilation.cl.args.push(format!(
 			"/I{}",
 			self.oidos_path.join("player").to_string_lossy()
 		));
-		compilation_descriptor
-			.crinkler
-			.args
-			.push("winmm.lib".to_string());
-		compilation_descriptor
-			.crinkler
-			.args
-			.push("oidos.obj".to_string());
-		compilation_descriptor
+		compilation.crinkler.args.push("winmm.lib".to_string());
+		compilation.crinkler.args.push("oidos.obj".to_string());
+		compilation
 			.crinkler
 			.args
 			.push("oidos-random.obj".to_string());
 
-		let integration_result = IntegrationResult {
-			codes,
-			compilation_descriptor,
-		};
+		let integration_result = IntegrationResult { codes, compilation };
 
 		let json =
 			serde_json::to_string(&integration_result).map_err(|_| "Failed to dump JSON.")?;

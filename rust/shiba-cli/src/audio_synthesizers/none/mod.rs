@@ -3,11 +3,12 @@ mod settings;
 pub use self::settings::NoneSettings;
 use super::{AudioSynthesizer, IntegrationResult};
 use crate::build::BuildOptions;
+use crate::compilation_data::Compilation;
+use crate::project_data::Project;
 use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
-use crate::types::{CompilationDescriptor, ProjectDescriptor};
 use ordered_float::OrderedFloat;
 use serde::Serialize;
-use tera::Tera;
+use tera::{Context, Tera};
 
 template_enum! {
 	declarations: "declarations",
@@ -17,11 +18,6 @@ template_enum! {
 	time_definition: "time_definition",
 }
 
-#[derive(Serialize)]
-struct Context {
-	speed: Option<OrderedFloat<f32>>,
-}
-
 pub struct NoneAudioSynthesizer<'a> {
 	settings: &'a NoneSettings,
 
@@ -29,10 +25,7 @@ pub struct NoneAudioSynthesizer<'a> {
 }
 
 impl<'a> NoneAudioSynthesizer<'a> {
-	pub fn new(
-		_project_descriptor: &'a ProjectDescriptor,
-		settings: &'a NoneSettings,
-	) -> Result<Self, String> {
+	pub fn new(_project: &'a Project, settings: &'a NoneSettings) -> Result<Self, String> {
 		let mut tera = Tera::default();
 
 		tera.add_raw_templates(Template::as_array())
@@ -46,9 +39,14 @@ impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 	fn integrate(
 		&self,
 		_build_options: &BuildOptions,
-		compilation_descriptor: &CompilationDescriptor,
+		compilation: &Compilation,
 	) -> Result<IntegrationResult, String> {
-		let context = Context {
+		#[derive(Serialize)]
+		struct OwnContext {
+			speed: Option<OrderedFloat<f32>>,
+		}
+
+		let context = OwnContext {
 			speed: self.settings.speed,
 		};
 
@@ -56,14 +54,17 @@ impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 		for (name, _) in Template::as_array() {
 			let s = self
 				.tera
-				.render(name, &context)
-				.map_err(|_| format!("Failed to render {}.", name))?;
+				.render(
+					name,
+					&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+				)
+				.map_err(|err| err.to_string())?;
 			codes.insert(name.to_string(), s);
 		}
 
 		Ok(IntegrationResult {
 			codes,
-			compilation_descriptor: compilation_descriptor.clone(),
+			compilation: compilation.clone(),
 		})
 	}
 }

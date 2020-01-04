@@ -1,10 +1,10 @@
-{% if shader_descriptor.glsl_version -%}
-	#version {{ shader_descriptor.glsl_version }}
+{% if shader_set.glsl_version -%}
+	#version {{ shader_set.glsl_version }}
 {% endif %}
 
 #pragma shiba uniform_arrays
 
-{% for uniform_array in shader_descriptor.uniform_arrays %}
+{% for uniform_array in shader_set.uniform_arrays %}
 	uniform {{ uniform_array.type_name }} {{ uniform_array.name }}[{{ uniform_array.variables | length }}];
 {% endfor %}
 
@@ -14,34 +14,34 @@
 	{{ variable.type_name }} {{ variable.name }};
 {% endfor %}
 
-{% if shader_descriptor.sections.attributes %}
+{% if shader_set.sections.attributes %}
 	#pragma shiba attributes
-	{{ shader_descriptor.sections.attributes }}
+	{{ shader_set.sections.attributes }}
 {% endif %}
 
-{% if shader_descriptor.sections.varyings %}
+{% if shader_set.sections.varyings %}
 	#pragma shiba varyings
-	{{ shader_descriptor.sections.varyings }}
+	{{ shader_set.sections.varyings }}
 {% endif %}
 
-{% if shader_descriptor.sections.outputs %}
+{% if shader_set.sections.outputs %}
 	#pragma shiba outputs
-	{{ shader_descriptor.sections.outputs }}
+	{{ shader_set.sections.outputs }}
 {% endif %}
 
-{% if shader_descriptor.sections.common %}
+{% if shader_set.sections.common %}
 	#pragma shiba common
-	{{ shader_descriptor.sections.common }}
+	{{ shader_set.sections.common }}
 {% endif %}
 
-{% for pass in shader_descriptor.passes %}
-	{% if pass.vertex %}
-		#pragma shiba vertex {{ loop.index - 1 }}
-		{{ pass.vertex }}
+{% for shader_source in shader_set.shader_specific_sources %}
+	{% if shader_source.vertex %}
+		#pragma shiba vertex {{ loop.index0 }}
+		{{ shader_source.vertex }}
 	{% endif %}
 
-	{% if pass.fragment %}
-		#pragma shiba fragment {{ loop.index - 1 }}
-		{{ pass.fragment }}
+	{% if shader_source.fragment %}
+		#pragma shiba fragment {{ loop.index0 }}
+		{{ shader_source.fragment }}
 	{% endif %}
 {% endfor %}

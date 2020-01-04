@@ -286,8 +286,8 @@ public:
 
 	#define SHIBA_VARIABLE static thread_local
 
-	SHIBA_VARIABLE GLint _shibaFragmentShaders[{{ passes | length }}];
-	SHIBA_VARIABLE GLint _shibaVertexShaders[{{ passes | length }}];
+	SHIBA_VARIABLE GLint _shibaFragmentShaderIds[{{ shader_specific_sources_length }}];
+	SHIBA_VARIABLE GLint _shibaVertexShaderIds[{{ shader_specific_sources_length }}];
 
 {% else %}
 

@@ -37,25 +37,25 @@ mod commands {
 	pub mod run;
 	pub mod server;
 }
+mod compilation_data;
 mod compiler;
 mod configuration;
+mod cpp_utils;
 mod executable_compilers;
 mod export;
-mod generator_utils {
-	pub mod cpp;
-	pub mod settings;
-}
 mod hash_extra;
 mod library_compilers;
 mod parsers;
 mod paths;
+mod project_data;
 mod project_files;
 mod run;
 mod settings;
+mod settings_utils;
 mod shader_codes;
+mod shader_data;
 mod shader_minifiers;
 mod shader_providers;
-mod types;
 
 use crate::build::BuildTarget;
 use crate::export::ExportOutput;

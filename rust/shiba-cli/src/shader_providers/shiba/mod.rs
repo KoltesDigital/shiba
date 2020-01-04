@@ -8,9 +8,10 @@ use super::ShaderProvider;
 use crate::build::{BuildOptions, BuildTarget};
 use crate::hash_extra;
 use crate::parsers::glsl;
+use crate::project_data::Project;
 use crate::project_files::{FileConsumer, IsPathHandled};
-use crate::types::{
-	ConstVariable, Pass, ProjectDescriptor, ShaderDescriptor, UniformArray, VariableKind,
+use crate::shader_data::{
+	ShaderConstVariable, ShaderSet, ShaderSource, ShaderUniformArray, ShaderVariableKind,
 };
 use regex::Regex;
 use serde::Serialize;
@@ -18,27 +19,24 @@ use serde_json;
 use std::cell::Cell;
 use std::fs;
 use std::path::PathBuf;
-use tera::Tera;
+use tera::{Context, Tera};
 
 #[derive(Serialize)]
-struct Context {
+struct OwnContext {
 	development: bool,
 	target: BuildTarget,
 }
 
 pub struct ShibaShaderProvider<'a> {
-	project_descriptor: &'a ProjectDescriptor,
+	project: &'a Project,
 
 	contents: String,
 	path: PathBuf,
 }
 
 impl<'a> ShibaShaderProvider<'a> {
-	pub fn new(
-		project_descriptor: &'a ProjectDescriptor,
-		settings: &'a ShibaSettings,
-	) -> Result<Self, String> {
-		let path = project_descriptor.directory.join(&settings.filename);
+	pub fn new(project: &'a Project, settings: &'a ShibaSettings) -> Result<Self, String> {
+		let path = project.directory.join(&settings.filename);
 		let contents = fs::read_to_string(&path).map_err(|err| {
 			format!(
 				"Failed to read shader at {}: {}",
@@ -48,7 +46,7 @@ impl<'a> ShibaShaderProvider<'a> {
 		})?;
 
 		Ok(ShibaShaderProvider {
-			project_descriptor,
+			project,
 			contents,
 			path,
 		})
@@ -60,32 +58,34 @@ impl<'a> ShibaShaderProvider<'a> {
 		tera.add_raw_template("template", code)
 			.map_err(|err| err.to_string())?;
 
-		let context = Context {
-			development: self.project_descriptor.development,
+		let context = OwnContext {
+			development: self.project.development,
 			target: build_options.target,
 		};
 
 		let code = tera
-			.render("template", &context)
-			.map_err(|_| "Failed to render template.")?;
+			.render(
+				"template",
+				&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+			)
+			.map_err(|err| err.to_string())?;
 
 		Ok(code)
 	}
 }
 
-fn ensure_passes_has_index(shader_descriptor: &mut ShaderDescriptor, index: usize) {
-	if shader_descriptor.passes.len() <= index {
-		shader_descriptor
-			.passes
-			.resize_with(index + 1, Pass::default);
-	}
+fn get_specific_source<'a>(shader_set: &'a mut ShaderSet, name: &str) -> &'a mut ShaderSource {
+	shader_set
+		.specific_sources
+		.entry(name.to_string())
+		.or_insert_with(ShaderSource::default)
 }
 
-fn parse(code: &str) -> Result<ShaderDescriptor, String> {
+fn parse(code: &str) -> Result<ShaderSet, String> {
 	let (input, (glsl_version, sections)) =
 		parsers::contents(code).map_err(|_| "Parsing error.".to_string())?;
 
-	let mut shader_descriptor = ShaderDescriptor {
+	let mut shader_set = ShaderSet {
 		glsl_version: glsl_version.map(|s| s.to_owned()),
 		..Default::default()
 	};
@@ -110,24 +110,24 @@ fn parse(code: &str) -> Result<ShaderDescriptor, String> {
 			};
 
 			match next_section.get() {
-				Directive::Attributes => append(&mut shader_descriptor.sections.attributes),
+				Directive::Attributes => append(&mut shader_set.sections.attributes),
 
-				Directive::Common => append(&mut shader_descriptor.sections.common),
+				Directive::Common => append(&mut shader_set.sections.common),
 
-				Directive::Fragment(index) => {
-					ensure_passes_has_index(&mut shader_descriptor, index);
-					append(&mut shader_descriptor.passes[index].fragment);
+				Directive::Fragment(name) => {
+					let source = get_specific_source(&mut shader_set, name);
+					append(&mut source.fragment);
 				}
 
-				Directive::Outputs => append(&mut shader_descriptor.sections.outputs),
+				Directive::Outputs => append(&mut shader_set.sections.outputs),
 
 				Directive::Prolog => append(&mut prolog_code),
 
-				Directive::Varyings => append(&mut shader_descriptor.sections.varyings),
+				Directive::Varyings => append(&mut shader_set.sections.varyings),
 
-				Directive::Vertex(index) => {
-					ensure_passes_has_index(&mut shader_descriptor, index);
-					append(&mut shader_descriptor.passes[index].vertex);
+				Directive::Vertex(name) => {
+					let source = get_specific_source(&mut shader_set, name);
+					append(&mut source.vertex);
 				}
 			}
 		}
@@ -143,25 +143,25 @@ fn parse(code: &str) -> Result<ShaderDescriptor, String> {
 	if let Some(prolog_code) = &prolog_code {
 		let (_, variables) =
 			glsl::variables(prolog_code).map_err(|_| "Parsing error.".to_string())?;
-		shader_descriptor.variables = variables;
+		shader_set.variables = variables;
 	}
 
-	Ok(shader_descriptor)
-}
-
-const OUTPUT_FILENAME: &str = "shader-descriptor.json";
-
-#[derive(Hash)]
-struct Inputs<'a> {
-	development: bool,
-	contents: &'a String,
-	target: BuildTarget,
+	Ok(shader_set)
 }
 
 impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
-	fn provide(&self, build_options: &BuildOptions) -> Result<ShaderDescriptor, String> {
+	fn provide(&self, build_options: &BuildOptions) -> Result<ShaderSet, String> {
+		const OUTPUT_FILENAME: &str = "shader-descriptor.json";
+
+		#[derive(Hash)]
+		struct Inputs<'a> {
+			development: bool,
+			contents: &'a String,
+			target: BuildTarget,
+		}
+
 		let inputs = Inputs {
-			development: self.project_descriptor.development,
+			development: self.project.development,
 			contents: &self.contents,
 			target: build_options.target,
 		};
@@ -170,27 +170,27 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 
 		if !build_options.force && build_cache_path.exists() {
 			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
-			let shader_descriptor =
+			let shader_set =
 				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;
-			return Ok(shader_descriptor);
+			return Ok(shader_set);
 		}
 
 		let contents = self.render(build_options, &self.contents)?;
 
-		let mut shader_descriptor = parse(&contents)?;
+		let mut shader_set = parse(&contents)?;
 
-		if shader_descriptor.passes.is_empty() {
-			return Err("Shader should define at least one pass.".to_string());
+		if shader_set.specific_sources.is_empty() {
+			return Err("Shader set should define at least one shader.".to_string());
 		}
 
 		// Replace constants by their value.
 		// Deactivate unreferenced variables.
-		for variable in shader_descriptor.variables.iter_mut() {
+		for variable in shader_set.variables.iter_mut() {
 			if variable.active {
 				let usage_re =
 					Regex::new(format!(r"\b{}\b", variable.name).as_str()).expect("Bad regex.");
 
-				if let VariableKind::Const(ConstVariable { value }) = &variable.kind {
+				if let ShaderVariableKind::Const(ShaderConstVariable { value }) = &variable.kind {
 					/*
 					console.log(
 						`Replacing references to constant "${variable.name}" by its value "${variable.value}".`
@@ -205,12 +205,12 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 						)
 					};
 
-					shader_descriptor.sections.common =
-						shader_descriptor.sections.common.as_ref().and_then(replace);
+					shader_set.sections.common =
+						shader_set.sections.common.as_ref().and_then(replace);
 
-					for pass in shader_descriptor.passes.iter_mut() {
-						pass.vertex = pass.vertex.as_ref().and_then(replace);
-						pass.fragment = pass.fragment.as_ref().and_then(replace);
+					for (_name, shader_source) in shader_set.specific_sources.iter_mut() {
+						shader_source.vertex = shader_source.vertex.as_ref().and_then(replace);
+						shader_source.fragment = shader_source.fragment.as_ref().and_then(replace);
 					}
 
 					variable.active = false;
@@ -225,53 +225,47 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 						}
 					};
 
-					find(&shader_descriptor.sections.common);
+					find(&shader_set.sections.common);
 
-					for pass in &shader_descriptor.passes {
-						find(&pass.vertex);
-						find(&pass.fragment);
+					for (_name, shader_source) in shader_set.specific_sources.iter() {
+						find(&shader_source.vertex);
+						find(&shader_source.fragment);
 					}
 
 					if !referenced {
-						/*
-						console.log(
-							`Global variable "${variable.name}" is not referenced and won't be used.`
-						);
-						*/
-
 						variable.active = false;
 					}
 				}
 			}
 		}
 
-		for variable in &shader_descriptor.variables {
+		for variable in &shader_set.variables {
 			if !variable.active {
 				continue;
 			}
 
-			if let VariableKind::Uniform(_) = variable.kind {
-				let uniform_array = match shader_descriptor
+			if let ShaderVariableKind::Uniform(_) = variable.kind {
+				let uniform_array = match shader_set
 					.uniform_arrays
 					.iter_mut()
 					.find(|uniform_array| uniform_array.type_name == variable.type_name)
 				{
 					Some(uniform_array) => uniform_array,
 					None => {
-						shader_descriptor.uniform_arrays.push(UniformArray {
+						shader_set.uniform_arrays.push(ShaderUniformArray {
 							name: format!("_shiba_{}_uniforms", variable.type_name),
 							minified_name: None,
 							variables: Vec::new(),
 							type_name: variable.type_name.clone(),
 						});
-						shader_descriptor.uniform_arrays.last_mut().unwrap()
+						shader_set.uniform_arrays.last_mut().unwrap()
 					}
 				};
 				uniform_array.variables.push(variable.clone());
 			}
 		}
 
-		for uniform_array in &shader_descriptor.uniform_arrays {
+		for uniform_array in &shader_set.uniform_arrays {
 			for (index, variable) in uniform_array.variables.iter().enumerate() {
 				let usage_re =
 					Regex::new(format!(r"\b{}\b", variable.name).as_str()).expect("Bad regex.");
@@ -285,31 +279,38 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 					)
 				};
 
-				shader_descriptor.sections.common =
-					shader_descriptor.sections.common.as_ref().and_then(replace);
+				shader_set.sections.common = shader_set.sections.common.as_ref().and_then(replace);
 
-				for pass in shader_descriptor.passes.iter_mut() {
-					pass.vertex = pass.vertex.as_ref().and_then(replace);
-					pass.fragment = pass.fragment.as_ref().and_then(replace);
+				for (_name, shader_source) in shader_set.specific_sources.iter_mut() {
+					shader_source.vertex = shader_source.vertex.as_ref().and_then(replace);
+					shader_source.fragment = shader_source.fragment.as_ref().and_then(replace);
 				}
 			}
 		}
 
-		let json = serde_json::to_string(&shader_descriptor).map_err(|_| "Failed to dump JSON.")?;
+		let json = serde_json::to_string(&shader_set).map_err(|_| "Failed to dump JSON.")?;
 		fs::write(build_cache_path, json).map_err(|err| err.to_string())?;
 
-		Ok(shader_descriptor)
+		Ok(shader_set)
+	}
+}
+
+impl FileConsumer for ShibaShaderProvider<'_> {
+	fn get_is_path_handled<'b, 'a: 'b>(&'a self) -> IsPathHandled<'b> {
+		Box::new(move |path| path == self.path)
 	}
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::types::{Sections, UniformVariable, Variable, VariableKind};
+	use crate::shader_data::{
+		ShaderSections, ShaderSourceMap, ShaderUniformVariable, ShaderVariable, ShaderVariableKind,
+	};
 
 	#[test]
 	fn test_parse() {
-		let shader_descriptor = parse(
+		let shader_set = parse(
 			r#"#version 450
 float regularVar0;
 float regularVar1[1];
@@ -320,46 +321,52 @@ uniform float uniformVar1[4];
 uniform vec2 uniformVar2;
 #pragma shiba common
 common code
-#pragma shiba vertex 0
+#pragma shiba vertex shader
 vertex code
-#pragma shiba fragment 0
+#pragma shiba fragment shader
 fragment code
 "#,
 		)
 		.unwrap();
 
+		let mut expected_specific_sources = ShaderSourceMap::new();
+		expected_specific_sources.insert(
+			"shader".to_string(),
+			ShaderSource {
+				vertex: Some("vertex code".to_string()),
+				fragment: Some("fragment code".to_string()),
+			},
+		);
+
 		assert_eq!(
-			shader_descriptor,
-			ShaderDescriptor {
+			shader_set,
+			ShaderSet {
 				glsl_version: Some("450".to_string()),
-				passes: vec![Pass {
-					vertex: Some("vertex code".to_string()),
-					fragment: Some("fragment code".to_string()),
-				}],
-				sections: Sections {
+				sections: ShaderSections {
 					common: Some("common code".to_string()),
 					..Default::default()
 				},
+				specific_sources: expected_specific_sources,
 				variables: vec![
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Regular,
+						kind: ShaderVariableKind::Regular,
 						length: None,
 						minified_name: None,
 						name: "regularVar0".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Regular,
+						kind: ShaderVariableKind::Regular,
 						length: Some(1),
 						minified_name: None,
 						name: "regularVar1".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Const(ConstVariable {
+						kind: ShaderVariableKind::Const(ShaderConstVariable {
 							value: "42.".to_string()
 						}),
 						length: None,
@@ -367,9 +374,9 @@ fragment code
 						name: "constVar".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Uniform(UniformVariable {
+						kind: ShaderVariableKind::Uniform(ShaderUniformVariable {
 							annotations: vec![]
 						}),
 						length: None,
@@ -377,9 +384,9 @@ fragment code
 						name: "uniformVar0".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Uniform(UniformVariable {
+						kind: ShaderVariableKind::Uniform(ShaderUniformVariable {
 							annotations: vec![]
 						}),
 						length: Some(4),
@@ -387,9 +394,9 @@ fragment code
 						name: "uniformVar1".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Uniform(UniformVariable {
+						kind: ShaderVariableKind::Uniform(ShaderUniformVariable {
 							annotations: vec![]
 						}),
 						length: None,
@@ -401,11 +408,5 @@ fragment code
 				..Default::default()
 			}
 		);
-	}
-}
-
-impl FileConsumer for ShibaShaderProvider<'_> {
-	fn get_is_path_handled<'b, 'a: 'b>(&'a self) -> IsPathHandled<'b> {
-		Box::new(move |path| path == self.path)
 	}
 }

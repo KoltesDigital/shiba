@@ -6,11 +6,11 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
 
-{{ api }}
+{{ api.api }}
 
-{{ opengl_declarations }}
+{{ api.opengl_declarations }}
 
-{{ shader_declarations }}
+{{ api.shader_declarations }}
 
 {% if project_codes.declarations %}
 	{{ project_codes.declarations }}
@@ -26,7 +26,7 @@ static void _shibaCommonInitialize(int32_t shibaResolutionWidth, int32_t shibaRe
 {
 	_shibaCreateScreenRect();
 
-	{{ shader_loading }}
+	{{ api.shader_loading }}
 
 	{% if project_codes.initialization %}
 		{{ project_codes.initialization }}
@@ -38,7 +38,7 @@ static void _shibaCommonRender(int32_t shibaResolutionWidth, int32_t shibaResolu
 	glViewport(0, 0, shibaResolutionWidth, shibaResolutionHeight);
 	shibaCheckGlError();
 
-	{{ render }}
+	{{ api.render }}
 }
 
 _SHIBA_EXPORT void _shibaUpdate(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
@@ -52,7 +52,7 @@ _SHIBA_EXPORT void _shibaEnsureIsInitialized(int32_t shibaResolutionWidth, int32
 
 	if (!_shibaIsInitialized)
 	{
-		{{ opengl_loading }}
+		{{ api.opengl_loading }}
 
 		_shibaCommonInitialize(shibaResolutionWidth, shibaResolutionHeight);
 
@@ -122,7 +122,7 @@ _SHIBA_EXPORT void _shibaViewportEnsureIsInitialized(int32_t shibaResolutionWidt
 {
 	if (!_shibaIsInitialized)
 	{
-		{{ opengl_loading }}
+		{{ api.opengl_loading }}
 
 		glGetIntegerv(GL_FRAMEBUFFER_BINDING, reinterpret_cast<GLint*>(&shibaFinalFramebufferId));
 		shibaCheckGlError();
@@ -151,15 +151,15 @@ _SHIBA_EXPORT void _shibaViewportRender(int32_t shibaResolutionWidth, int32_t sh
 	_shibaCommonRender(shibaResolutionWidth, shibaResolutionHeight);
 }
 
-struct _ShibaShaderPasses
+struct _ShibaShaderSources
 {
 	const char *vertex;
 	const char *fragment;
 };
 
-_SHIBA_EXPORT void _shibaUpdateShaderPasses(int count, _ShibaShaderPasses *passes)
+_SHIBA_EXPORT void _shibaUpdateShaderSources(int count, _ShibaShaderSources *shader_specific_sources)
 {
-	if (count != {{ passes | length }})
+	if (count != {{ shader_specific_sources_length }})
 	{
 		return;
 	}
@@ -167,30 +167,30 @@ _SHIBA_EXPORT void _shibaUpdateShaderPasses(int count, _ShibaShaderPasses *passe
 	glUseProgram(0);
 	shibaCheckGlError();
 
-	for (int i = 0; i < {{ passes | length }}; ++i)
+	for (int i = 0; i < {{ shader_specific_sources_length }}; ++i)
 	{
-		auto &pass = passes[i];
+		auto &shader_source = shader_specific_sources[i];
 
-		glShaderSource(_shibaVertexShaders[i], 1, pass.vertex != nullptr ? &pass.vertex : &_shibaShaderNullVertexCode, 0);
+		glShaderSource(_shibaVertexShaderIds[i], 1, shader_source.vertex != nullptr ? &shader_source.vertex : &_shibaShaderNullVertexCode, 0);
 		shibaCheckGlError();
-		glCompileShader(_shibaVertexShaders[i]);
+		glCompileShader(_shibaVertexShaderIds[i]);
 		shibaCheckGlError();
-		shibaCheckShaderInfoLog(_shibaVertexShaders[i]);
+		shibaCheckShaderInfoLog(_shibaVertexShaderIds[i]);
 
-		if (pass.fragment != nullptr)
+		if (shader_source.fragment != nullptr)
 		{
-			glShaderSource(_shibaFragmentShaders[i], 1, &pass.fragment, 0);
+			glShaderSource(_shibaFragmentShaderIds[i], 1, &shader_source.fragment, 0);
 			shibaCheckGlError();
-			glCompileShader(_shibaFragmentShaders[i]);
+			glCompileShader(_shibaFragmentShaderIds[i]);
 			shibaCheckGlError();
-			shibaCheckShaderInfoLog(_shibaFragmentShaders[i]);
+			shibaCheckShaderInfoLog(_shibaFragmentShaderIds[i]);
 		}
 
 		auto program =
-			{% if passes | length == 1 %}
-				shibaProgram
+			{% if shader_specific_sources_length == 1 %}
+				shibaShaderId
 			{% else %}
-				shibaPrograms[i]
+				shibaShaderIds[i]
 			{% endif %}
 		;
 
@@ -199,14 +199,14 @@ _SHIBA_EXPORT void _shibaUpdateShaderPasses(int count, _ShibaShaderPasses *passe
 
 		shibaCheckProgramInfoLog(program);
 
-		{% for uniform_array in uniform_arrays %}
-			shibaUniformLocations[i][{{ loop.index - 1 }}] = glGetUniformLocation(program, "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
+		{% for uniform_array in shader_set.uniform_arrays %}
+			shibaUniformLocations[i][{{ loop.index0 }}] = glGetUniformLocation(program, "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
 			shibaCheckGlError();
 		{% endfor %}
 
-		shibaLog() << "Uniform locations in pass " << i << ":";
-		{% for uniform_array in uniform_arrays %}
-			shibaLog() << "{{ uniform_array.type_name }}: " << shibaUniformLocations[i][{{ loop.index - 1 }}];
+		shibaLog() << "Uniform locations in shader #" << i << ":";
+		{% for uniform_array in shader_set.uniform_arrays %}
+			shibaLog() << "  {{ uniform_array.type_name }}: " << shibaUniformLocations[i][{{ loop.index0 }}];
 		{% endfor %}
 		shibaLog();
 	}
@@ -214,7 +214,7 @@ _SHIBA_EXPORT void _shibaUpdateShaderPasses(int count, _ShibaShaderPasses *passe
 
 _SHIBA_EXPORT void _shibaSetActiveUniformValues(_ShibaUniformValue *_shibaArgValues)
 {
-	{{ set_active_uniform_values }}
+	{{ api.set_active_uniform_values }}
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)

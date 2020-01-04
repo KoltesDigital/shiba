@@ -4,40 +4,37 @@ pub use self::settings::CrinklerSettings;
 use super::ExecutableCompiler;
 use crate::build::{BuildOptions, BuildTarget};
 use crate::compiler::{CompileOptions, Compiler};
-use crate::generator_utils::cpp;
+use crate::cpp_utils;
 use crate::hash_extra;
 use crate::paths::BUILD_ROOT_DIRECTORY;
+use crate::project_data::Project;
 use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
-use crate::types::{Pass, ProjectDescriptor, UniformArray};
+use crate::shader_data::{ShaderSourceMap, ShaderUniformArray};
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tera::Tera;
+use tera::{Context, Tera};
 
 pub struct CrinklerCompiler<'a> {
-	project_descriptor: &'a ProjectDescriptor,
+	project: &'a Project,
 	settings: &'a CrinklerSettings,
 
-	cpp_template_renderer: cpp::template::Renderer,
+	api_generator: cpp_utils::api::Generator,
 	crinkler_path: PathBuf,
-	msvc_command_generator: cpp::msvc::CommandGenerator,
+	msvc_command_generator: cpp_utils::msvc::CommandGenerator,
 	tera: Tera,
 }
 
 impl<'a> CrinklerCompiler<'a> {
-	pub fn new(
-		project_descriptor: &'a ProjectDescriptor,
-		settings: &'a CrinklerSettings,
-	) -> Result<Self, String> {
-		let cpp_template_renderer =
-			cpp::template::Renderer::new(&project_descriptor.configuration)?;
-		let crinkler_path = project_descriptor
+	pub fn new(project: &'a Project, settings: &'a CrinklerSettings) -> Result<Self, String> {
+		let api_generator = cpp_utils::api::Generator::new(&project.configuration)?;
+		let crinkler_path = project
 			.configuration
 			.paths
 			.get("crinkler")
 			.ok_or("Please set configuration key paths.crinkler.")?
 			.clone();
-		let msvc_command_generator = cpp::msvc::CommandGenerator::new()?;
+		let msvc_command_generator = cpp_utils::msvc::CommandGenerator::new()?;
 
 		let mut tera = Tera::default();
 
@@ -45,45 +42,15 @@ impl<'a> CrinklerCompiler<'a> {
 			.map_err(|err| err.to_string())?;
 
 		Ok(CrinklerCompiler {
-			project_descriptor,
+			project,
 			settings,
 
-			cpp_template_renderer,
+			api_generator,
 			crinkler_path,
 			msvc_command_generator,
 			tera,
 		})
 	}
-}
-
-const OUTPUT_FILENAME: &str = "crinkler.exe";
-
-#[derive(Hash)]
-struct Inputs<'a> {
-	cpp_template_renderer: cpp::template::RendererInputs<'a>,
-	crinkler_path: &'a Path,
-	development: bool,
-	msvc_command_generator: cpp::msvc::CommandGeneratorInputs<'a>,
-	options: &'a CompileOptions<'a>,
-	settings: &'a CrinklerSettings,
-	target: BuildTarget,
-}
-
-#[derive(Serialize)]
-struct Context<'a> {
-	api: &'a String,
-	audio_codes: &'a CodeMap,
-	development: bool,
-	opengl_declarations: &'a String,
-	opengl_loading: &'a String,
-	passes: &'a [Pass],
-	project_codes: &'a CodeMap,
-	render: &'a String,
-	settings: &'a CrinklerSettings,
-	shader_declarations: &'a String,
-	shader_loading: &'a String,
-	target: BuildTarget,
-	uniform_arrays: &'a [UniformArray],
 }
 
 impl<'a> Compiler for CrinklerCompiler<'a> {
@@ -92,10 +59,23 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 		build_options: &BuildOptions,
 		options: &CompileOptions,
 	) -> Result<PathBuf, String> {
+		const OUTPUT_FILENAME: &str = "crinkler.exe";
+
+		#[derive(Hash)]
+		struct Inputs<'a> {
+			api_generator: cpp_utils::api::GeneratorInputs<'a>,
+			crinkler_path: &'a Path,
+			development: bool,
+			msvc_command_generator: cpp_utils::msvc::CommandGeneratorInputs<'a>,
+			options: &'a CompileOptions<'a>,
+			settings: &'a CrinklerSettings,
+			target: BuildTarget,
+		}
+
 		let inputs = Inputs {
-			cpp_template_renderer: self.cpp_template_renderer.get_inputs(),
+			api_generator: self.api_generator.get_inputs(),
 			crinkler_path: &self.crinkler_path,
-			development: self.project_descriptor.development,
+			development: self.project.development,
 			msvc_command_generator: self.msvc_command_generator.get_inputs(),
 			options,
 			settings: self.settings,
@@ -108,32 +88,52 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 			return Ok(build_cache_path);
 		}
 
-		let contents = self.cpp_template_renderer.render(
+		let contents = self.api_generator.generate(
 			options.project_codes,
-			options.shader_descriptor,
-			self.project_descriptor.development,
+			options.shader_set,
+			self.project.development,
 			BuildTarget::Executable,
 		)?;
 
-		let context = Context {
+		#[derive(Serialize)]
+		struct OwnContext<'a> {
+			api: &'a String,
+			audio_codes: &'a CodeMap,
+			development: bool,
+			opengl_declarations: &'a String,
+			opengl_loading: &'a String,
+			project_codes: &'a CodeMap,
+			render: &'a String,
+			settings: &'a CrinklerSettings,
+			shader_declarations: &'a String,
+			shader_loading: &'a String,
+			shader_specific_sources: &'a ShaderSourceMap,
+			shader_uniform_arrays: &'a [ShaderUniformArray],
+			target: BuildTarget,
+		}
+
+		let context = OwnContext {
 			api: &contents.api,
 			audio_codes: &options.audio_codes,
-			development: self.project_descriptor.development,
+			development: self.project.development,
 			opengl_declarations: &contents.opengl_declarations,
 			opengl_loading: &contents.opengl_loading,
-			passes: &options.shader_descriptor.passes,
 			project_codes: &options.project_codes,
 			render: &contents.render,
 			settings: self.settings,
 			shader_declarations: &contents.shader_declarations,
 			shader_loading: &contents.shader_loading,
+			shader_specific_sources: &options.shader_set.specific_sources,
+			shader_uniform_arrays: &options.shader_set.uniform_arrays,
 			target: build_options.target,
-			uniform_arrays: &options.shader_descriptor.uniform_arrays,
 		};
 		let contents = self
 			.tera
-			.render("template", &context)
-			.map_err(|_| "Failed to render template.")?;
+			.render(
+				"template",
+				&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+			)
+			.map_err(|err| err.to_string())?;
 
 		let build_directory = BUILD_ROOT_DIRECTORY
 			.join("executable-compilers")
@@ -145,7 +145,7 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 
 		let mut compilation = self
 			.msvc_command_generator
-			.command(cpp::msvc::Platform::X86)
+			.command(cpp_utils::msvc::Platform::X86)
 			.arg("cl")
 			.arg("/c")
 			.args(&self.settings.cl.args)
@@ -153,7 +153,7 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 			.arg("/Faexecutable.asm")
 			.arg("/Foexecutable.obj")
 			.arg("executable.cpp")
-			.args(&options.compilation_descriptor.cl.args)
+			.args(&options.compilation.cl.args)
 			.arg("&&")
 			.arg(&self.crinkler_path)
 			.args(vec![
@@ -166,7 +166,7 @@ impl<'a> Compiler for CrinklerCompiler<'a> {
 				"user32.lib",
 			])
 			.args(&self.settings.crinkler.args)
-			.args(&options.compilation_descriptor.crinkler.args)
+			.args(&options.compilation.crinkler.args)
 			.arg("executable.obj")
 			.current_dir(&build_directory)
 			.spawn()

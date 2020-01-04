@@ -29,7 +29,7 @@ fn version(input: &str) -> IResult<&str, &str> {
 	Ok((input, version))
 }
 
-pub type Contents<'a> = (Option<&'a str>, Vec<(&'a str, Directive)>);
+pub type Contents<'a> = (Option<&'a str>, Vec<(&'a str, Directive<'a>)>);
 
 pub fn contents(input: &str) -> IResult<&str, Contents> {
 	tuple((opt(version), sections))(input)
@@ -47,7 +47,7 @@ mod tests {
 prolog code
 #pragma shiba common
 common code
-#pragma shiba vertex 42
+#pragma shiba vertex id
 vertex code
 "#,
 		);
@@ -60,7 +60,7 @@ vertex code
 					Some("450"),
 					vec![
 						("#define foo bar\nprolog code\n", Directive::Common),
-						("common code\n", Directive::Vertex(42)),
+						("common code\n", Directive::Vertex("id")),
 					]
 				)
 			))

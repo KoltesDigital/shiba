@@ -8,8 +8,8 @@ fn section(input: &str) -> IResult<&str, Directive> {
 		value(Directive::Common, tag("common")),
 		map(fragment_directive, Directive::Fragment),
 		value(Directive::Outputs, tag("outputs")),
-		value(Directive::UniformArrays, tag("uniform_arrays")),
-		value(Directive::Variables, tag("variables")),
+		value(Directive::ShaderUniformArrays, tag("uniform_arrays")),
+		value(Directive::ShaderVariables, tag("variables")),
 		value(Directive::Varyings, tag("varyings")),
 		map(vertex_directive, Directive::Vertex),
 	)))(input)
@@ -35,7 +35,7 @@ mod tests {
 prolog code
 #pragma shiba common
 common code
-#pragma shiba vertex 42
+#pragma shiba vertex id
 vertex code
 "#,
 		);
@@ -49,7 +49,7 @@ vertex code
 						"#version 450\n#define foo bar\nprolog code\n",
 						Directive::Common
 					),
-					("common code\n", Directive::Vertex(42)),
+					("common code\n", Directive::Vertex("id")),
 				]
 			))
 		);

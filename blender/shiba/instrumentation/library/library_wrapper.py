@@ -1,12 +1,12 @@
 import ctypes
 from shiba import callback_lists
-from shiba.library_definitions import ShaderPasses
+from shiba.library_definitions import ShaderSource
 import struct
 
 
 class _ToUpdate:
     def __init__(self):
-        self.shader_passes = None
+        self.shader_sources = None
 
 
 class LibraryWrapper:
@@ -16,13 +16,13 @@ class LibraryWrapper:
         self.__to_update = _ToUpdate()
         self.__viewport_to_update = _ToUpdate()
 
-    def set_shader_passes(self, passes):
-        self.__to_update.shader_passes = passes
-        self.__viewport_to_update.shader_passes = passes
+    def set_shader_sources(self, sources):
+        self.__to_update.shader_sources = sources
+        self.__viewport_to_update.shader_sources = sources
         callback_lists.viewport_update.trigger()
 
     def _execute_updates(self, to_update):
-        if to_update.shader_passes:
+        if to_update.shader_sources:
             def to_char_p(d, key):
                 value = d.get(key, None)
                 if value is not None:
@@ -31,19 +31,19 @@ class LibraryWrapper:
                     value = ctypes.c_char_p()
                 return value
 
-            count = len(to_update.shader_passes)
-            ShaderPassArray = ShaderPasses * count
-            array = [ShaderPasses(
-                vertex=to_char_p(shader_pass, 'vertex'),
-                fragment=to_char_p(shader_pass, 'fragment'),
+            count = len(to_update.shader_sources)
+            ShaderSourceArray = ShaderSource * count
+            array = [ShaderSource(
+                vertex=to_char_p(shader_source, 'vertex'),
+                fragment=to_char_p(shader_source, 'fragment'),
             )
-                for shader_pass in to_update.shader_passes]
-            passes = ShaderPassArray(*array)
-            self.__library._shibaUpdateShaderPasses(
+                for shader_source in to_update.shader_sources]
+            shader_sources = ShaderSourceArray(*array)
+            self.__library._shibaUpdateShaderSources(
                 count,
-                passes,
+                shader_sources,
             )
-            to_update.shader_passes = None
+            to_update.shader_sources = None
 
     def update(self, width, height, is_preview):
         self.__library._shibaUpdate(

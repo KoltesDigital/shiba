@@ -6,7 +6,7 @@ from shiba.instrumentation import paths
 from shiba.instrumentation.error import StateMatchFailure
 from shiba.instrumentation.server import cli_server
 from shiba.instrumentation.server.desired_state import desired_state
-from shiba.instrumentation.server.event_handlers import event_handlers
+from shiba.instrumentation.server.event_handlers import EVENT_HANDLERS
 from shiba.instrumentation.server.server_connection import ServerConnection
 import socket
 from threading import Lock, Thread
@@ -52,7 +52,7 @@ def _run_socket_thread():
 
             obj = json.loads(line)
             event_kind = obj['event']
-            event_handler = event_handlers.get(event_kind, None)
+            event_handler = EVENT_HANDLERS.get(event_kind, None)
             if event_handler:
                 event_handler(obj)
             else:

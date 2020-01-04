@@ -1,5 +1,5 @@
 use super::{shiba, ShaderProvider};
-use crate::types::ProjectDescriptor;
+use crate::project_data::Project;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Hash)]
@@ -17,13 +17,12 @@ impl Default for Settings {
 impl Settings {
 	pub fn instantiate<'a>(
 		&'a self,
-		project_descriptor: &'a ProjectDescriptor,
+		project: &'a Project,
 	) -> Result<Box<(dyn ShaderProvider + 'a)>, String> {
 		let instance: Box<(dyn ShaderProvider + 'a)> = match self {
-			Settings::Shiba(settings) => Box::new(shiba::ShibaShaderProvider::new(
-				project_descriptor,
-				settings,
-			)?),
+			Settings::Shiba(settings) => {
+				Box::new(shiba::ShibaShaderProvider::new(project, settings)?)
+			}
 		};
 		Ok(instance)
 	}

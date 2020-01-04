@@ -1,18 +1,19 @@
-use crate::types::{ConstVariable, Pass, ShaderDescriptor, VariableKind};
+use crate::shader_data::{ShaderConstVariable, ShaderSet, ShaderVariableKind};
 use regex::Regex;
 use serde::Serialize;
 use std::collections::HashMap;
 
 #[derive(Debug, Default, Serialize)]
 pub struct ShaderCodes {
-	pub after_stage_variables: String,
 	pub before_stage_variables: String,
+	pub after_stage_variables: String,
+
 	pub fragment_specific: String,
 	pub vertex_specific: String,
 }
 
 impl ShaderCodes {
-	pub fn load(shader_descriptor: &ShaderDescriptor) -> ShaderCodes {
+	pub fn load(shader_set: &ShaderSet) -> ShaderCodes {
 		let mut shader_codes = ShaderCodes::default();
 		let mut vertex_location_index = 0;
 
@@ -20,7 +21,7 @@ impl ShaderCodes {
 			static ref STAGE_VARIABLE_RE: Regex = Regex::new(r"\w+ [\w,]+;").expect("Bad regex.");
 		}
 
-		if let Some(code) = &shader_descriptor.sections.attributes {
+		if let Some(code) = &shader_set.sections.attributes {
 			for mat in STAGE_VARIABLE_RE.find_iter(code.as_str()) {
 				shader_codes.vertex_specific += format!(
 					"layout(location={})in {}",
@@ -32,31 +33,31 @@ impl ShaderCodes {
 			}
 		}
 
-		if let Some(code) = &shader_descriptor.sections.varyings {
+		if let Some(code) = &shader_set.sections.varyings {
 			for mat in STAGE_VARIABLE_RE.find_iter(code.as_str()) {
 				shader_codes.vertex_specific += format!("out {}", mat.as_str()).as_str();
 				shader_codes.fragment_specific += format!("in {}", mat.as_str()).as_str();
 			}
 		}
 
-		if let Some(code) = &shader_descriptor.sections.outputs {
+		if let Some(code) = &shader_set.sections.outputs {
 			for mat in STAGE_VARIABLE_RE.find_iter(code.as_str()) {
 				shader_codes.fragment_specific += format!("out {}", mat.as_str()).as_str();
 			}
 		}
 
-		if let Some(version) = &shader_descriptor.glsl_version {
+		if let Some(version) = &shader_set.glsl_version {
 			shader_codes.before_stage_variables = format!("#version {}\n", version);
 		}
 
 		let mut globals_by_type = HashMap::new();
-		for variable in &shader_descriptor.variables {
+		for variable in &shader_set.variables {
 			if !variable.active {
 				continue;
 			}
 
 			match variable.kind {
-				VariableKind::Uniform(_) => {}
+				ShaderVariableKind::Uniform(_) => {}
 				_ => {
 					if !globals_by_type.contains_key(&variable.type_name) {
 						let _ = globals_by_type.insert(variable.type_name.clone(), Vec::new());
@@ -67,7 +68,8 @@ impl ShaderCodes {
 						.as_ref()
 						.unwrap_or(&variable.name)
 						.clone();
-					if let VariableKind::Const(ConstVariable { value }) = &variable.kind {
+					if let ShaderVariableKind::Const(ShaderConstVariable { value }) = &variable.kind
+					{
 						name += format!(" = {}", value).as_str();
 					}
 					globals_by_type
@@ -78,7 +80,7 @@ impl ShaderCodes {
 			}
 		}
 
-		for uniform_array in &shader_descriptor.uniform_arrays {
+		for uniform_array in &shader_set.uniform_arrays {
 			shader_codes.after_stage_variables += format!(
 				"uniform {} {}[{}];",
 				uniform_array.type_name,
@@ -96,7 +98,7 @@ impl ShaderCodes {
 				format!("{} {};", type_name, variables.join(",")).as_str();
 		}
 
-		if let Some(code) = &shader_descriptor.sections.common {
+		if let Some(code) = &shader_set.sections.common {
 			shader_codes.after_stage_variables += code.as_str();
 		}
 
@@ -111,29 +113,4 @@ impl ShaderCodes {
 
 		shader_codes
 	}
-}
-
-pub fn to_standalone_passes(shader_descriptor: &ShaderDescriptor) -> Vec<Pass> {
-	let shader_codes = ShaderCodes::load(shader_descriptor);
-	let vertex_prefix = shader_codes.before_stage_variables.clone()
-		+ shader_codes.vertex_specific.as_str()
-		+ shader_codes.after_stage_variables.as_str();
-	let fragment_prefix = shader_codes.before_stage_variables
-		+ shader_codes.fragment_specific.as_str()
-		+ shader_codes.after_stage_variables.as_str();
-	shader_descriptor
-		.passes
-		.iter()
-		.map(|pass| {
-			let vertex = pass
-				.vertex
-				.as_ref()
-				.map(|code| vertex_prefix.clone() + code.as_str());
-			let fragment = pass
-				.fragment
-				.as_ref()
-				.map(|code| fragment_prefix.clone() + code.as_str());
-			Pass { vertex, fragment }
-		})
-		.collect()
 }

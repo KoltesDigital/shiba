@@ -1,5 +1,5 @@
 {% if target == "executable" %}
-	{% for variable in variables %}
+	{% for variable in shader_variables %}
 		{% for annotation in variable.annotations %}
 			{% if annotation.kind == "resolution-height" %}
 				{{ variable.name }} = shibaResolutionHeight;
@@ -19,11 +19,12 @@
 	{{ project_codes.rendering }}
 {% else %}
 	{% if target == "library" %}
-		glUseProgram(shibaProgram);
+		glUseProgram(shibaShaderId);
 		shibaCheckGlError();
 	{% endif %}
 
-	shibaSetUniformsForPass(0);
+	shibaSetUniformsForShader(0);
+	shibaCheckGlError();
 
 	shibaDrawScreenRect();
 	shibaCheckGlError();

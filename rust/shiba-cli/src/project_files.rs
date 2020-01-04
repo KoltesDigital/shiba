@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tera::Tera;
+use tera::{Context, Tera};
 
 pub type IsPathHandled<'a> = Box<dyn Fn(&Path) -> bool + 'a>;
 
@@ -58,20 +58,19 @@ impl ProjectFiles {
 		target: BuildTarget,
 	) -> Result<CodeMap, String> {
 		#[derive(Serialize)]
-		struct Context {
+		struct OwnContext {
 			development: bool,
 			target: BuildTarget,
 		}
 
-		let context = Context {
+		let context = OwnContext {
 			development,
 			target,
 		};
 
-		let codes = self
-			.code_files
+		self.code_files
 			.iter()
-			.filter_map(|path| {
+			.map(|path| {
 				let name = path
 					.file_stem()
 					.unwrap()
@@ -79,27 +78,23 @@ impl ProjectFiles {
 					.expect("Failed to convert path.")
 					.to_string();
 
-				let contents = fs::read_to_string(&path).expect("Failed to read file.");
+				let contents = fs::read_to_string(&path).map_err(|err| err.to_string())?;
 
 				let mut tera = Tera::default();
 
-				match tera.add_raw_template(&name, &contents) {
-					Ok(()) => match tera.render(&name, &context) {
-						Ok(contents) => Some((name, contents)),
-						Err(err) => {
-							println!("{}", err);
-							None
-						}
-					},
-					Err(err) => {
-						println!("{}", err);
-						None
-					}
-				}
-			})
-			.collect();
+				tera.add_raw_template(&name, &contents)
+					.map_err(|err| err.to_string())?;
 
-		Ok(codes)
+				let contents = tera
+					.render(
+						&name,
+						&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+					)
+					.map_err(|err| err.to_string())?;
+
+				Ok((name, contents))
+			})
+			.collect()
 	}
 
 	pub fn get_static_files(&self) -> &Vec<PathBuf> {

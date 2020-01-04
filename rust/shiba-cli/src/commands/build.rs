@@ -1,5 +1,5 @@
 use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
-use crate::types::ProjectDescriptor;
+use crate::project_data::Project;
 use std::path::Path;
 
 pub struct Options<'a> {
@@ -9,7 +9,7 @@ pub struct Options<'a> {
 }
 
 pub fn execute(options: &Options) -> Result<(), String> {
-	let project_descriptor = ProjectDescriptor::load(options.project_directory, options.target)?;
+	let project = Project::load(options.project_directory, options.target)?;
 
 	let mut event_listener = |event: BuildEvent| match event {
 		BuildEvent::ExecutableCompiled(event) => match event.get_size() {
@@ -34,7 +34,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 	let duration = build::build_duration(
 		&BuildOptions {
 			force: options.force,
-			project_descriptor: &project_descriptor,
+			project: &project,
 			target: options.target,
 		},
 		&mut event_listener,

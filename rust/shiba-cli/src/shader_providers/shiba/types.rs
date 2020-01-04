@@ -1,10 +1,10 @@
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Directive {
+pub enum Directive<'a> {
 	Attributes,
 	Common,
-	Fragment(usize),
+	Fragment(&'a str),
 	Outputs,
 	Prolog,
 	Varyings,
-	Vertex(usize),
+	Vertex(&'a str),
 }

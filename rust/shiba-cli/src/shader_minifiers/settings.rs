@@ -1,5 +1,5 @@
 use super::{shader_minifier, ShaderMinifier};
-use crate::types::ProjectDescriptor;
+use crate::project_data::Project;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Hash)]
@@ -11,12 +11,12 @@ pub enum Settings {
 impl Settings {
 	pub fn instantiate<'a>(
 		&'a self,
-		project_descriptor: &'a ProjectDescriptor,
+		project: &'a Project,
 	) -> Result<Box<(dyn ShaderMinifier + 'a)>, String> {
 		let instance: Box<(dyn ShaderMinifier + 'a)> = match self {
-			Settings::ShaderMinifier => Box::new(
-				shader_minifier::ShaderMinifierShaderMinifier::new(project_descriptor)?,
-			),
+			Settings::ShaderMinifier => {
+				Box::new(shader_minifier::ShaderMinifierShaderMinifier::new(project)?)
+			}
 		};
 		Ok(instance)
 	}

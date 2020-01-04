@@ -66,11 +66,11 @@ def _handle_shader_provided_event(obj):
     if obj['target'] == 'library':
         with instrumentation.library.get_library_wrapper() as library_wrapper:
             if library_wrapper:
-                library_wrapper.set_shader_passes(obj['passes'])
+                library_wrapper.set_shader_sources(obj['sources'])
         uniforms.set_shader_variables(obj['variables'])
 
 
-event_handlers = {
+EVENT_HANDLERS = {
     'build-ended': _handle_build_ended_event,
     'build-started': _handle_build_started_event,
     'error': _handle_error_event,

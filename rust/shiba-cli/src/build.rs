@@ -1,7 +1,9 @@
+use crate::compilation_data::Compilation;
 use crate::compiler::{CompileOptions, CompilerKind};
+use crate::project_data::Project;
 use crate::project_files::{self, ProjectFiles};
-use crate::shader_codes::to_standalone_passes;
-use crate::types::{CompilationDescriptor, Pass, ProjectDescriptor, Variable};
+use crate::shader_codes::ShaderCodes;
+use crate::shader_data::{ShaderSet, ShaderSource, ShaderVariable};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -26,8 +28,8 @@ pub struct LibraryCompiledEvent {
 }
 
 pub struct ShaderProvidedEvent<'a> {
-	pub passes: Vec<Pass>,
-	pub variables: &'a Vec<Variable>,
+	pub sources: Vec<ShaderSource>,
+	pub variables: &'a Vec<ShaderVariable>,
 }
 
 pub struct StaticFilesProvidedEvent<'a> {
@@ -62,7 +64,7 @@ impl FromStr for BuildTarget {
 
 pub struct BuildOptions<'a> {
 	pub force: bool,
-	pub project_descriptor: &'a ProjectDescriptor,
+	pub project: &'a Project,
 	pub target: BuildTarget,
 }
 
@@ -71,31 +73,44 @@ pub fn build(
 	event_listener: &mut dyn FnMut(BuildEvent) -> (),
 ) -> Result<(), String> {
 	let audio_synthesizer = options
-		.project_descriptor
+		.project
 		.settings
 		.audio_synthesizer
-		.instantiate(&options.project_descriptor)?;
+		.instantiate(&options.project)?;
 
 	let shader_minifier = options
-		.project_descriptor
+		.project
 		.settings
 		.shader_minifier
 		.as_ref()
-		.map(|shader_minifier| shader_minifier.instantiate(&options.project_descriptor))
+		.map(|shader_minifier| shader_minifier.instantiate(&options.project))
 		.transpose()?;
 
 	let shader_provider = options
-		.project_descriptor
+		.project
 		.settings
 		.shader_provider
-		.instantiate(&options.project_descriptor)?;
+		.instantiate(&options.project)?;
 
-	let compiler = options
-		.project_descriptor
-		.instantiate_compiler(options.target)?;
+	let compiler = match options.target {
+		BuildTarget::Executable => CompilerKind::Executable(
+			options
+				.project
+				.settings
+				.executable_compiler
+				.instantiate(options.project)?,
+		),
+		BuildTarget::Library => CompilerKind::Library(
+			options
+				.project
+				.settings
+				.library_compiler
+				.instantiate(options.project)?,
+		),
+	};
 
 	let project_files = ProjectFiles::load(
-		&options.project_descriptor.directory,
+		&options.project.directory,
 		&project_files::LoadOptions {
 			compiler_paths: &[match compiler {
 				CompilerKind::Executable(ref compiler) => compiler.get_is_path_handled(),
@@ -125,30 +140,30 @@ pub fn build(
 	}));
 
 	let project_codes =
-		project_files.get_compiler_codes(options.project_descriptor.development, options.target)?;
+		project_files.get_compiler_codes(options.project.development, options.target)?;
 
-	let compilation_descriptor = CompilationDescriptor::default();
+	let compilation = Compilation::default();
 
-	let integration_result = audio_synthesizer.integrate(options, &compilation_descriptor)?;
+	let integration_result = audio_synthesizer.integrate(options, &compilation)?;
 	let audio_codes = integration_result.codes;
-	let compilation_descriptor = integration_result.compilation_descriptor;
+	let compilation = integration_result.compilation;
 
-	let mut shader_descriptor = shader_provider.provide(options)?;
+	let mut shader_set = shader_provider.provide(options)?;
 
 	if let Some(shader_minifier) = shader_minifier {
-		shader_descriptor = shader_minifier.minify(options, &shader_descriptor)?;
+		shader_set = shader_minifier.minify(options, &shader_set)?;
 	}
 
 	event_listener(BuildEvent::ShaderProvided(ShaderProvidedEvent {
-		passes: to_standalone_passes(&shader_descriptor),
-		variables: &shader_descriptor.variables,
+		sources: to_standalone_shader_sources(&shader_set),
+		variables: &shader_set.variables,
 	}));
 
 	let compile_options = CompileOptions {
 		audio_codes: &audio_codes,
-		compilation_descriptor: &compilation_descriptor,
+		compilation: &compilation,
 		project_codes: &project_codes,
-		shader_descriptor: &shader_descriptor,
+		shader_set: &shader_set,
 	};
 
 	match compiler {
@@ -179,4 +194,29 @@ pub fn build_duration(
 
 	let duration = start.elapsed();
 	Ok(duration)
+}
+
+fn to_standalone_shader_sources(shader_set: &ShaderSet) -> Vec<ShaderSource> {
+	let shader_codes = ShaderCodes::load(shader_set);
+	let vertex_prefix = shader_codes.before_stage_variables.clone()
+		+ shader_codes.vertex_specific.as_str()
+		+ shader_codes.after_stage_variables.as_str();
+	let fragment_prefix = shader_codes.before_stage_variables
+		+ shader_codes.fragment_specific.as_str()
+		+ shader_codes.after_stage_variables.as_str();
+	shader_set
+		.specific_sources
+		.iter()
+		.map(|(_name, shader_source)| {
+			let vertex = shader_source
+				.vertex
+				.as_ref()
+				.map(|code| vertex_prefix.clone() + code.as_str());
+			let fragment = shader_source
+				.fragment
+				.as_ref()
+				.map(|code| fragment_prefix.clone() + code.as_str());
+			ShaderSource { vertex, fragment }
+		})
+		.collect()
 }

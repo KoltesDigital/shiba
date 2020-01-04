@@ -1,11 +1,11 @@
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Directive {
+pub enum Directive<'a> {
 	Attributes,
 	Common,
-	Fragment(usize),
+	Fragment(&'a str),
 	Outputs,
-	UniformArrays,
-	Variables,
+	ShaderUniformArrays,
+	ShaderVariables,
 	Varyings,
-	Vertex(usize),
+	Vertex(&'a str),
 }

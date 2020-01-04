@@ -1,5 +1,5 @@
 use crate::paths::TEMP_DIRECTORY;
-use crate::types::ProjectDescriptor;
+use crate::project_data::Project;
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -32,14 +32,14 @@ pub struct ExportOptions<'a> {
 	pub build_path: &'a Path,
 	pub directory: &'a Path,
 	pub output: ExportOutput,
-	pub project_descriptor: &'a ProjectDescriptor,
+	pub project: &'a Project,
 	pub static_files: &'a [PathBuf],
 }
 
 pub fn export(options: &ExportOptions) -> Result<PathBuf, String> {
 	let mut export_directory = PathBuf::from(options.directory);
 	if export_directory.is_relative() {
-		export_directory = options.project_descriptor.directory.join(export_directory);
+		export_directory = options.project.directory.join(export_directory);
 	}
 
 	if export_directory.exists() {
@@ -58,7 +58,7 @@ pub fn export(options: &ExportOptions) -> Result<PathBuf, String> {
 	} else {
 		TEMP_DIRECTORY.join("export")
 	};
-	let temp_named_directory = temp_directory.join(&options.project_descriptor.settings.name);
+	let temp_named_directory = temp_directory.join(&options.project.settings.name);
 
 	if temp_named_directory.exists() {
 		fs::remove_dir_all(&temp_named_directory).map_err(|err| err.to_string())?;
@@ -66,7 +66,7 @@ pub fn export(options: &ExportOptions) -> Result<PathBuf, String> {
 
 	fs::create_dir_all(&temp_named_directory).map_err(|err| err.to_string())?;
 
-	let mut target_filename = options.project_descriptor.settings.name.clone();
+	let mut target_filename = options.project.settings.name.clone();
 	if let Some(extension) = options.build_path.extension() {
 		target_filename.push('.');
 		target_filename.push_str(&extension.to_string_lossy());
@@ -92,16 +92,16 @@ pub fn export(options: &ExportOptions) -> Result<PathBuf, String> {
 		}
 
 		ExportOutput::SevenZ => {
-			let sevenz_path = &options.project_descriptor.configuration.get_path("7z");
+			let sevenz_path = &options.project.configuration.get_path("7z");
 
 			let output_path =
-				export_directory.join(format!("{}.7z", options.project_descriptor.settings.name));
+				export_directory.join(format!("{}.7z", options.project.settings.name));
 
 			let mut archiving = Command::new(sevenz_path)
 				.arg("a")
 				.arg("-t7z")
 				.arg(&output_path)
-				.arg(&options.project_descriptor.settings.name)
+				.arg(&options.project.settings.name)
 				.current_dir(&temp_directory)
 				.spawn()
 				.map_err(|err| err.to_string())?;
@@ -115,16 +115,16 @@ pub fn export(options: &ExportOptions) -> Result<PathBuf, String> {
 		}
 
 		ExportOutput::Zip => {
-			let sevenz_path = &options.project_descriptor.configuration.get_path("7z");
+			let sevenz_path = &options.project.configuration.get_path("7z");
 
 			let output_path =
-				export_directory.join(format!("{}.zip", options.project_descriptor.settings.name));
+				export_directory.join(format!("{}.zip", options.project.settings.name));
 
 			let mut archiving = Command::new(sevenz_path)
 				.arg("a")
 				.arg("-tzip")
 				.arg(&output_path)
-				.arg(&options.project_descriptor.settings.name)
+				.arg(&options.project.settings.name)
 				.current_dir(&temp_directory)
 				.spawn()
 				.map_err(|err| err.to_string())?;

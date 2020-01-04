@@ -1,4 +1,4 @@
-use crate::generator_utils::settings::Resolution;
+use crate::settings_utils::Resolution;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;

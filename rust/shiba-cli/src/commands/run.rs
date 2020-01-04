@@ -1,6 +1,6 @@
 use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
+use crate::project_data::Project;
 use crate::run::{self, RunOptions};
-use crate::types::ProjectDescriptor;
 use std::path::Path;
 
 pub struct Options<'a> {
@@ -8,8 +8,7 @@ pub struct Options<'a> {
 }
 
 pub fn execute(options: &Options) -> Result<(), String> {
-	let project_descriptor =
-		ProjectDescriptor::load(options.project_directory, BuildTarget::Executable)?;
+	let project = Project::load(options.project_directory, BuildTarget::Executable)?;
 
 	let mut executable_path = None;
 
@@ -22,7 +21,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 	build::build(
 		&BuildOptions {
 			force: false,
-			project_descriptor: &project_descriptor,
+			project: &project,
 			target: BuildTarget::Executable,
 		},
 		&mut event_listener,

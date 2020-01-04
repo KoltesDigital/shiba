@@ -1,0 +1,207 @@
+{% if shader_specific_sources_length == 1 %}
+
+	shibaLog() << "Loading lone shader_source.";
+
+	{
+		shibaShaderId = glCreateProgram();
+		shibaCheckGlError();
+
+		{% if shader_specific_source_0.vertex or target == "library" %}
+			const char *vertexShaderSources[] = {
+				{% if shader_specific_source_0.vertex %}
+					{% if shader_codes.before_stage_variables %}
+						_shibaShaderBeforeStageVariablesCode,
+					{% endif %}
+					{% if shader_codes.vertex_specific %}
+						_shibaShaderVertexSpecificCode,
+					{% endif %}
+					{% if shader_codes.after_stage_variables %}
+						_shibaShaderAfterStageVariablesCode,
+					{% endif %}
+					_shibaShaderCodes[0],
+				{% elif target == "library" %}
+					_shibaShaderNullVertexCode,
+				{% endif %}
+			};
+
+			GLint vertexShaderId = glCreateShader(GL_VERTEX_SHADER);
+			glShaderSource(vertexShaderId, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
+			shibaCheckGlError();
+			glCompileShader(vertexShaderId);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(vertexShaderId);
+			glAttachShader(shibaShaderId, vertexShaderId);
+			shibaCheckGlError();
+
+			{% if development %}
+				_shibaVertexShaderIds[0] = vertexShaderId;
+			{% endif %}
+		{% endif %}
+
+		{% if shader_specific_source_0.fragment %}
+			const char *fragmentShaderSources[] = {
+				{% if shader_codes.before_stage_variables %}
+					_shibaShaderBeforeStageVariablesCode,
+				{% endif %}
+				{% if shader_codes.fragment_specific %}
+					_shibaShaderFragmentSpecificCode,
+				{% endif %}
+				{% if shader_codes.after_stage_variables %}
+					_shibaShaderAfterStageVariablesCode,
+				{% endif %}
+				_shibaShaderCodes[1],
+			};
+
+			GLint fragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
+			glShaderSource(fragmentShaderId, sizeof(fragmentShaderSources) / sizeof(fragmentShaderSources[0]), fragmentShaderSources, 0);
+			shibaCheckGlError();
+			glCompileShader(fragmentShaderId);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(fragmentShaderId);
+			glAttachShader(shibaShaderId, fragmentShaderId);
+			shibaCheckGlError();
+
+			{% if development %}
+				_shibaFragmentShaderIds[0] = fragmentShaderId;
+			{% endif %}
+		{% else %}
+			{% if development %}
+				_shibaFragmentShaderIds[0] = 0;
+			{% endif %}
+		{% endif %}
+
+		glLinkProgram(shibaShaderId);
+		shibaCheckGlError();
+
+		shibaCheckProgramInfoLog(shibaShaderId);
+
+		{% for uniform_array in shader_uniform_arrays %}
+			shibaUniformLocations[0][{{ loop.index0 }}] = glGetUniformLocation(shibaShaderId, "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
+			shibaCheckGlError();
+		{% endfor %}
+
+		{% if development %}
+			shibaLog() << "Uniform locations in shader #" << 0 << ":";
+			{% for uniform_array in shader_uniform_arrays %}
+				shibaLog() << "  {{ uniform_array.type_name }}: " << shibaUniformLocations[0][{{ loop.index0 }}];
+			{% endfor %}
+			shibaLog();
+		{% endif %}
+	}
+
+{% else %}
+
+	for (auto i = 0; i < {{ shader_specific_sources_length }}; ++i)
+	{
+		shibaLog() << "Loading shader_source " << i << ".";
+
+		shibaShaderIds[i] = glCreateProgram();
+		shibaCheckGlError();
+
+		if (_shibaShaderCodes[i * 2] != nullptr
+			{% if target == "library" %}
+				|| true
+			{% endif %}
+		)
+		{
+			const char *vertexShaderSources[] = {
+				{% if shader_codes.before_stage_variables %}
+					_shibaShaderBeforeStageVariablesCode,
+				{% endif %}
+				{% if shader_codes.vertex_specific %}
+					_shibaShaderVertexSpecificCode,
+				{% endif %}
+				{% if shader_codes.after_stage_variables %}
+					_shibaShaderAfterStageVariablesCode,
+				{% endif %}
+				_shibaShaderCodes[i * 2],
+			};
+
+			GLint vertexShaderId = glCreateShader(GL_VERTEX_SHADER);
+			shibaCheckGlError();
+			{% if target == "library" %}
+				if (_shibaShaderCodes[i * 2] != nullptr)
+				{
+					glShaderSource(vertexShaderId, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
+				}
+				else
+				{
+					glShaderSource(vertexShaderId, 1, &_shibaShaderNullVertexCode, 0);
+				}
+			{% else %}
+				glShaderSource(vertexShaderId, sizeof(vertexShaderSources) / sizeof(vertexShaderSources[0]), vertexShaderSources, 0);
+			{% endif %}
+			shibaCheckGlError();
+			glCompileShader(vertexShaderId);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(vertexShaderId);
+			glAttachShader(shibaShaderIds[i], vertexShaderId);
+			shibaCheckGlError();
+
+			{% if development %}
+				_shibaVertexShaderIds[i] = vertexShaderId;
+			{% endif %}
+		}
+		{% if development %}
+			else
+			{
+				_shibaVertexShaderIds[i] = 0;
+			}
+		{% endif %}
+
+		if (_shibaShaderCodes[i * 2 + 1] != nullptr)
+		{
+			const char *fragmentShaderSources[] = {
+				{% if shader_codes.before_stage_variables %}
+					_shibaShaderBeforeStageVariablesCode,
+				{% endif %}
+				{% if shader_codes.fragment_specific %}
+					_shibaShaderFragmentSpecificCode,
+				{% endif %}
+				{% if shader_codes.after_stage_variables %}
+					_shibaShaderAfterStageVariablesCode,
+				{% endif %}
+				_shibaShaderCodes[i * 2 + 1],
+			};
+
+			GLint fragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
+			shibaCheckGlError();
+			glShaderSource(fragmentShaderId, sizeof(fragmentShaderSources) / sizeof(fragmentShaderSources[0]), fragmentShaderSources, 0);
+			shibaCheckGlError();
+			glCompileShader(fragmentShaderId);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(fragmentShaderId);
+			glAttachShader(shibaShaderIds[i], fragmentShaderId);
+			shibaCheckGlError();
+
+			{% if development %}
+				_shibaFragmentShaderIds[i] = fragmentShaderId;
+			{% endif %}
+		}
+		{% if development %}
+			else
+			{
+				_shibaFragmentShaderIds[i] = 0;
+			}
+		{% endif %}
+
+		glLinkProgram(shibaShaderIds[i]);
+		shibaCheckGlError();
+
+		shibaCheckProgramInfoLog(shibaShaderIds[i]);
+
+		{% for uniform_array in shader_uniform_arrays %}
+			shibaUniformLocations[i][{{ loop.index0 }}] = glGetUniformLocation(shibaShaderIds[i], "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
+			shibaCheckGlError();
+		{% endfor %}
+
+		{% if development %}
+			shibaLog() << "Uniform locations in shader #" << i << ":";
+			{% for uniform_array in shader_uniform_arrays %}
+				shibaLog() << "  {{ uniform_array.type_name }}: " << shibaUniformLocations[i][{{ loop.index0 }}];
+			{% endfor %}
+			shibaLog();
+		{% endif %}
+	}
+
+{% endif %}

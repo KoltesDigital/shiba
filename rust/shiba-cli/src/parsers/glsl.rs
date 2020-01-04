@@ -1,7 +1,7 @@
 use super::*;
-use crate::types::{
-	ConstVariable, UniformAnnotationControlDescriptor, UniformAnnotationKind, UniformVariable,
-	Variable, VariableKind,
+use crate::shader_data::{
+	ShaderConstVariable, ShaderUniformAnnotationControl, ShaderUniformAnnotationKind,
+	ShaderUniformVariable, ShaderVariable, ShaderVariableKind,
 };
 use nom::{
 	branch::*, bytes::complete::*, character::complete::*, combinator::*, multi::*, sequence::*,
@@ -52,7 +52,7 @@ pub fn identifier_length_value(input: &str) -> IResult<&str, (&str, Option<usize
 	)(input)
 }
 
-pub fn const_variables(input: &str) -> IResult<&str, Vec<Variable>> {
+pub fn const_variables(input: &str) -> IResult<&str, Vec<ShaderVariable>> {
 	map(
 		tuple((
 			tag("const"),
@@ -64,9 +64,9 @@ pub fn const_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 		)),
 		|(_, _, type_name, _, list, _)| {
 			list.into_iter()
-				.map(|(name, length, value)| Variable {
+				.map(|(name, length, value)| ShaderVariable {
 					active: true,
-					kind: VariableKind::Const(ConstVariable {
+					kind: ShaderVariableKind::Const(ShaderConstVariable {
 						value: value.to_string(),
 					}),
 					length,
@@ -79,7 +79,7 @@ pub fn const_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 	)(input)
 }
 
-pub fn regular_variables(input: &str) -> IResult<&str, Vec<Variable>> {
+pub fn regular_variables(input: &str) -> IResult<&str, Vec<ShaderVariable>> {
 	map(
 		tuple((
 			identifier,
@@ -89,9 +89,9 @@ pub fn regular_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 		)),
 		|(type_name, _, list, _)| {
 			list.into_iter()
-				.map(|(name, length)| Variable {
+				.map(|(name, length)| ShaderVariable {
 					active: true,
-					kind: VariableKind::Regular,
+					kind: ShaderVariableKind::Regular,
 					length,
 					minified_name: None,
 					name: name.to_string(),
@@ -150,7 +150,7 @@ pub fn uniform_control_annotation_parameters<'a>(
 	)(input)
 }
 
-pub fn uniform_annotation<'a>(input: &'a str) -> IResult<&'a str, UniformAnnotationKind> {
+pub fn uniform_annotation<'a>(input: &'a str) -> IResult<&'a str, ShaderUniformAnnotationKind> {
 	alt((
 		map(
 			tuple((
@@ -163,31 +163,34 @@ pub fn uniform_annotation<'a>(input: &'a str) -> IResult<&'a str, UniformAnnotat
 				)),
 			)),
 			|(_, _, parameters)| {
-				UniformAnnotationKind::Control(UniformAnnotationControlDescriptor {
+				ShaderUniformAnnotationKind::Control(ShaderUniformAnnotationControl {
 					parameters: parameters.unwrap_or_default(),
 				})
 			},
 		),
 		value(
-			UniformAnnotationKind::InverseProjection,
+			ShaderUniformAnnotationKind::InverseProjection,
 			tag("inverse-projection"),
 		),
-		value(UniformAnnotationKind::InverseView, tag("inverse-view")),
-		value(UniformAnnotationKind::Projection, tag("projection")),
 		value(
-			UniformAnnotationKind::ResolutionHeight,
+			ShaderUniformAnnotationKind::InverseView,
+			tag("inverse-view"),
+		),
+		value(ShaderUniformAnnotationKind::Projection, tag("projection")),
+		value(
+			ShaderUniformAnnotationKind::ResolutionHeight,
 			tag("resolution-height"),
 		),
 		value(
-			UniformAnnotationKind::ResolutionWidth,
+			ShaderUniformAnnotationKind::ResolutionWidth,
 			tag("resolution-width"),
 		),
-		value(UniformAnnotationKind::Time, tag("time")),
-		value(UniformAnnotationKind::View, tag("view")),
+		value(ShaderUniformAnnotationKind::Time, tag("time")),
+		value(ShaderUniformAnnotationKind::View, tag("view")),
 	))(input)
 }
 
-pub fn uniform_variables(input: &str) -> IResult<&str, Vec<Variable>> {
+pub fn uniform_variables(input: &str) -> IResult<&str, Vec<ShaderVariable>> {
 	map(
 		tuple((
 			tag("uniform"),
@@ -210,9 +213,9 @@ pub fn uniform_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 		)),
 		|(_, _, type_name, _, list, _, annotations)| {
 			list.into_iter()
-				.map(|(name, length)| Variable {
+				.map(|(name, length)| ShaderVariable {
 					active: true,
-					kind: VariableKind::Uniform(UniformVariable {
+					kind: ShaderVariableKind::Uniform(ShaderUniformVariable {
 						annotations: annotations.clone().unwrap_or_default(),
 					}),
 					length,
@@ -225,7 +228,7 @@ pub fn uniform_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 	)(input)
 }
 
-pub fn variables(input: &str) -> IResult<&str, Vec<Variable>> {
+pub fn variables(input: &str) -> IResult<&str, Vec<ShaderVariable>> {
 	map(
 		many0(take_unless(alt((
 			value(
@@ -278,24 +281,24 @@ fn parse_digit1(input: &str) -> IResult<&str, usize> {
 	})(input)
 }
 
-pub fn fragment_directive(input: &str) -> IResult<&str, usize> {
+pub fn fragment_directive(input: &str) -> IResult<&str, &str> {
 	map(
-		tuple((tag("fragment"), space1, parse_digit1)),
-		|(_, _, index)| index,
+		tuple((tag("fragment"), space1, identifier)),
+		|(_, _, name)| name,
 	)(input)
 }
 
-pub fn vertex_directive(input: &str) -> IResult<&str, usize> {
+pub fn vertex_directive(input: &str) -> IResult<&str, &str> {
 	map(
-		tuple((tag("vertex"), space1, parse_digit1)),
-		|(_, _, index)| index,
+		tuple((tag("vertex"), space1, identifier)),
+		|(_, _, name)| name,
 	)(input)
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::types::UniformAnnotationControlDescriptor;
+	use crate::shader_data::ShaderUniformAnnotationControl;
 
 	#[test]
 	fn test_identifier() {
@@ -359,25 +362,25 @@ uniform bool uniformVar3;
 			Ok((
 				"\n",
 				vec![
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Regular,
+						kind: ShaderVariableKind::Regular,
 						length: None,
 						minified_name: None,
 						name: "regularVar0".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Regular,
+						kind: ShaderVariableKind::Regular,
 						length: Some(1),
 						minified_name: None,
 						name: "regularVar1".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Const(ConstVariable {
+						kind: ShaderVariableKind::Const(ShaderConstVariable {
 							value: "42.".to_string()
 						}),
 						length: None,
@@ -385,9 +388,9 @@ uniform bool uniformVar3;
 						name: "constVar0".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Const(ConstVariable {
+						kind: ShaderVariableKind::Const(ShaderConstVariable {
 							value: "1337.".to_string()
 						}),
 						length: None,
@@ -395,9 +398,9 @@ uniform bool uniformVar3;
 						name: "constVar1".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Uniform(UniformVariable {
+						kind: ShaderVariableKind::Uniform(ShaderUniformVariable {
 							annotations: vec![]
 						}),
 						length: None,
@@ -405,9 +408,9 @@ uniform bool uniformVar3;
 						name: "uniformVar0".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Uniform(UniformVariable {
+						kind: ShaderVariableKind::Uniform(ShaderUniformVariable {
 							annotations: vec![]
 						}),
 						length: Some(4),
@@ -415,11 +418,11 @@ uniform bool uniformVar3;
 						name: "uniformVar1".to_string(),
 						type_name: "float".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Uniform(UniformVariable {
-							annotations: vec![UniformAnnotationKind::Control(
-								UniformAnnotationControlDescriptor {
+						kind: ShaderVariableKind::Uniform(ShaderUniformVariable {
+							annotations: vec![ShaderUniformAnnotationKind::Control(
+								ShaderUniformAnnotationControl {
 									parameters: expected_control_annotation_parameters,
 								}
 							)]
@@ -429,9 +432,9 @@ uniform bool uniformVar3;
 						name: "uniformVar2".to_string(),
 						type_name: "vec3".to_string(),
 					},
-					Variable {
+					ShaderVariable {
 						active: true,
-						kind: VariableKind::Uniform(UniformVariable {
+						kind: ShaderVariableKind::Uniform(ShaderUniformVariable {
 							annotations: vec![]
 						}),
 						length: None,

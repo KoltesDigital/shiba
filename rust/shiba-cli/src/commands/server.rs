@@ -1,7 +1,8 @@
 use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
 use crate::export::{self, ExportOptions, ExportOutput};
+use crate::project_data::Project;
 use crate::run::{self, RunOptions};
-use crate::types::{Pass, ProjectDescriptor, Variable};
+use crate::shader_data::{ShaderSource, ShaderVariable};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
@@ -74,9 +75,9 @@ enum EventKind<'a> {
 		duration: f32,
 	},
 	ShaderProvided {
-		passes: &'a Vec<Pass>,
+		sources: &'a Vec<ShaderSource>,
 		target: BuildTarget,
-		variables: &'a Vec<Variable>,
+		variables: &'a Vec<ShaderVariable>,
 	},
 }
 
@@ -123,7 +124,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 		#[derive(Default)]
 		struct BuildTargetArtifacts {
 			path: Option<PathBuf>,
-			project_descriptor: Option<ProjectDescriptor>,
+			project: Option<Project>,
 			static_files: Option<Vec<PathBuf>>,
 		}
 
@@ -151,8 +152,8 @@ pub fn execute(options: &Options) -> Result<(), String> {
 								});
 							}
 
-							match ProjectDescriptor::load(&command_project_directory, target) {
-								Ok(project_descriptor) => {
+							match Project::load(&command_project_directory, target) {
+								Ok(project) => {
 									let mut event_listener = |event: BuildEvent| match event {
 										BuildEvent::ExecutableCompiled(event) => {
 											match event.get_size() {
@@ -202,7 +203,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 											command_state.broadcast(&Event {
 												id: &command_id,
 												kind: EventKind::ShaderProvided {
-													passes: &event.passes,
+													sources: &event.sources,
 													target,
 													variables: &event.variables,
 												},
@@ -224,7 +225,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 									let result = build::build_duration(
 										&BuildOptions {
 											force: force.unwrap_or(false),
-											project_descriptor: &project_descriptor,
+											project: &project,
 											target,
 										},
 										&mut event_listener,
@@ -271,12 +272,10 @@ pub fn execute(options: &Options) -> Result<(), String> {
 
 									match target {
 										BuildTarget::Executable => {
-											executable_artifacts.project_descriptor =
-												Some(project_descriptor);
+											executable_artifacts.project = Some(project);
 										}
 										BuildTarget::Library => {
-											library_artifacts.project_descriptor =
-												Some(project_descriptor);
+											library_artifacts.project = Some(project);
 										}
 									};
 								}
@@ -284,10 +283,10 @@ pub fn execute(options: &Options) -> Result<(), String> {
 								Err(err) => {
 									match target {
 										BuildTarget::Executable => {
-											executable_artifacts.project_descriptor = None;
+											executable_artifacts.project = None;
 										}
 										BuildTarget::Library => {
-											library_artifacts.project_descriptor = None;
+											library_artifacts.project = None;
 										}
 									};
 
@@ -321,10 +320,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 								match export::export(&ExportOptions {
 									build_path: &build_path,
 									directory: &PathBuf::from(directory),
-									project_descriptor: artifact
-										.project_descriptor
-										.as_ref()
-										.unwrap(),
+									project: artifact.project.as_ref().unwrap(),
 									output,
 									static_files: artifact.static_files.as_ref().unwrap(),
 								}) {

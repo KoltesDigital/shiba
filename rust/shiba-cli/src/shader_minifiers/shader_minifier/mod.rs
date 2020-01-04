@@ -7,7 +7,10 @@ use crate::build::BuildOptions;
 use crate::hash_extra;
 use crate::parsers::glsl;
 use crate::paths::BUILD_ROOT_DIRECTORY;
-use crate::types::{Pass, ProjectDescriptor, Sections, ShaderDescriptor, Variable, VariableKind};
+use crate::project_data::Project;
+use crate::shader_data::{
+	ShaderSections, ShaderSet, ShaderSource, ShaderSourceMap, ShaderVariable, ShaderVariableKind,
+};
 use regex::Regex;
 use serde::Serialize;
 use serde_json;
@@ -16,7 +19,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str;
-use tera::Tera;
+use tera::{Context, Tera};
 
 pub struct ShaderMinifierShaderMinifier {
 	exe_path: PathBuf,
@@ -24,8 +27,8 @@ pub struct ShaderMinifierShaderMinifier {
 }
 
 impl ShaderMinifierShaderMinifier {
-	pub fn new(project_descriptor: &ProjectDescriptor) -> Result<Self, String> {
-		let exe_path = project_descriptor
+	pub fn new(project: &Project) -> Result<Self, String> {
+		let exe_path = project
 			.configuration
 			.paths
 			.get("shader-minifier")
@@ -41,70 +44,73 @@ impl ShaderMinifierShaderMinifier {
 	}
 }
 
-const OUTPUT_FILENAME: &str = "shader-descriptor.json";
-
-#[derive(Hash)]
-struct Inputs<'a> {
-	exe_path: &'a Path,
-	original_shader_descriptor: &'a ShaderDescriptor,
-}
-
-#[derive(Serialize)]
-struct Context<'a> {
-	pub non_uniform_variables: &'a Vec<&'a mut Variable>,
-	pub shader_descriptor: &'a ShaderDescriptor,
-}
-
 impl ShaderMinifier for ShaderMinifierShaderMinifier {
 	fn minify(
 		&self,
 		build_options: &BuildOptions,
-		original_shader_descriptor: &ShaderDescriptor,
-	) -> Result<ShaderDescriptor, String> {
+		original_shader_set: &ShaderSet,
+	) -> Result<ShaderSet, String> {
+		const OUTPUT_FILENAME: &str = "shader-descriptor.json";
+
+		#[derive(Hash)]
+		struct Inputs<'a> {
+			exe_path: &'a Path,
+			original_shader_set: &'a ShaderSet,
+		}
+
 		let inputs = Inputs {
 			exe_path: &self.exe_path,
-			original_shader_descriptor,
+			original_shader_set,
 		};
 		let build_cache_directory = hash_extra::get_build_cache_directory(&inputs)?;
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
 
 		if !build_options.force && build_cache_path.exists() {
 			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
-			let shader_descriptor =
+			let shader_set =
 				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;
-			return Ok(shader_descriptor);
+			return Ok(shader_set);
 		}
 
-		let glsl_version = original_shader_descriptor.glsl_version.clone();
-		let mut passes = original_shader_descriptor
-			.passes
+		let glsl_version = original_shader_set.glsl_version.clone();
+		let mut specific_sources = original_shader_set
+			.specific_sources
 			.iter()
-			.map(|_| Pass::default())
-			.collect::<Vec<_>>();
-		let mut sections = Sections::default();
-		let mut uniform_arrays = original_shader_descriptor.uniform_arrays.clone();
-		let mut variables = original_shader_descriptor.variables.clone();
+			.map(|(name, _)| (name.clone(), ShaderSource::default()))
+			.collect::<ShaderSourceMap>();
+		let mut sections = ShaderSections::default();
+		let mut uniform_arrays = original_shader_set.uniform_arrays.clone();
+		let mut variables = original_shader_set.variables.clone();
 
 		let mut non_uniform_variables = variables
 			.iter_mut()
 			.filter(|variable| {
 				variable.active
 					&& match variable.kind {
-						VariableKind::Uniform(_) => false,
+						ShaderVariableKind::Uniform(_) => false,
 						_ => true,
 					}
 			})
 			.collect::<Vec<_>>();
 
-		let context = Context {
+		#[derive(Serialize)]
+		struct OwnContext<'a> {
+			pub non_uniform_variables: &'a Vec<&'a mut ShaderVariable>,
+			pub shader_set: &'a ShaderSet,
+		}
+
+		let context = OwnContext {
 			non_uniform_variables: &non_uniform_variables,
-			shader_descriptor: &original_shader_descriptor,
+			shader_set: &original_shader_set,
 		};
 
 		let shader = self
 			.tera
-			.render("template", &context)
-			.map_err(|_| "Failed to render template.")?;
+			.render(
+				"template",
+				&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+			)
+			.map_err(|err| err.to_string())?;
 
 		let build_directory = BUILD_ROOT_DIRECTORY
 			.join("shader-minifiers")
@@ -167,20 +173,20 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 
 						Directive::Common => sections.common = code,
 
-						Directive::Fragment(index) => {
-							passes[index].fragment = code;
+						Directive::Fragment(name) => {
+							specific_sources.get_mut(name).unwrap().fragment = code;
 						}
 
 						Directive::Outputs => sections.outputs = code,
 
-						Directive::UniformArrays => uniform_arrays_string = code,
+						Directive::ShaderUniformArrays => uniform_arrays_string = code,
 
-						Directive::Variables => non_uniform_variables_string = code,
+						Directive::ShaderVariables => non_uniform_variables_string = code,
 
 						Directive::Varyings => sections.varyings = code,
 
-						Directive::Vertex(index) => {
-							passes[index].vertex = code;
+						Directive::Vertex(name) => {
+							specific_sources.get_mut(name).unwrap().vertex = code;
 						}
 					}
 				}
@@ -214,17 +220,17 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 			}
 		}
 
-		let shader_descriptor = ShaderDescriptor {
+		let shader_set = ShaderSet {
 			glsl_version,
-			passes,
+			specific_sources,
 			sections,
 			uniform_arrays,
 			variables,
 		};
 
-		let json = serde_json::to_string(&shader_descriptor).map_err(|_| "Failed to dump JSON.")?;
+		let json = serde_json::to_string(&shader_set).map_err(|_| "Failed to dump JSON.")?;
 		fs::write(build_cache_path, json).map_err(|err| err.to_string())?;
 
-		Ok(shader_descriptor)
+		Ok(shader_set)
 	}
 }

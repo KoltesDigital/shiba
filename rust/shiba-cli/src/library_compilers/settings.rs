@@ -1,5 +1,5 @@
 use super::{msvc, LibraryCompiler};
-use crate::types::ProjectDescriptor;
+use crate::project_data::Project;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Hash)]
@@ -11,12 +11,10 @@ pub enum Settings {
 impl Settings {
 	pub fn instantiate<'a>(
 		&'a self,
-		project_descriptor: &'a ProjectDescriptor,
+		project: &'a Project,
 	) -> Result<Box<(dyn LibraryCompiler + 'a)>, String> {
 		let instance: Box<(dyn LibraryCompiler + 'a)> = match self {
-			Settings::Msvc(settings) => {
-				Box::new(msvc::MsvcCompiler::new(project_descriptor, settings)?)
-			}
+			Settings::Msvc(settings) => Box::new(msvc::MsvcCompiler::new(project, settings)?),
 		};
 		Ok(instance)
 	}

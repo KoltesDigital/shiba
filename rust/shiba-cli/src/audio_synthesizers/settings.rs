@@ -1,5 +1,5 @@
 use super::{none, oidos, AudioSynthesizer};
-use crate::types::ProjectDescriptor;
+use crate::project_data::Project;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Hash)]
@@ -12,17 +12,15 @@ pub enum Settings {
 impl Settings {
 	pub fn instantiate<'a>(
 		&'a self,
-		project_descriptor: &'a ProjectDescriptor,
+		project: &'a Project,
 	) -> Result<Box<(dyn AudioSynthesizer + 'a)>, String> {
 		let instance: Box<(dyn AudioSynthesizer + 'a)> = match self {
-			Settings::None(settings) => Box::new(none::NoneAudioSynthesizer::new(
-				project_descriptor,
-				settings,
-			)?),
-			Settings::Oidos(settings) => Box::new(oidos::OidosAudioSynthesizer::new(
-				project_descriptor,
-				settings,
-			)?),
+			Settings::None(settings) => {
+				Box::new(none::NoneAudioSynthesizer::new(project, settings)?)
+			}
+			Settings::Oidos(settings) => {
+				Box::new(oidos::OidosAudioSynthesizer::new(project, settings)?)
+			}
 		};
 		Ok(instance)
 	}

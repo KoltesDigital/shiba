@@ -4,41 +4,38 @@ pub use self::settings::MsvcSettings;
 use super::LibraryCompiler;
 use crate::build::{BuildOptions, BuildTarget};
 use crate::compiler::{CompileOptions, Compiler};
-use crate::generator_utils::cpp;
+use crate::cpp_utils;
 use crate::hash_extra;
 use crate::paths::BUILD_ROOT_DIRECTORY;
+use crate::project_data::Project;
 use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
-use crate::types::{ProjectDescriptor, ShaderDescriptor};
+use crate::shader_data::ShaderSet;
 use serde::Serialize;
 use std::fs;
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
-use tera::Tera;
+use tera::{Context, Tera};
 
 pub struct MsvcCompiler<'a> {
-	project_descriptor: &'a ProjectDescriptor,
+	project: &'a Project,
 	settings: &'a MsvcSettings,
 
-	cpp_template_renderer: cpp::template::Renderer,
+	api_generator: cpp_utils::api::Generator,
 	glew_path: PathBuf,
-	msvc_command_generator: cpp::msvc::CommandGenerator,
+	msvc_command_generator: cpp_utils::msvc::CommandGenerator,
 	tera: Tera,
 }
 
 impl<'a> MsvcCompiler<'a> {
-	pub fn new(
-		project_descriptor: &'a ProjectDescriptor,
-		settings: &'a MsvcSettings,
-	) -> Result<Self, String> {
-		let cpp_template_renderer =
-			cpp::template::Renderer::new(&project_descriptor.configuration)?;
-		let glew_path = project_descriptor
+	pub fn new(project: &'a Project, settings: &'a MsvcSettings) -> Result<Self, String> {
+		let api_generator = cpp_utils::api::Generator::new(&project.configuration)?;
+		let glew_path = project
 			.configuration
 			.paths
 			.get("glew")
 			.ok_or("Please set configuration key paths.glew.")?
 			.clone();
-		let msvc_command_generator = cpp::msvc::CommandGenerator::new()?;
+		let msvc_command_generator = cpp_utils::msvc::CommandGenerator::new()?;
 
 		let mut tera = Tera::default();
 
@@ -46,37 +43,15 @@ impl<'a> MsvcCompiler<'a> {
 			.map_err(|err| err.to_string())?;
 
 		Ok(MsvcCompiler {
-			project_descriptor,
+			project,
 			settings,
 
-			cpp_template_renderer,
+			api_generator,
 			glew_path,
 			msvc_command_generator,
 			tera,
 		})
 	}
-}
-
-const OUTPUT_FILENAME: &str = "msvc.dll";
-
-#[derive(Hash)]
-struct Inputs<'a> {
-	cpp_template_renderer: cpp::template::RendererInputs<'a>,
-	development: bool,
-	glew_path: &'a Path,
-	msvc_command_generator: cpp::msvc::CommandGeneratorInputs<'a>,
-	options: &'a CompileOptions<'a>,
-	settings: &'a MsvcSettings,
-	target: BuildTarget,
-}
-
-#[derive(Serialize)]
-struct Context<'a> {
-	#[serde(flatten)]
-	cpp_contents: &'a cpp::template::Contents,
-	project_codes: &'a CodeMap,
-	#[serde(flatten)]
-	shader_descriptor: &'a ShaderDescriptor,
 }
 
 impl<'a> Compiler for MsvcCompiler<'a> {
@@ -85,9 +60,22 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 		build_options: &BuildOptions,
 		options: &CompileOptions,
 	) -> Result<PathBuf, String> {
+		const OUTPUT_FILENAME: &str = "msvc.dll";
+
+		#[derive(Hash)]
+		struct Inputs<'a> {
+			api_generator: cpp_utils::api::GeneratorInputs<'a>,
+			development: bool,
+			glew_path: &'a Path,
+			msvc_command_generator: cpp_utils::msvc::CommandGeneratorInputs<'a>,
+			options: &'a CompileOptions<'a>,
+			settings: &'a MsvcSettings,
+			target: BuildTarget,
+		}
+
 		let inputs = Inputs {
-			cpp_template_renderer: self.cpp_template_renderer.get_inputs(),
-			development: self.project_descriptor.development,
+			api_generator: self.api_generator.get_inputs(),
+			development: self.project.development,
 			glew_path: &self.glew_path,
 			msvc_command_generator: self.msvc_command_generator.get_inputs(),
 			options,
@@ -101,22 +89,34 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 			return Ok(build_cache_path);
 		}
 
-		let contents = self.cpp_template_renderer.render(
+		let api = self.api_generator.generate(
 			options.project_codes,
-			options.shader_descriptor,
-			self.project_descriptor.development,
+			options.shader_set,
+			self.project.development,
 			BuildTarget::Library,
 		)?;
 
-		let context = Context {
-			cpp_contents: &contents,
+		#[derive(Serialize)]
+		struct OwnContext<'a> {
+			api: &'a cpp_utils::api::Contents,
+			project_codes: &'a CodeMap,
+			shader_set: &'a ShaderSet,
+			shader_specific_sources_length: usize,
+		}
+
+		let context = OwnContext {
+			api: &api,
 			project_codes: &options.project_codes,
-			shader_descriptor: &options.shader_descriptor,
+			shader_set: &options.shader_set,
+			shader_specific_sources_length: options.shader_set.specific_sources.len(),
 		};
 		let contents = self
 			.tera
-			.render("template", &context)
-			.map_err(|_| "Failed to render template.")?;
+			.render(
+				"template",
+				&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+			)
+			.map_err(|err| err.to_string())?;
 
 		let build_directory = BUILD_ROOT_DIRECTORY.join("library-compilers").join("msvc");
 		fs::create_dir_all(&build_directory).map_err(|err| err.to_string())?;
@@ -126,7 +126,7 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 
 		let mut compilation = self
 			.msvc_command_generator
-			.command(cpp::msvc::Platform::X64)
+			.command(cpp_utils::msvc::Platform::X64)
 			.arg("cl")
 			.arg("/c")
 			.arg("/EHsc")
@@ -137,7 +137,7 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 				"/I{}",
 				self.glew_path.join("include").to_string_lossy(),
 			))
-			.args(&options.compilation_descriptor.cl.args)
+			.args(&options.compilation.cl.args)
 			.arg("library.cpp")
 			.arg("&&")
 			.arg("link")
@@ -153,7 +153,7 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 					.to_string_lossy()
 					.as_ref(),
 			)
-			.args(&options.compilation_descriptor.link.args)
+			.args(&options.compilation.link.args)
 			.arg("library.obj")
 			.current_dir(&build_directory)
 			.spawn()

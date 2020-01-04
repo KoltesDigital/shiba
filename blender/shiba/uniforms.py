@@ -400,9 +400,9 @@ def set_shader_variables(variables):
             )
             _active_uniform_descriptors.append(uniform_descriptor)
 
-        control_annotation = uniform_descriptor.get_annotation(UniformControlAnnotationDescriptor)
-        if control_annotation is not None:
-            control_annotation.add_property()
+            control_annotation = uniform_descriptor.get_annotation(UniformControlAnnotationDescriptor)
+            if control_annotation is not None:
+                control_annotation.add_property()
 
     # Redraw the panel, when it'll be available.
 
