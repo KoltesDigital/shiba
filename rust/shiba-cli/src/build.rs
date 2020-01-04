@@ -2,8 +2,7 @@ use crate::compilation_data::Compilation;
 use crate::compiler::{CompileOptions, CompilerKind};
 use crate::project_data::Project;
 use crate::project_files::{self, ProjectFiles};
-use crate::shader_codes::ShaderCodes;
-use crate::shader_data::{ShaderSet, ShaderSource, ShaderVariable};
+use crate::shader_data::ShaderSet;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -27,9 +26,8 @@ pub struct LibraryCompiledEvent {
 	pub path: PathBuf,
 }
 
-pub struct ShaderProvidedEvent<'a> {
-	pub sources: Vec<ShaderSource>,
-	pub variables: &'a Vec<ShaderVariable>,
+pub struct ShaderSetProvidedEvent<'a> {
+	pub shader_set: &'a ShaderSet,
 }
 
 pub struct StaticFilesProvidedEvent<'a> {
@@ -39,7 +37,7 @@ pub struct StaticFilesProvidedEvent<'a> {
 pub enum BuildEvent<'a> {
 	ExecutableCompiled(ExecutableCompiledEvent),
 	LibraryCompiled(LibraryCompiledEvent),
-	ShaderProvided(ShaderProvidedEvent<'a>),
+	ShaderSetProvided(ShaderSetProvidedEvent<'a>),
 	StaticFilesProvided(StaticFilesProvidedEvent<'a>),
 }
 
@@ -154,9 +152,8 @@ pub fn build(
 		shader_set = shader_minifier.minify(options, &shader_set)?;
 	}
 
-	event_listener(BuildEvent::ShaderProvided(ShaderProvidedEvent {
-		sources: to_standalone_shader_sources(&shader_set),
-		variables: &shader_set.variables,
+	event_listener(BuildEvent::ShaderSetProvided(ShaderSetProvidedEvent {
+		shader_set: &shader_set,
 	}));
 
 	let compile_options = CompileOptions {
@@ -194,29 +191,4 @@ pub fn build_duration(
 
 	let duration = start.elapsed();
 	Ok(duration)
-}
-
-fn to_standalone_shader_sources(shader_set: &ShaderSet) -> Vec<ShaderSource> {
-	let shader_codes = ShaderCodes::load(shader_set);
-	let vertex_prefix = shader_codes.before_stage_variables.clone()
-		+ shader_codes.vertex_specific.as_str()
-		+ shader_codes.after_stage_variables.as_str();
-	let fragment_prefix = shader_codes.before_stage_variables
-		+ shader_codes.fragment_specific.as_str()
-		+ shader_codes.after_stage_variables.as_str();
-	shader_set
-		.specific_sources
-		.iter()
-		.map(|(_name, shader_source)| {
-			let vertex = shader_source
-				.vertex
-				.as_ref()
-				.map(|code| vertex_prefix.clone() + code.as_str());
-			let fragment = shader_source
-				.fragment
-				.as_ref()
-				.map(|code| fragment_prefix.clone() + code.as_str());
-			ShaderSource { vertex, fragment }
-		})
-		.collect()
 }

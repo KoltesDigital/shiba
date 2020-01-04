@@ -62,7 +62,11 @@ def _handle_run_event(obj):
     notifications.add(Notification(message, 3))
 
 
-def _handle_shader_provided_event(obj):
+def _handle_shader_set_provided_event(obj):
+    print("Shader mapping for target '%s':" % obj['target'])
+    for i, shader_source in enumerate(obj['sources']):
+        print("  #%d: %s" % (i, shader_source['name']))
+
     if obj['target'] == 'library':
         with instrumentation.library.get_library_wrapper() as library_wrapper:
             if library_wrapper:
@@ -78,5 +82,5 @@ EVENT_HANDLERS = {
     'exported': _handle_exported_event,
     'library-compiled': _handle_library_compiled_event,
     'run': _handle_run_event,
-    'shader-provided': _handle_shader_provided_event,
+    'shader-set-provided': _handle_shader_set_provided_event,
 }

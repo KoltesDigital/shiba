@@ -2,7 +2,8 @@ use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
 use crate::export::{self, ExportOptions, ExportOutput};
 use crate::project_data::Project;
 use crate::run::{self, RunOptions};
-use crate::shader_data::{ShaderSource, ShaderVariable};
+use crate::shader_codes::ShaderCodes;
+use crate::shader_data::{ShaderSet, ShaderSource, ShaderVariable};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
@@ -50,6 +51,14 @@ struct Command {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "kebab-case")]
+struct ShaderSourceExt<'a> {
+	name: &'a str,
+	#[serde(flatten)]
+	shader_source: ShaderSource,
+}
+
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "kebab-case", tag = "event")]
 enum EventKind<'a> {
 	BuildEnded {
@@ -74,8 +83,8 @@ enum EventKind<'a> {
 	Run {
 		duration: f32,
 	},
-	ShaderProvided {
-		sources: &'a Vec<ShaderSource>,
+	ShaderSetProvided {
+		sources: &'a Vec<ShaderSourceExt<'a>>,
 		target: BuildTarget,
 		variables: &'a Vec<ShaderVariable>,
 	},
@@ -198,14 +207,16 @@ pub fn execute(options: &Options) -> Result<(), String> {
 											library_artifacts.path = Some(event.path);
 										}
 
-										BuildEvent::ShaderProvided(event) => {
+										BuildEvent::ShaderSetProvided(event) => {
 											let mut command_state = command_state.write().unwrap();
 											command_state.broadcast(&Event {
 												id: &command_id,
-												kind: EventKind::ShaderProvided {
-													sources: &event.sources,
+												kind: EventKind::ShaderSetProvided {
+													sources: &to_shader_source_exts(
+														&event.shader_set,
+													),
 													target,
-													variables: &event.variables,
+													variables: &event.shader_set.variables,
 												},
 											});
 										}
@@ -481,4 +492,33 @@ pub fn execute(options: &Options) -> Result<(), String> {
 	}
 
 	Ok(())
+}
+
+fn to_shader_source_exts(shader_set: &ShaderSet) -> Vec<ShaderSourceExt> {
+	let shader_codes = ShaderCodes::load(shader_set);
+	let vertex_prefix = shader_codes.before_stage_variables.clone()
+		+ shader_codes.vertex_specific.as_str()
+		+ shader_codes.after_stage_variables.as_str();
+	let fragment_prefix = shader_codes.before_stage_variables
+		+ shader_codes.fragment_specific.as_str()
+		+ shader_codes.after_stage_variables.as_str();
+	shader_set
+		.specific_sources
+		.iter()
+		.map(|(name, shader_source)| {
+			let vertex = shader_source
+				.vertex
+				.as_ref()
+				.map(|code| vertex_prefix.clone() + code.as_str());
+			let fragment = shader_source
+				.fragment
+				.as_ref()
+				.map(|code| fragment_prefix.clone() + code.as_str());
+			let shader_source = ShaderSource { vertex, fragment };
+			ShaderSourceExt {
+				name,
+				shader_source,
+			}
+		})
+		.collect()
 }
