@@ -2,11 +2,14 @@ import ctypes
 
 
 Mat2 = ctypes.c_float * 4
-Mat3 = ctypes.c_float * 9
-Mat4 = ctypes.c_float * 16
+
+MAT2_IDENTITY = Mat2(
+    1, 0,
+    0, 1,
+)
 
 
-def to_c_mat2(matrix):
+def to_mat2(matrix):
     return Mat2(
         matrix[0][0],
         matrix[1][0],
@@ -15,7 +18,16 @@ def to_c_mat2(matrix):
     )
 
 
-def to_c_mat3(matrix):
+Mat3 = ctypes.c_float * 9
+
+MAT3_IDENTITY = Mat3(
+    1, 0, 0,
+    0, 1, 0,
+    0, 0, 1,
+)
+
+
+def to_mat3(matrix):
     return Mat3(
         matrix[0][0],
         matrix[1][0],
@@ -29,7 +41,17 @@ def to_c_mat3(matrix):
     )
 
 
-def to_c_mat4(matrix):
+Mat4 = ctypes.c_float * 16
+
+MAT4_IDENTITY = Mat4(
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
+)
+
+
+def to_mat4(matrix):
     return Mat4(
         matrix[0][0],
         matrix[1][0],

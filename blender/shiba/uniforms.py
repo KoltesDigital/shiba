@@ -166,9 +166,7 @@ def _make_UniformControlMatAnnotationDescriptor(size, get_from_obj):
         def get_uniform_value(self, context_values, uniforms):
             try:
                 obj = getattr(uniforms, self.property_name)
-                if obj:
-                    return get_from_obj(obj)
-                return None
+                return get_from_obj(obj)
             except:
                 return None
 
@@ -176,15 +174,15 @@ def _make_UniformControlMatAnnotationDescriptor(size, get_from_obj):
 
 
 UniformControlMat2AnnotationDescriptor = _make_UniformControlMatAnnotationDescriptor(2, lambda obj: UniformValue(
-    as_mat2=library_definitions.to_c_mat2(obj.matrix_world),
+    as_mat2=library_definitions.to_mat2(obj.matrix_world) if obj else library_definitions.MAT2_IDENTITY,
 ))
 
 UniformControlMat3AnnotationDescriptor = _make_UniformControlMatAnnotationDescriptor(3, lambda obj: UniformValue(
-    as_mat3=library_definitions.to_c_mat3(obj.matrix_world),
+    as_mat3=library_definitions.to_mat3(obj.matrix_world) if obj else library_definitions.MAT3_IDENTITY,
 ))
 
 UniformControlMat4AnnotationDescriptor = _make_UniformControlMatAnnotationDescriptor(4, lambda obj: UniformValue(
-    as_mat4=library_definitions.to_c_mat4(obj.matrix_world),
+    as_mat4=library_definitions.to_mat4(obj.matrix_world) if obj else library_definitions.MAT4_IDENTITY,
 ))
 
 
@@ -239,7 +237,7 @@ UniformControlVec4AnnotationDescriptor = _make_UniformControlVecAnnotationDescri
 class UniformInverseProjectionAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
     def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
-            as_mat4=library_definitions.to_c_mat4(context_values.inverse_projection),
+            as_mat4=library_definitions.to_mat4(context_values.inverse_projection),
         )
 
 
@@ -247,7 +245,7 @@ class UniformInverseProjectionAnnotationDescriptor(UniformAnnotationWithValueDes
 class UniformInverseViewAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
     def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
-            as_mat4=library_definitions.to_c_mat4(context_values.inverse_view),
+            as_mat4=library_definitions.to_mat4(context_values.inverse_view),
         )
 
 
@@ -255,7 +253,7 @@ class UniformInverseViewAnnotationDescriptor(UniformAnnotationWithValueDescripto
 class UniformProjectionAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
     def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
-            as_mat4=library_definitions.to_c_mat4(context_values.projection),
+            as_mat4=library_definitions.to_mat4(context_values.projection),
         )
 
 
@@ -263,7 +261,7 @@ class UniformProjectionAnnotationDescriptor(UniformAnnotationWithValueDescriptor
 class UniformViewAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
     def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
-            as_mat4=library_definitions.to_c_mat4(context_values.view),
+            as_mat4=library_definitions.to_mat4(context_values.view),
         )
 
 
