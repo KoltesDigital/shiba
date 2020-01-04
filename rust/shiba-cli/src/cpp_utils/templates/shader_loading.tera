@@ -1,6 +1,6 @@
 {% if shader_specific_sources_length == 1 %}
 
-	shibaLog() << "Loading lone shader_source.";
+	shibaLog() << "Loading lone shader.";
 
 	{
 		shibaShaderId = glCreateProgram();
@@ -93,7 +93,7 @@
 
 	for (auto i = 0; i < {{ shader_specific_sources_length }}; ++i)
 	{
-		shibaLog() << "Loading shader_source " << i << ".";
+		shibaLog() << "Loading shader #" << i << ".";
 
 		shibaShaderIds[i] = glCreateProgram();
 		shibaCheckGlError();
