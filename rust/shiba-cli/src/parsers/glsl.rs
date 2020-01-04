@@ -7,6 +7,7 @@ use nom::{
 	branch::*, bytes::complete::*, character::complete::*, combinator::*, multi::*, sequence::*,
 	IResult,
 };
+use std::collections::BTreeMap;
 use std::slice;
 use std::str;
 
@@ -19,7 +20,7 @@ pub fn identifier<'a>(input: &'a str) -> IResult<&'a str, &'a str> {
 		|(first, rest): (&str, &str)| {
 			let ptr = first.as_ptr();
 			unsafe {
-				let slice = slice::from_raw_parts(ptr, rest.len() + 1);
+				let slice = slice::from_raw_parts(ptr, 1 + rest.len());
 				str::from_utf8(slice)
 			}
 			.unwrap()
@@ -101,23 +102,69 @@ pub fn regular_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 	)(input)
 }
 
+pub fn uniform_control_annotation_parameters<'a>(
+	input: &'a str,
+) -> IResult<&'a str, BTreeMap<String, String>> {
+	map(
+		separated_list(
+			char(','),
+			map(
+				tuple((
+					space0,
+					identifier,
+					space0,
+					char('='),
+					space0,
+					alt((
+						map(
+							tuple((
+								take_while_m_n(1, 1, |c: char| c == '('),
+								take_while(|c: char| c != ')'),
+								char(')'),
+							)),
+							|(left, middle, _): (_, &str, _)| {
+								let ptr = left.as_ptr();
+								unsafe {
+									let slice = slice::from_raw_parts(ptr, 1 + middle.len() + 1);
+									str::from_utf8(slice)
+								}
+								.unwrap()
+							},
+						),
+						map(
+							tuple((
+								take_while_m_n(1, 1, |c: char| c == '"'),
+								take_while(|c: char| c != '"'),
+								char('"'),
+							)),
+							|(_, middle, _): (_, &str, _)| middle,
+						),
+						take_while(|c: char| c != ',' && c != ')'),
+					)),
+					space0,
+				)),
+				|(_, key, _, _, _, value, _)| (key.to_string(), value.to_string()),
+			),
+		),
+		|tuples| tuples.into_iter().collect(),
+	)(input)
+}
+
 pub fn uniform_annotation<'a>(input: &'a str) -> IResult<&'a str, UniformAnnotationKind> {
 	alt((
 		map(
 			tuple((
 				tag("control"),
-				space1,
-				take_while(|c: char| c == '_' || c.is_alphabetic()),
+				space0,
 				opt(delimited(
 					char('('),
-					take_while(|c: char| c != ')'),
+					uniform_control_annotation_parameters,
 					char(')'),
 				)),
 			)),
-			|(_, _, control_kind, control_parameters): (_, _, _, Option<&'a str>)| {
+			|(_, _, parameters)| {
 				UniformAnnotationKind::Control(UniformAnnotationControlDescriptor {
-					control_kind: control_kind.to_string(),
-					control_parameters: control_parameters.map(|value| value.to_string()),
+					parameters: parameters.unwrap_or_default(),
 				})
 			},
 		),
@@ -166,7 +213,7 @@ pub fn uniform_variables(input: &str) -> IResult<&str, Vec<Variable>> {
 				.map(|(name, length)| Variable {
 					active: true,
 					kind: VariableKind::Uniform(UniformVariable {
-						annotations: annotations.clone().unwrap_or_else(Vec::new),
+						annotations: annotations.clone().unwrap_or_default(),
 					}),
 					length,
 					minified_name: None,
@@ -256,6 +303,36 @@ mod tests {
 	}
 
 	#[test]
+	fn test_uniform_control_annotation_parameters() {
+		let parameters = uniform_control_annotation_parameters(
+			"default=(.5,.5,.5), min=0, max=1, subtype=color)",
+		);
+
+		let mut expected_parameters = BTreeMap::new();
+		expected_parameters.insert("default".to_string(), "(.5,.5,.5)".to_string());
+		expected_parameters.insert("min".to_string(), "0".to_string());
+		expected_parameters.insert("max".to_string(), "1".to_string());
+		expected_parameters.insert("subtype".to_string(), "color".to_string());
+
+		assert_eq!(parameters, Ok((")", expected_parameters)));
+	}
+
+	#[test]
+	fn test_uniform_control_annotation_parameters_with_spaces() {
+		let parameters = uniform_control_annotation_parameters(
+			" default = (0, 1) , description = \"foo, bar\" , min = 0 , max = 1 )",
+		);
+
+		let mut expected_parameters = BTreeMap::new();
+		expected_parameters.insert("default".to_string(), "(0, 1)".to_string());
+		expected_parameters.insert("description".to_string(), "foo, bar".to_string());
+		expected_parameters.insert("min".to_string(), "0 ".to_string());
+		expected_parameters.insert("max".to_string(), "1 ".to_string());
+
+		assert_eq!(parameters, Ok((")", expected_parameters)));
+	}
+
+	#[test]
 	fn test_variables() {
 		let variables = variables(
 			r#"precision mediump float;
@@ -264,11 +341,18 @@ float regularVar1[1];
 #define foo bar
 const float constVar0 = 42., constVar1 = 1337.;
 uniform float uniformVar0;
-uniform float uniformVar1[4];
-uniform vec2 uniformVar2; // simple comment
-uniform bool uniformVar3; // shiba control checkbox(default=true)
+uniform float uniformVar1[4]; // simple comment
+uniform vec3 uniformVar2; // shiba control(default=(.5,.5,.5), min=0, max=1, subtype=color)
+uniform bool uniformVar3;
 "#,
 		);
+
+		let mut expected_control_annotation_parameters = BTreeMap::new();
+		expected_control_annotation_parameters
+			.insert("default".to_string(), "(.5,.5,.5)".to_string());
+		expected_control_annotation_parameters.insert("min".to_string(), "0".to_string());
+		expected_control_annotation_parameters.insert("max".to_string(), "1".to_string());
+		expected_control_annotation_parameters.insert("subtype".to_string(), "color".to_string());
 
 		assert_eq!(
 			variables,
@@ -334,22 +418,21 @@ uniform bool uniformVar3; // shiba control checkbox(default=true)
 					Variable {
 						active: true,
 						kind: VariableKind::Uniform(UniformVariable {
-							annotations: vec![]
+							annotations: vec![UniformAnnotationKind::Control(
+								UniformAnnotationControlDescriptor {
+									parameters: expected_control_annotation_parameters,
+								}
+							)]
 						}),
 						length: None,
 						minified_name: None,
 						name: "uniformVar2".to_string(),
-						type_name: "vec2".to_string(),
+						type_name: "vec3".to_string(),
 					},
 					Variable {
 						active: true,
 						kind: VariableKind::Uniform(UniformVariable {
-							annotations: vec![UniformAnnotationKind::Control(
-								UniformAnnotationControlDescriptor {
-									control_kind: "checkbox".to_string(),
-									control_parameters: Some("default=true".to_string()),
-								}
-							)]
+							annotations: vec![]
 						}),
 						length: None,
 						minified_name: None,

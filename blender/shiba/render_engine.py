@@ -84,7 +84,7 @@ class RenderEngine(bpy.types.RenderEngine):
                         view=camera_matrix.inverted(),
                     )
 
-                    values = uniforms.get_api_uniform_values(context_values, scene.shiba.uniforms)
+                    values = uniforms.get_uniform_values(context_values, scene.shiba.uniforms)
                     library_wrapper.set_uniform_values(values)
 
                     frame = library_wrapper.render(
@@ -129,7 +129,7 @@ class RenderEngine(bpy.types.RenderEngine):
                     view=context.region_data.view_matrix,
                 )
 
-                values = uniforms.get_api_uniform_values(context_values, context.scene.shiba.uniforms)
+                values = uniforms.get_uniform_values(context_values, context.scene.shiba.uniforms)
                 library_wrapper.set_uniform_values(values)
 
                 library_wrapper.viewport_render(width, height)

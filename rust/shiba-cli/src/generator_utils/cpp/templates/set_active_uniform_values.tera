@@ -12,7 +12,7 @@
 				or annotation.kind == 'time'
 				or annotation.kind == 'view'
 			%}
-				{{ variable.name }} = _shibaArgValues[{{ variable_index }}].as_{{ variable.as_value_name }};
+				{{ variable.name }} = _shibaArgValues[{{ variable_index }}].{{ variable.as_value_name }};
 				{% break %}
 			{% endif %}
 		{% endfor %}

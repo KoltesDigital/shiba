@@ -118,7 +118,7 @@ struct Args {
 fn main() -> Result<(), String> {
 	let args = Args::from_args();
 
-	let command = args.command.unwrap_or_else(Command::default);
+	let command = args.command.unwrap_or_default();
 	match command {
 		Command::Build { force, target } => commands::build::execute(&commands::build::Options {
 			force,

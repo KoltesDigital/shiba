@@ -376,19 +376,25 @@ fn to_opengl_type_name(type_name: &str) -> &'static str {
 		"mat3" => "ShibaMat3",
 		"mat4" => "ShibaMat4",
 		"uint" => "GLuint",
+		"vec2" => "ShibaVec2",
+		"vec3" => "ShibaVec3",
+		"vec4" => "ShibaVec4",
 		_ => "GLint",
 	}
 }
 
 fn to_as_value_name(type_name: &str) -> &'static str {
 	match type_name {
-		"bool" => "int",
-		"int" => "int",
-		"float" => "float",
-		"mat2" => "mat2",
-		"mat3" => "mat3",
-		"mat4" => "mat4",
-		"uint" => "uint",
-		_ => "int",
+		"bool" => "asInt",
+		"int" => "asInt",
+		"float" => "asFloat",
+		"mat2" => "asMat2",
+		"mat3" => "asMat3",
+		"mat4" => "asMat4",
+		"uint" => "asUint",
+		"vec2" => "asVec2",
+		"vec3" => "asVec3",
+		"vec4" => "asVec4",
+		_ => "asInt",
 	}
 }

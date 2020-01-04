@@ -1,7 +1,7 @@
 import bpy
 from dataclasses import dataclass, field
-from shiba import callback_lists
-from shiba.library_definitions import Matrix, UniformValue, to_c_matrix
+from shiba import callback_lists, library_definitions
+from shiba.library_definitions import Mat4, UniformValue
 from typing import List
 
 
@@ -11,13 +11,13 @@ class Uniforms(bpy.types.PropertyGroup):
 
 @dataclass
 class ContextValues:
-    inverse_projection: Matrix = None
-    inverse_view: Matrix = None
-    projection: Matrix = None
+    inverse_projection: Mat4 = None
+    inverse_view: Mat4 = None
+    projection: Mat4 = None
     resolution_height: float = None
     resolution_width: float = None
     time: float = None
-    view: Matrix = None
+    view: Mat4 = None
 
 
 @dataclass
@@ -27,143 +27,249 @@ class UniformAnnotationDescriptor:
 
 @dataclass
 class UniformAnnotationWithValueDescriptor(UniformAnnotationDescriptor):
-    def to_api_uniform_value(self, context_values, uniforms):
+    def get_uniform_value(self, context_values, uniforms):
         raise NotImplementedError()
+
+
+def _transform_eval(s):
+    return eval(s, {}, {})
+
+
+def _transform_id(s):
+    return s
+
+
+def _make_transform_from_enum(array):
+    def transform(value):
+        value = value.upper()
+        return value if value in array else None
+    return transform
+
+
+_CONTROL_ANNOTATION_SINGLE_SUBTYPES = {'PIXEL', 'UNSIGNED', 'PERCENTAGE', 'FACTOR', 'ANGLE', 'TIME', 'DISTANCE', 'NONE'}
+_transform_single_subtype = _make_transform_from_enum(_CONTROL_ANNOTATION_SINGLE_SUBTYPES)
+
+_CONTROL_ANNOTATION_ARRAY_SUBTYPES = {'COLOR', 'TRANSLATION', 'DIRECTION', 'VELOCITY', 'ACCELERATION', 'MATRIX', 'EULER', 'QUATERNION', 'AXISANGLE', 'XYZ', 'COLOR_GAMMA', 'LAYER', 'LAYER_MEMBER', 'POWER', 'NONE'}
+_transform_array_subtype = _make_transform_from_enum(_CONTROL_ANNOTATION_ARRAY_SUBTYPES)
+
+_CONTROL_ANNOTATION_UNITS = ['NONE', 'LENGTH', 'AREA', 'VOLUME', 'ROTATION', 'TIME', 'VELOCITY', 'ACCELERATION', 'MASS', 'CAMERA', 'POWER']
+_transform_unit = _make_transform_from_enum(_CONTROL_ANNOTATION_UNITS)
 
 
 @dataclass
 class UniformControlAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
     name: str = None
+    parameters: object = None
 
     @property
     def property_name(self):
-        return 'uniform_%s' % self.name
+        return self.name
 
     def add_property(self):
         pass
 
     def remove_property(self):
-        pass
-
-    def draw_property(self, uniforms, layout):
-        pass
-
-
-@dataclass
-class UniformControlCheckboxAnnotationDescriptor(UniformControlAnnotationDescriptor):
-    default: bool = False
-
-    def add_property(self):
-        setattr(Uniforms, self.property_name, bpy.props.BoolProperty(
-            default=self.default,
-            name=self.name,
-            update=_update,
-        ))
-
-    def remove_property(self):
-        delattr(Uniforms, self.property_name)
+        try:
+            delattr(Uniforms, self.property_name)
+        except AttributeError:
+            pass
 
     def draw_property(self, uniforms, layout):
         layout.prop(uniforms, self.property_name)
 
-    def to_api_uniform_value(self, context_values, uniforms):
-        value = getattr(uniforms, self.property_name)
-        return UniformValue(
-            as_float=float(value),
-            as_int=int(value),
-            as_uint=int(value),
-        )
+    def _make_args(self, **kwargs):
+        args = {}
+        if self.parameters:
+            for key, transform in kwargs.items():
+                if key in self.parameters:
+                    arg = transform(self.parameters[key])
+                    if arg is not None:
+                        args[key] = arg
+        return args
 
 
 @dataclass
-class UniformControlObjectAnnotationDescriptor(UniformControlAnnotationDescriptor):
+class UniformControlBoolAnnotationDescriptor(UniformControlAnnotationDescriptor):
     def add_property(self):
-        setattr(Uniforms, self.property_name, bpy.props.PointerProperty(
-            name=self.name,
-            type=bpy.types.Object,
-            update=_update,
-        ))
-
-    def remove_property(self):
-        delattr(Uniforms, self.property_name)
-
-    def draw_property(self, uniforms, layout):
-        layout.prop(uniforms, self.property_name)
-
-    def to_api_uniform_value(self, context_values, uniforms):
-        obj = getattr(uniforms, self.property_name)
-        if obj:
-            return UniformValue(
-                as_mat4=to_c_matrix(obj.matrix_world),
+        try:
+            args = self._make_args(
+                default=lambda value: bool(_transform_eval(value)),
+                description=_transform_id,
             )
-        return UniformValue()
+            setattr(Uniforms, self.property_name, bpy.props.BoolProperty(
+                name=self.name,
+                update=_update,
+                **args
+            ))
+        except:
+            pass
+
+    def get_uniform_value(self, context_values, uniforms):
+        try:
+            value = getattr(uniforms, self.property_name)
+            return UniformValue(
+                as_int=int(value),
+            )
+        except:
+            return None
 
 
 @dataclass
-class UniformControlSliderAnnotationDescriptor(UniformControlAnnotationDescriptor):
-    default: float = 0.0
-    max: float = 3.402823e+38
-    min: float = -3.402823e+38
-
+class UniformControlFloatAnnotationDescriptor(UniformControlAnnotationDescriptor):
     def add_property(self):
-        setattr(Uniforms, self.property_name, bpy.props.FloatProperty(
-            default=self.default,
-            max=self.max,
-            min=self.min,
-            name=self.name,
-            update=_update,
-        ))
+        try:
+            args = self._make_args(
+                default=_transform_eval,
+                description=_transform_id,
+                max=_transform_eval,
+                min=_transform_eval,
+                precision=_transform_eval,
+                step=lambda value: _transform_eval(value) * 100,
+                subtype=_transform_single_subtype,
+                unit=_transform_unit,
+            )
+            setattr(Uniforms, self.property_name, bpy.props.FloatProperty(
+                name=self.name,
+                update=_update,
+                **args
+            ))
+        except:
+            pass
 
-    def remove_property(self):
-        delattr(Uniforms, self.property_name)
+    def get_uniform_value(self, context_values, uniforms):
+        try:
+            value = getattr(uniforms, self.property_name)
+            return UniformValue(
+                as_float=float(value),
+            )
+        except:
+            return None
 
-    def draw_property(self, uniforms, layout):
-        layout.prop(uniforms, self.property_name)
 
-    def to_api_uniform_value(self, context_values, uniforms):
-        value = getattr(uniforms, self.property_name)
-        return UniformValue(
-            as_float=float(value),
-            as_int=int(value),
-            as_uint=int(value),
-        )
+def _make_UniformControlMatAnnotationDescriptor(size, get_from_obj):
+    @dataclass
+    class UniformControlMatAnnotationDescriptor(UniformControlAnnotationDescriptor):
+        def add_property(self):
+            try:
+                args = self._make_args(
+                    description=_transform_id,
+                )
+                setattr(Uniforms, self.property_name, bpy.props.PointerProperty(
+                    name=self.name,
+                    type=bpy.types.Object,
+                    update=_update,
+                    **args
+                ))
+            except:
+                pass
+
+        def get_uniform_value(self, context_values, uniforms):
+            try:
+                obj = getattr(uniforms, self.property_name)
+                if obj:
+                    return get_from_obj(obj)
+                return None
+            except:
+                return None
+
+    return UniformControlMatAnnotationDescriptor
+
+
+UniformControlMat2AnnotationDescriptor = _make_UniformControlMatAnnotationDescriptor(2, lambda obj: UniformValue(
+    as_mat2=library_definitions.to_c_mat2(obj.matrix_world),
+))
+
+UniformControlMat3AnnotationDescriptor = _make_UniformControlMatAnnotationDescriptor(3, lambda obj: UniformValue(
+    as_mat3=library_definitions.to_c_mat3(obj.matrix_world),
+))
+
+UniformControlMat4AnnotationDescriptor = _make_UniformControlMatAnnotationDescriptor(4, lambda obj: UniformValue(
+    as_mat4=library_definitions.to_c_mat4(obj.matrix_world),
+))
+
+
+def _make_UniformControlVecAnnotationDescriptor(size, get_from_value):
+    @dataclass
+    class UniformControlVecAnnotationDescriptor(UniformControlAnnotationDescriptor):
+        def add_property(self):
+            try:
+                args = self._make_args(
+                    default=_transform_eval,
+                    description=_transform_id,
+                    max=_transform_eval,
+                    min=_transform_eval,
+                    precision=_transform_eval,
+                    step=lambda value: _transform_eval(value) * 100,
+                    subtype=_transform_array_subtype,
+                    unit=_transform_unit,
+                )
+                setattr(Uniforms, self.property_name, bpy.props.FloatVectorProperty(
+                    name=self.name,
+                    size=size,
+                    update=_update,
+                    **args
+                ))
+            except:
+                pass
+
+        def get_uniform_value(self, context_values, uniforms):
+            try:
+                value = getattr(uniforms, self.property_name)
+                return get_from_value(value)
+            except:
+                return None
+
+    return UniformControlVecAnnotationDescriptor
+
+
+UniformControlVec2AnnotationDescriptor = _make_UniformControlVecAnnotationDescriptor(2, lambda value: UniformValue(
+    as_vec2=(value[0], value[1]),
+))
+
+UniformControlVec3AnnotationDescriptor = _make_UniformControlVecAnnotationDescriptor(3, lambda value: UniformValue(
+    as_vec3=(value[0], value[1], value[2]),
+))
+
+UniformControlVec4AnnotationDescriptor = _make_UniformControlVecAnnotationDescriptor(4, lambda value: UniformValue(
+    as_vec4=(value[0], value[1], value[2], value[3]),
+))
 
 
 @dataclass
 class UniformInverseProjectionAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
-    def to_api_uniform_value(self, context_values, uniforms):
+    def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
-            as_mat4=to_c_matrix(context_values.inverse_projection),
+            as_mat4=library_definitions.to_c_mat4(context_values.inverse_projection),
         )
 
 
 @dataclass
 class UniformInverseViewAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
-    def to_api_uniform_value(self, context_values, uniforms):
+    def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
-            as_mat4=to_c_matrix(context_values.inverse_view),
+            as_mat4=library_definitions.to_c_mat4(context_values.inverse_view),
         )
 
 
 @dataclass
 class UniformProjectionAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
-    def to_api_uniform_value(self, context_values, uniforms):
+    def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
-            as_mat4=to_c_matrix(context_values.projection),
+            as_mat4=library_definitions.to_c_mat4(context_values.projection),
         )
 
 
 @dataclass
 class UniformViewAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
-    def to_api_uniform_value(self, context_values, uniforms):
+    def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
-            as_mat4=to_c_matrix(context_values.view),
+            as_mat4=library_definitions.to_c_mat4(context_values.view),
         )
 
 
 @dataclass
 class UniformResolutionHeightAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
-    def to_api_uniform_value(self, context_values, uniforms):
+    def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
             as_float=context_values.resolution_height,
             as_int=int(context_values.resolution_height),
@@ -173,7 +279,7 @@ class UniformResolutionHeightAnnotationDescriptor(UniformAnnotationWithValueDesc
 
 @dataclass
 class UniformResolutionWidthAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
-    def to_api_uniform_value(self, context_values, uniforms):
+    def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
             as_float=context_values.resolution_width,
             as_int=int(context_values.resolution_width),
@@ -183,7 +289,7 @@ class UniformResolutionWidthAnnotationDescriptor(UniformAnnotationWithValueDescr
 
 @dataclass
 class UniformTimeAnnotationDescriptor(UniformAnnotationWithValueDescriptor):
-    def to_api_uniform_value(self, context_values, uniforms):
+    def get_uniform_value(self, context_values, uniforms):
         return UniformValue(
             as_float=context_values.time,
             as_int=int(context_values.time),
@@ -215,76 +321,58 @@ def _update(_self, _context):
     callback_lists.viewport_update.trigger()
 
 
-def _parse_control_parameters(str):
-    if not str:
-        return None
-
-    d = {}
-    arr = str.split(',')
-    for item in arr:
-        pair = item.split('=')
-        if len(pair) == 2:
-            key = pair[0].strip()
-            value = pair[1].strip()
-            d[key] = value
-    return d
+_CONTROL_ANNOTATION_CLASSES = {
+    'bool': UniformControlBoolAnnotationDescriptor,
+    'float': UniformControlFloatAnnotationDescriptor,
+    'mat2': UniformControlMat2AnnotationDescriptor,
+    'mat3': UniformControlMat3AnnotationDescriptor,
+    'mat4': UniformControlMat4AnnotationDescriptor,
+    'vec2': UniformControlVec2AnnotationDescriptor,
+    'vec3': UniformControlVec3AnnotationDescriptor,
+    'vec4': UniformControlVec4AnnotationDescriptor,
+}
 
 
-def _make_control_annotation(annotation, name):
-    control_parameters = _parse_control_parameters(annotation['control-parameters'])
-    if annotation['control-kind'] == 'checkbox':
-        args = control_parameters and {
-            'default': control_parameters.get('default', 'unchecked') == 'checked'
-        } or {}
-        return UniformControlCheckboxAnnotationDescriptor(
+def _make_control_annotation(annotation, type_name, name):
+    Cls = _CONTROL_ANNOTATION_CLASSES.get(type_name, None)
+    if Cls:
+        return Cls(
             name=name,
-            **args
+            parameters=annotation['parameters'],
         )
-    if annotation['control-kind'] == 'object':
-        return UniformControlObjectAnnotationDescriptor(
-            name=name,
-        )
-    if annotation['control-kind'] == 'slider':
-        args = control_parameters and {
-            'default': float(control_parameters.get('default', 0.0)),
-            'max': float(control_parameters.get('max', 3.402823e+38)),
-            'min': float(control_parameters.get('min', -3.402823e+38)),
-        } or {}
-        return UniformControlSliderAnnotationDescriptor(
-            name=name,
-            **args
-        )
+    else:
+        print('Unknown control for type %s.' % type_name)
 
 
-def _make_inverse_projection_annotation(annotation, name):
+def _make_inverse_projection_annotation(annotation, type_name, name):
     return UniformInverseProjectionAnnotationDescriptor()
 
 
-def _make_inverse_view_annotation(annotation, name):
+def _make_inverse_view_annotation(annotation, type_name, name):
     return UniformInverseViewAnnotationDescriptor()
 
 
-def _make_projection_annotation(annotation, name):
+def _make_projection_annotation(annotation, type_name, name):
     return UniformProjectionAnnotationDescriptor()
 
 
-def _make_resolution_height_annotation(annotation, name):
+def _make_resolution_height_annotation(annotation, type_name, name):
     return UniformResolutionHeightAnnotationDescriptor()
 
 
-def _make_resolution_width_annotation(annotation, name):
+def _make_resolution_width_annotation(annotation, type_name, name):
     return UniformResolutionWidthAnnotationDescriptor()
 
 
-def _make_time_annotation(annotation, name):
+def _make_time_annotation(annotation, type_name, name):
     return UniformTimeAnnotationDescriptor()
 
 
-def _make_view_annotation(annotation, name):
+def _make_view_annotation(annotation, type_name, name):
     return UniformViewAnnotationDescriptor()
 
 
-_make_annotation_handlers = {
+_MAKE_ANNOTATION_HANDLERS = {
     'control': _make_control_annotation,
     'inverse-projection': _make_inverse_projection_annotation,
     'inverse-view': _make_inverse_view_annotation,
@@ -299,17 +387,18 @@ _make_annotation_handlers = {
 def set_shader_variables(variables):
     _active_uniform_descriptors.clear()
 
-    def make_annotation(annotation, name):
-        handler = _make_annotation_handlers[annotation['kind']]
-        return handler(annotation, name)
+    def make_annotation(annotation, type_name, name):
+        handler = _MAKE_ANNOTATION_HANDLERS[annotation['kind']]
+        return handler(annotation, type_name, name)
 
     for variable in variables:
         if variable['kind'] == 'uniform' and variable['active'] == True:
+            type_name = variable['type-name']
             name = variable['name']
             uniform_descriptor = UniformDescriptor(
-                annotations=[make_annotation(annotation, name) for annotation in variable['annotations']],
+                annotations=[make_annotation(annotation, type_name, name) for annotation in variable['annotations']],
                 name=name,
-                type_name=variable['type-name'],
+                type_name=type_name,
             )
             _active_uniform_descriptors.append(uniform_descriptor)
 
@@ -320,15 +409,17 @@ def set_shader_variables(variables):
     # Redraw the panel, when it'll be available.
 
 
-def get_api_uniform_values(context_values, uniforms):
-    def to_api_uniform_value(uniform_descriptor):
-        control_annotation = uniform_descriptor.get_annotation(UniformAnnotationWithValueDescriptor)
-        if control_annotation is not None:
-            return control_annotation.to_api_uniform_value(context_values, uniforms)
+def get_uniform_values(context_values, uniforms):
+    def get_uniform_value(uniform_descriptor):
+        annotation_with_value = uniform_descriptor.get_annotation(UniformAnnotationWithValueDescriptor)
+        if annotation_with_value is not None:
+            uniform_value = annotation_with_value.get_uniform_value(context_values, uniforms)
+            if uniform_value:
+                return uniform_value
         return UniformValue()
 
     UniformValueArray = UniformValue * len(_active_uniform_descriptors)
-    array = [to_api_uniform_value(uniform_descriptor) for uniform_descriptor in _active_uniform_descriptors]
+    array = [get_uniform_value(uniform_descriptor) for uniform_descriptor in _active_uniform_descriptors]
     uniform_values = UniformValueArray(*array)
 
     return uniform_values

@@ -3,6 +3,7 @@ use crate::compiler::CompilerKind;
 use crate::configuration::Configuration;
 use crate::settings::Settings;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::hash::Hash;
 use std::path::{Path, PathBuf};
 
@@ -28,8 +29,7 @@ pub struct ConstVariable {
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct UniformAnnotationControlDescriptor {
-	pub control_kind: String,
-	pub control_parameters: Option<String>,
+	pub parameters: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]

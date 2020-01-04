@@ -26,6 +26,32 @@ using ShibaMat2 = _ShibaMatrix<2, 2>;
 using ShibaMat3 = _ShibaMatrix<3, 3>;
 using ShibaMat4 = _ShibaMatrix<4, 4>;
 
+template <int Elements>
+struct _ShibaVector
+{
+	float data[Elements];
+
+	_ShibaVector()
+	{
+		std::memset(data, 0, sizeof(float) * Elements);
+	}
+
+	_ShibaVector(const _ShibaVector &other)
+	{
+		std::memcpy(data, other.data, sizeof(float) * Elements);
+	}
+
+	_ShibaVector &operator=(const _ShibaVector &other)
+	{
+		std::memcpy(data, other.data, sizeof(float) * Elements);
+		return *this;
+	}
+};
+
+using ShibaVec2 = _ShibaVector<2>;
+using ShibaVec3 = _ShibaVector<3>;
+using ShibaVec4 = _ShibaVector<4>;
+
 class _ShibaNoLogger
 {
 public:
@@ -123,6 +149,36 @@ public:
 			<< matrix.data[13] << ", "
 			<< matrix.data[14] << ", "
 			<< matrix.data[15]
+			<< ")";
+	}
+
+	std::ostream & operator<< (std::ostream &os, const ShibaVec2 &vector)
+	{
+		return os
+			<< "vec2("
+			<< vector.data[0] << ", "
+			<< vector.data[1]
+			<< ")";
+	}
+
+	std::ostream & operator<< (std::ostream &os, const ShibaVec3 &vector)
+	{
+		return os
+			<< "vec3("
+			<< vector.data[0] << ", "
+			<< vector.data[1] << ", "
+			<< vector.data[2]
+			<< ")";
+	}
+
+	std::ostream & operator<< (std::ostream &os, const ShibaVec4 &vector)
+	{
+		return os
+			<< "vec4("
+			<< vector.data[0] << ", "
+			<< vector.data[1] << ", "
+			<< vector.data[2] << ", "
+			<< vector.data[3]
 			<< ")";
 	}
 
@@ -437,12 +493,15 @@ void main() {\n\
 
 	struct _ShibaUniformValue
 	{
-		float as_float;
-		GLint as_int;
-		ShibaMat2 as_mat2;
-		ShibaMat3 as_mat3;
-		ShibaMat4 as_mat4;
-		GLuint as_uint;
+		GLfloat asFloat;
+		GLint asInt;
+		ShibaMat2 asMat2;
+		ShibaMat3 asMat3;
+		ShibaMat4 asMat4;
+		GLuint asUint;
+		ShibaVec2 asVec2;
+		ShibaVec3 asVec3;
+		ShibaVec4 asVec4;
 	};
 
 {% else %}
