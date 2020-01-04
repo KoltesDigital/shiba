@@ -29,7 +29,7 @@
 			shibaCheckGlError();
 			glCompileShader(vertexShaderId);
 			shibaCheckGlError();
-			shibaCheckShaderInfoLog(vertexShaderId);
+			// shibaCheckShaderInfoLog(vertexShaderId);
 			glAttachShader(shibaShaderId, vertexShaderId);
 			shibaCheckGlError();
 
@@ -57,7 +57,7 @@
 			shibaCheckGlError();
 			glCompileShader(fragmentShaderId);
 			shibaCheckGlError();
-			shibaCheckShaderInfoLog(fragmentShaderId);
+			// shibaCheckShaderInfoLog(fragmentShaderId);
 			glAttachShader(shibaShaderId, fragmentShaderId);
 			shibaCheckGlError();
 
@@ -134,7 +134,7 @@
 			shibaCheckGlError();
 			glCompileShader(vertexShaderId);
 			shibaCheckGlError();
-			shibaCheckShaderInfoLog(vertexShaderId);
+			// shibaCheckShaderInfoLog(vertexShaderId);
 			glAttachShader(shibaShaderIds[i], vertexShaderId);
 			shibaCheckGlError();
 
@@ -170,7 +170,7 @@
 			shibaCheckGlError();
 			glCompileShader(fragmentShaderId);
 			shibaCheckGlError();
-			shibaCheckShaderInfoLog(fragmentShaderId);
+			// shibaCheckShaderInfoLog(fragmentShaderId);
 			glAttachShader(shibaShaderIds[i], fragmentShaderId);
 			shibaCheckGlError();
 

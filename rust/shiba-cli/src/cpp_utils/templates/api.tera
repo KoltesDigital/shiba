@@ -267,17 +267,17 @@ public:
 		}
 	}
 
-	static void shibaCheckProgramInfoLog(GLuint program)
+	static void shibaCheckProgramInfoLog(GLuint programId)
 	{
 		GLint length;
-		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+		glGetProgramiv(programId, GL_INFO_LOG_LENGTH, &length);
 		shibaCheckGlError();
 
 		if (length > 0)
 		{
 			auto buffer = std::make_unique<GLchar[]>(length);
 			
-			glGetProgramInfoLog(program, length, NULL, buffer.get());
+			glGetProgramInfoLog(programId, length, NULL, buffer.get());
 			shibaCheckGlError();
 
 			shibaError() << buffer;
@@ -299,7 +299,7 @@ public:
 	#define shibaClearWindowsError()
 	#define shibaCheckGlError()
 	#define shibaCheckShaderInfoLog(shader)
-	#define shibaCheckProgramInfoLog(program)
+	#define shibaCheckProgramInfoLog(programId)
 
 {% endif %}
 
