@@ -23,8 +23,7 @@
 		shibaCheckGlError();
 	{% endif %}
 
-	glUniform1fv(0, shibaFloatUniformCount, shibaFloatUniforms);
-	shibaCheckGlError();
+	shibaSetUniformsForPass(0);
 
 	shibaDrawScreenRect();
 	shibaCheckGlError();

@@ -34,6 +34,7 @@ struct UniformArrayExt<'a> {
 
 	first_letter_uppercased_type_name: String,
 	opengl_type_name: &'static str,
+	opengl_uniform_call: String,
 }
 
 #[derive(Serialize)]
@@ -187,17 +188,23 @@ impl Renderer {
 			.uniform_arrays
 			.iter()
 			.map(|uniform_array| {
-				let opengl_type_name = to_opengl_type_name(uniform_array.type_name.as_str());
 				let mut first_letter_uppercased_type_name = uniform_array.type_name.clone();
 				if let Some(c) = first_letter_uppercased_type_name.get_mut(0..1) {
 					c.make_ascii_uppercase();
 				}
+
+				let opengl_type_name = to_opengl_type_name(&uniform_array.type_name);
+				let opengl_uniform_call = to_opengl_uniform_call(
+					&uniform_array.type_name,
+					&first_letter_uppercased_type_name,
+				);
 
 				UniformArrayExt {
 					uniform_array,
 
 					first_letter_uppercased_type_name,
 					opengl_type_name,
+					opengl_uniform_call,
 				}
 			})
 			.collect::<Vec<UniformArrayExt>>();
@@ -380,6 +387,22 @@ fn to_opengl_type_name(type_name: &str) -> &'static str {
 		"vec3" => "ShibaVec3",
 		"vec4" => "ShibaVec4",
 		_ => "GLint",
+	}
+}
+
+fn to_opengl_uniform_call(type_name: &str, first_letter_uppercased_type_name: &str) -> String {
+	match type_name {
+		"bool" => "glUniform1iv(shibaUniformLocations[PASS][shibaBoolUniformLocationIndex], shibaBoolUniformCount, shibaBoolUniforms)".to_string(),
+		"int" => "glUniform1iv(shibaUniformLocations[PASS][shibaIntUniformLocationIndex], shibaIntUniformCount, shibaIntUniforms)".to_string(),
+		"float" => "glUniform1fv(shibaUniformLocations[PASS][shibaFloatUniformLocationIndex], shibaFloatUniformCount, shibaFloatUniforms)".to_string(),
+		"mat2" => "glUniformMatrix2fv(shibaUniformLocations[PASS][shibaMat2UniformLocationIndex], shibaMat2UniformCount, GL_FALSE, reinterpret_cast<GLfloat *>(shibaMat2Uniforms))".to_string(),
+		"mat3" => "glUniformMatrix3fv(shibaUniformLocations[PASS][shibaMat3UniformLocationIndex], shibaMat3UniformCount, GL_FALSE, reinterpret_cast<GLfloat *>(shibaMat3Uniforms))".to_string(),
+		"mat4" => "glUniformMatrix4fv(shibaUniformLocations[PASS][shibaMat4UniformLocationIndex], shibaMat4UniformCount, GL_FALSE, reinterpret_cast<GLfloat *>(shibaMat4Uniforms))".to_string(),
+		"uint" => "glUniform1iv(shibaUniformLocations[PASS][shibaUintUniformLocationIndex], shibaUintUniformCount, shibaUintUniforms)".to_string(),
+		"vec2" => "glUniform2fv(shibaUniformLocations[PASS][shibaVec2UniformLocationIndex], shibaVec2UniformCount, reinterpret_cast<GLfloat *>(shibaVec2Uniforms))".to_string(),
+		"vec3" => "glUniform3fv(shibaUniformLocations[PASS][shibaVec3UniformLocationIndex], shibaVec3UniformCount, reinterpret_cast<GLfloat *>(shibaVec3Uniforms))".to_string(),
+		"vec4" => "glUniform4fv(shibaUniformLocations[PASS][shibaVec4UniformLocationIndex], shibaVec4UniformCount, reinterpret_cast<GLfloat *>(shibaVec4Uniforms))".to_string(),
+		_ => format!("glUniform1iv(shibaUniformLocations[PASS][shiba{0}UniformLocationIndex], shiba{0}UniformCount, shiba{0}Uniforms)", first_letter_uppercased_type_name),
 	}
 }
 
