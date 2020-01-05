@@ -59,24 +59,24 @@ static const PIXELFORMATDESCRIPTOR _shibaPixelFormatDescriptor = {
 void main()
 {
 	int shibaResolutionWidth =
-		{% if settings.resolution.width %}
-			{{ settings.resolution.width }}
+		{% if runtime_settings.resolution.width %}
+			{{ runtime_settings.resolution.width }}
 		{% else %}
 			GetSystemMetrics(SM_CXSCREEN)
 		{% endif %}
-		{% if settings.resolution.scale %}
-			* {{ settings.resolution.scale }}
+		{% if runtime_settings.resolution.scale %}
+			* {{ runtime_settings.resolution.scale }}
 		{% endif %}
 	;
 
 	int shibaResolutionHeight =
-		{% if settings.resolution.height %}
-			{{ settings.resolution.height }}
+		{% if runtime_settings.resolution.height %}
+			{{ runtime_settings.resolution.height }}
 		{% else %}
 			GetSystemMetrics(SM_CYSCREEN)
 		{% endif %}
-		{% if settings.resolution.scale %}
-			* {{ settings.resolution.scale }}
+		{% if runtime_settings.resolution.scale %}
+			* {{ runtime_settings.resolution.scale }}
 		{% endif %}
 	;
 
@@ -91,7 +91,7 @@ void main()
 	ShowCursor(false);
 	shibaCheckWindowsError();
 
-	{% if settings.loading_black_screen %}
+	{% if runtime_settings | get(key="loading-black-screen") %}
 		wglSwapLayerBuffers(_shibaDC, WGL_SWAP_MAIN_PLANE);
 		shibaCheckWindowsError();
 	{% endif %}
@@ -132,9 +132,9 @@ void main()
 		wglSwapLayerBuffers(_shibaDC, WGL_SWAP_MAIN_PLANE);
 		shibaCheckWindowsError();
 	} while (
-		{% if settings.close_when_finished %}
-			{% if settings.duration %}
-				time < {{ settings.duration }}
+		{% if runtime_settings | get(key="close-when-finished") %}
+			{% if runtime_settings.duration %}
+				time < {{ runtime_settings.duration }}
 			{% elif audio_codes.duration %}
 				time < {{ audio_codes.duration }}
 			{% elif audio_codes.is_playing %}
