@@ -1,0 +1,223 @@
+#include <windows.h>
+
+#define GLEW_STATIC
+
+#include <cstdlib>
+#include <GL/glew.h>
+#include <GL/gl.h>
+
+{{ api.api }}
+
+{{ api.opengl_declarations }}
+
+{{ api.shader_declarations }}
+
+{% if project_codes.declarations %}
+	{{ project_codes.declarations }}
+{% endif %}
+
+#define _SHIBA_EXPORT extern "C" __declspec(dllexport)
+
+static void _shibaCommonUpdate(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+{
+}
+
+static void _shibaCommonInitialize(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+{
+	_shibaCreateScreenRect();
+
+	{{ api.shader_loading }}
+
+	{% if project_codes.initialization %}
+		{{ project_codes.initialization }}
+	{% endif %}
+}
+
+static void _shibaCommonRender(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+{
+	glViewport(0, 0, shibaResolutionWidth, shibaResolutionHeight);
+	shibaCheckGlError();
+
+	{{ api.render }}
+}
+
+_SHIBA_EXPORT void _shibaUpdate(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+{
+	_shibaCommonUpdate(shibaResolutionWidth, shibaResolutionHeight);
+}
+
+_SHIBA_EXPORT void _shibaEnsureIsInitialized(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
+{
+	_shibaStandaloneContext.use();
+
+	if (!_shibaIsInitialized)
+	{
+		{{ api.opengl_loading }}
+
+		_shibaCommonInitialize(shibaResolutionWidth, shibaResolutionHeight);
+
+		shibaCheckGlError();
+		glGenTextures(1, &_shibaFinalFramebufferTextureId);
+		shibaCheckGlError();
+		glBindTexture(GL_TEXTURE_2D, _shibaFinalFramebufferTextureId);
+		shibaCheckGlError();
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, shibaResolutionWidth, shibaResolutionHeight, 0, GL_RGBA, GL_FLOAT, NULL);
+		shibaCheckGlError();
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		shibaCheckGlError();
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		//shibaCheckGlError();
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		shibaCheckGlError();
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		shibaCheckGlError();
+
+		glGenFramebuffers(1, &_shibaFinalFramebufferId);
+		shibaCheckGlError();
+
+		glBindFramebuffer(GL_FRAMEBUFFER, _shibaFinalFramebufferId);
+		shibaCheckGlError();
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _shibaFinalFramebufferTextureId, 0);
+		shibaCheckGlError();
+		auto status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		shibaCheckGlError();
+		if (status != GL_FRAMEBUFFER_COMPLETE)
+		{
+			shibaError() << "Final framebuffer is incomplete!";
+			return;
+		}
+		else
+		{
+			shibaLog() << "Final framebuffer is complete.";
+		}
+
+		shibaFinalFramebufferId = _shibaFinalFramebufferId;
+
+		shibaIsViewport = false;
+		_shibaIsInitialized = true;
+	}
+	else
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, shibaFinalFramebufferId);
+		shibaCheckGlError();
+	}
+}
+
+_SHIBA_EXPORT void _shibaRender(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight, bool isPreview, void *buffer)
+{
+	_shibaCommonRender(shibaResolutionWidth, shibaResolutionHeight);
+
+	glReadBuffer(GL_COLOR_ATTACHMENT0);
+	shibaCheckGlError();
+	glReadPixels(0, 0, shibaResolutionWidth, shibaResolutionHeight, GL_RGBA, GL_FLOAT, buffer);
+	shibaCheckGlError();
+}
+
+_SHIBA_EXPORT void _shibaViewportUpdate(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+{
+	_shibaCommonUpdate(shibaResolutionWidth, shibaResolutionHeight);
+}
+
+_SHIBA_EXPORT void _shibaViewportEnsureIsInitialized(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+{
+	if (!_shibaIsInitialized)
+	{
+		{{ api.opengl_loading }}
+
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING, reinterpret_cast<GLint*>(&shibaFinalFramebufferId));
+		shibaCheckGlError();
+
+		_shibaCommonInitialize(shibaResolutionWidth, shibaResolutionHeight);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, shibaFinalFramebufferId);
+		shibaCheckGlError();
+
+		shibaIsViewport = true;
+		_shibaIsInitialized = true;
+	}
+	else
+	{
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING, reinterpret_cast<GLint*>(&shibaFinalFramebufferId));
+		shibaCheckGlError();
+	}
+}
+
+_SHIBA_EXPORT void _shibaViewportRender(int32_t shibaResolutionWidth, int32_t shibaResolutionHeight)
+{
+	// Viewport sets a different default clear color.
+	glClearColor(0.f, 0.f, 0.f, 0.f);
+	shibaCheckGlError();
+
+	_shibaCommonRender(shibaResolutionWidth, shibaResolutionHeight);
+}
+
+struct _ShibaShaderSources
+{
+	const char *vertex;
+	const char *fragment;
+};
+
+_SHIBA_EXPORT void _shibaUpdateShaderSources(int count, _ShibaShaderSources *shader_specific_sources)
+{
+	if (count != {{ shader_specific_sources_length }})
+	{
+		return;
+	}
+
+	glUseProgram(0);
+	shibaCheckGlError();
+
+	for (int i = 0; i < {{ shader_specific_sources_length }}; ++i)
+	{
+		auto &shader_source = shader_specific_sources[i];
+
+		glShaderSource(_shibaVertexShaderIds[i], 1, shader_source.vertex != nullptr ? &shader_source.vertex : &_shibaShaderNullVertexCode, 0);
+		shibaCheckGlError();
+		glCompileShader(_shibaVertexShaderIds[i]);
+		shibaCheckGlError();
+		shibaCheckShaderInfoLog(_shibaVertexShaderIds[i]);
+
+		if (shader_source.fragment != nullptr)
+		{
+			glShaderSource(_shibaFragmentShaderIds[i], 1, &shader_source.fragment, 0);
+			shibaCheckGlError();
+			glCompileShader(_shibaFragmentShaderIds[i]);
+			shibaCheckGlError();
+			shibaCheckShaderInfoLog(_shibaFragmentShaderIds[i]);
+		}
+
+		auto programId =
+			{% if shader_specific_sources_length == 1 %}
+				shibaProgramId
+			{% else %}
+				shibaProgramIds[i]
+			{% endif %}
+		;
+
+		glLinkProgram(programId);
+		shibaCheckGlError();
+
+		shibaCheckProgramInfoLog(programId);
+
+		{% for uniform_array in shader_set.uniform_arrays %}
+			shibaUniformLocations[i][{{ loop.index0 }}] = glGetUniformLocation(programId, "{% if uniform_array.minified_name %}{{ uniform_array.minified_name }}{% else %}{{ uniform_array.name }}{% endif %}");
+			shibaCheckGlError();
+		{% endfor %}
+
+		shibaLog() << "Uniform locations in shader #" << i << ":";
+		{% for uniform_array in shader_set.uniform_arrays %}
+			shibaLog() << "  {{ uniform_array.type_name }}: " << shibaUniformLocations[i][{{ loop.index0 }}];
+		{% endfor %}
+		shibaLog();
+	}
+}
+
+_SHIBA_EXPORT void _shibaSetActiveUniformValues(_ShibaUniformValue *_shibaArgValues)
+{
+	{{ api.set_active_uniform_values }}
+}
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpReserved)
+{
+	return TRUE;
+}

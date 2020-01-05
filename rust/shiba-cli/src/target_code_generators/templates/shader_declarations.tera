@@ -1,0 +1,54 @@
+{% if shader_specific_sources_length == 1 %}
+	SHIBA_VARIABLE GLint shibaProgramId;
+
+	{% for name, _shader_source in shader_specific_sources %}
+		#define {{ name }} 0
+	{% endfor %}
+{% else %}
+	SHIBA_VARIABLE GLint shibaProgramIds[{{ shader_specific_sources_length }}];
+
+	{% for name, _shader_source in shader_specific_sources %}
+		#define {{ name }} {{ loop.index0 }}
+	{% endfor %}
+{% endif %}
+
+SHIBA_CONST char *_shibaShaderCodes[] = {
+	{% for _name, shader_source in shader_specific_sources %}
+		{{ shader_source.vertex | string_literal }},
+		{{ shader_source.fragment | string_literal }},
+	{% endfor %}
+};
+
+{% if shader_codes.after_stage_variables %}
+	SHIBA_CONST char *_shibaShaderAfterStageVariablesCode = {{ shader_codes.after_stage_variables | string_literal }};
+{% endif %}
+
+{% if shader_codes.before_stage_variables %}
+	SHIBA_CONST char *_shibaShaderBeforeStageVariablesCode = {{ shader_codes.before_stage_variables | string_literal }};
+{% endif %}
+
+{% if shader_codes.fragment_specific %}
+	SHIBA_CONST char *_shibaShaderFragmentSpecificCode = {{ shader_codes.fragment_specific | string_literal }};
+{% endif %}
+
+{% if shader_codes.vertex_specific %}
+	SHIBA_CONST char *_shibaShaderVertexSpecificCode = {{ shader_codes.vertex_specific | string_literal }};
+{% endif %}
+
+{% for uniform_array in shader_uniform_arrays %}
+	SHIBA_CONST int shiba{{ uniform_array.first_letter_uppercased_type_name }}UniformLocationIndex = {{ loop.index0 }};
+	SHIBA_CONST int shiba{{ uniform_array.first_letter_uppercased_type_name }}UniformCount = {{ uniform_array.variables | length }};
+	SHIBA_VARIABLE {{ uniform_array.opengl_type_name }} shiba{{ uniform_array.first_letter_uppercased_type_name }}Uniforms[{{ uniform_array.variables | length }}];
+	#define shibaSet{{ uniform_array.first_letter_uppercased_type_name }}UniformsForShader(SHADER) {{ uniform_array.opengl_uniform_call }}
+	{% for variable in uniform_array.variables %}
+		#define {{ variable.name }} shiba{{ uniform_array.first_letter_uppercased_type_name }}Uniforms[{{ loop.index0 }}]
+	{% endfor %}
+{% endfor %}
+
+SHIBA_VARIABLE int shibaUniformLocations[{{ shader_specific_sources_length }}][{{ shader_uniform_arrays | length }}];
+
+#define shibaSetUniformsForShader(SHADER) { \
+	{% for uniform_array in shader_uniform_arrays -%}
+		shibaSet{{ uniform_array.first_letter_uppercased_type_name }}UniformsForShader(SHADER); \
+	{% endfor -%}
+}

@@ -37,8 +37,11 @@ impl ShaderMinifierShaderMinifier {
 
 		let mut tera = Tera::default();
 
-		tera.add_raw_template("template", include_str!("template.tera"))
-			.map_err(|err| err.to_string())?;
+		tera.add_raw_template(
+			"shader-minifier-shader-minifier",
+			include_str!("template.tera"),
+		)
+		.map_err(|err| err.to_string())?;
 
 		Ok(ShaderMinifierShaderMinifier { exe_path, tera })
 	}
@@ -107,7 +110,7 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 		let shader = self
 			.tera
 			.render(
-				"template",
+				"shader-minifier-shader-minifier",
 				&Context::from_serialize(&context).map_err(|err| err.to_string())?,
 			)
 			.map_err(|err| err.to_string())?;

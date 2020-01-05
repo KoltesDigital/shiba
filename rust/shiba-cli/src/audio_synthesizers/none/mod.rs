@@ -1,8 +1,9 @@
 mod settings;
 
 pub use self::settings::NoneSettings;
-use super::{AudioSynthesizer, IntegrationResult};
+use super::AudioSynthesizer;
 use crate::build::BuildOptions;
+use crate::compilation::CompilationJobEmitter;
 use crate::compilation_data::Compilation;
 use crate::project_data::Project;
 use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
@@ -39,8 +40,8 @@ impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 	fn integrate(
 		&self,
 		_build_options: &BuildOptions,
-		compilation: &Compilation,
-	) -> Result<IntegrationResult, String> {
+		_compilation: &mut Compilation,
+	) -> Result<CodeMap, String> {
 		#[derive(Serialize)]
 		struct OwnContext {
 			speed: Option<OrderedFloat<f32>>,
@@ -62,10 +63,17 @@ impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 			codes.insert(name.to_string(), s);
 		}
 
-		Ok(IntegrationResult {
-			codes,
-			compilation: compilation.clone(),
-		})
+		Ok(codes)
+	}
+}
+
+impl CompilationJobEmitter for NoneAudioSynthesizer<'_> {
+	fn requires_asm_compiler(&self) -> bool {
+		false
+	}
+
+	fn requires_cpp_compiler(&self) -> bool {
+		false
 	}
 }
 

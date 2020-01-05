@@ -67,7 +67,7 @@ enum EventKind<'a> {
 		successful: bool,
 	},
 	BuildStarted,
-	ExecutableCompiled {
+	ExecutableBuilt {
 		path: &'a str,
 		size: u64,
 	},
@@ -77,7 +77,7 @@ enum EventKind<'a> {
 	Error {
 		message: &'a str,
 	},
-	LibraryCompiled {
+	LibraryBuilt {
 		path: &'a str,
 	},
 	Run {
@@ -164,7 +164,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 							match Project::load(&command_project_directory, target) {
 								Ok(project) => {
 									let mut event_listener = |event: BuildEvent| match event {
-										BuildEvent::ExecutableCompiled(event) => {
+										BuildEvent::ExecutableBuilt(event) => {
 											match event.get_size() {
 												Ok(size) => {
 													let path = event.path.to_string_lossy();
@@ -173,7 +173,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 														command_state.write().unwrap();
 													command_state.broadcast(&Event {
 														id: &command_id,
-														kind: EventKind::ExecutableCompiled {
+														kind: EventKind::ExecutableBuilt {
 															path: &path,
 															size,
 														},
@@ -188,10 +188,11 @@ pub fn execute(options: &Options) -> Result<(), String> {
 													});
 												}
 											}
-											executable_artifacts.path = Some(event.path);
+											executable_artifacts.path =
+												Some(event.path.to_path_buf());
 										}
 
-										BuildEvent::LibraryCompiled(event) => {
+										BuildEvent::LibraryBuilt(event) => {
 											{
 												let path = event.path.to_string_lossy();
 
@@ -199,12 +200,10 @@ pub fn execute(options: &Options) -> Result<(), String> {
 													command_state.write().unwrap();
 												command_state.broadcast(&Event {
 													id: &command_id,
-													kind: EventKind::LibraryCompiled {
-														path: &path,
-													},
+													kind: EventKind::LibraryBuilt { path: &path },
 												});
 											}
-											library_artifacts.path = Some(event.path);
+											library_artifacts.path = Some(event.path.to_path_buf());
 										}
 
 										BuildEvent::ShaderSetProvided(event) => {

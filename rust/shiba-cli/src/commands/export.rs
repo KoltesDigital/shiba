@@ -18,12 +18,12 @@ pub fn execute(options: &Options) -> Result<(), String> {
 	let mut static_files = None;
 
 	let mut event_listener = |event: BuildEvent| match event {
-		BuildEvent::ExecutableCompiled(event) => {
-			build_path = Some(event.path);
+		BuildEvent::ExecutableBuilt(event) => {
+			build_path = Some(event.path.to_path_buf());
 		}
 
-		BuildEvent::LibraryCompiled(event) => {
-			build_path = Some(event.path);
+		BuildEvent::LibraryBuilt(event) => {
+			build_path = Some(event.path.to_path_buf());
 		}
 
 		BuildEvent::StaticFilesProvided(event) => {

@@ -1,23 +1,37 @@
-use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use std::path::PathBuf;
 
-#[derive(Clone, Default, Deserialize, Hash, Serialize)]
-pub struct ClCompilation {
-	pub args: Vec<String>,
+#[derive(Default, Hash)]
+pub struct Common {
+	pub link_dependencies: BTreeSet<PathBuf>,
+	pub link_library_paths: BTreeSet<PathBuf>,
 }
 
-#[derive(Clone, Default, Deserialize, Hash, Serialize)]
-pub struct CrinklerCompilation {
-	pub args: Vec<String>,
+#[derive(Hash)]
+pub enum CompilationJobKind {
+	Asm,
+	Cpp,
 }
 
-#[derive(Clone, Default, Deserialize, Hash, Serialize)]
-pub struct LinkCompilation {
-	pub args: Vec<String>,
+#[derive(Hash)]
+pub struct CompilationJob {
+	pub kind: CompilationJobKind,
+	pub path: PathBuf,
+
+	pub include_paths: BTreeSet<PathBuf>,
 }
 
-#[derive(Clone, Default, Deserialize, Hash, Serialize)]
+#[derive(Default, Hash)]
 pub struct Compilation {
-	pub cl: ClCompilation,
-	pub crinkler: CrinklerCompilation,
-	pub link: LinkCompilation,
+	pub jobs: Vec<CompilationJob>,
+	pub include_paths: BTreeSet<PathBuf>,
+
+	pub common: Common,
+}
+
+#[derive(Default, Hash)]
+pub struct Linking {
+	pub sources: Vec<PathBuf>,
+
+	pub common: Common,
 }

@@ -6,19 +6,13 @@ use crate::build::BuildOptions;
 use crate::compilation_data::Compilation;
 use crate::project_files::CodeMap;
 use crate::project_files::FileConsumer;
-use serde::{Deserialize, Serialize};
+use crate::compilation::CompilationJobEmitter;
 pub use settings::Settings;
 
-#[derive(Deserialize, Serialize)]
-pub struct IntegrationResult {
-	pub codes: CodeMap,
-	pub compilation: Compilation,
-}
-
-pub trait AudioSynthesizer: FileConsumer {
+pub trait AudioSynthesizer: FileConsumer + CompilationJobEmitter {
 	fn integrate(
 		&self,
 		build_options: &BuildOptions,
-		compilation: &Compilation,
-	) -> Result<IntegrationResult, String>;
+		compilation: &mut Compilation,
+	) -> Result<CodeMap, String>;
 }

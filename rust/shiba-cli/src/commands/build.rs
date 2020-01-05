@@ -12,7 +12,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 	let project = Project::load(options.project_directory, options.target)?;
 
 	let mut event_listener = |event: BuildEvent| match event {
-		BuildEvent::ExecutableCompiled(event) => match event.get_size() {
+		BuildEvent::ExecutableBuilt(event) => match event.get_size() {
 			Ok(size) => {
 				println!("Executable compiled:");
 				println!("  Path: {:?}", event.path);
@@ -23,7 +23,7 @@ pub fn execute(options: &Options) -> Result<(), String> {
 			}
 		},
 
-		BuildEvent::LibraryCompiled(event) => {
+		BuildEvent::LibraryBuilt(event) => {
 			println!("Library compiled:");
 			println!("  Path: {:?}", event.path);
 		}

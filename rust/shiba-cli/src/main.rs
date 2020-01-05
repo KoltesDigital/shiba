@@ -28,6 +28,7 @@ macro_rules! template_enum {
 	};
 }
 
+mod asm_compilers;
 mod audio_synthesizers;
 mod build;
 mod commands {
@@ -37,25 +38,28 @@ mod commands {
 	pub mod run;
 	pub mod server;
 }
+mod compilation;
 mod compilation_data;
-mod compiler;
+mod compilers;
 mod configuration;
-mod cpp_utils;
-mod executable_compilers;
+mod cpp_compilers;
+mod executable_linkers;
 mod export;
 mod hash_extra;
-mod library_compilers;
+mod library_linkers;
+mod linkers;
+mod msvc;
 mod parsers;
 mod paths;
 mod project_data;
 mod project_files;
 mod run;
 mod settings;
-mod settings_utils;
 mod shader_codes;
 mod shader_data;
 mod shader_minifiers;
 mod shader_providers;
+mod target_code_generators;
 
 use crate::build::BuildTarget;
 use crate::export::ExportOutput;

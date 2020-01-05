@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use std::hash::Hash;
 
 fn default_filename() -> String {
 	"shader.frag".to_string()

@@ -67,8 +67,8 @@ def match_states():
         if _locked_file.path != desired_state.path:
             # Make sure indirect DLL dependencies are found.
             parent_path = os.path.dirname(desired_state.path)
-            if os.environ["PATH"].find(parent_path) == -1:
-                os.environ["PATH"] += ";" + parent_path
+            if os.environ['PATH'].find(parent_path) == -1:
+                os.environ['PATH'] += ";" + parent_path
 
             _locked_file.set_path(desired_state.path)
 

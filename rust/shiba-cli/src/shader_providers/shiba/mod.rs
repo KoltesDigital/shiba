@@ -55,7 +55,7 @@ impl<'a> ShibaShaderProvider<'a> {
 	fn render(&self, build_options: &BuildOptions, code: &str) -> Result<String, String> {
 		let mut tera = Tera::default();
 
-		tera.add_raw_template("template", code)
+		tera.add_raw_template("shader-provider-shiba", code)
 			.map_err(|err| err.to_string())?;
 
 		let context = OwnContext {
@@ -65,7 +65,7 @@ impl<'a> ShibaShaderProvider<'a> {
 
 		let code = tera
 			.render(
-				"template",
+				"shader-provider-shiba",
 				&Context::from_serialize(&context).map_err(|err| err.to_string())?,
 			)
 			.map_err(|err| err.to_string())?;

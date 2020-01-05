@@ -40,7 +40,7 @@ def _handle_error_event(obj):
     notifications.add(Notification("Error, see system console.", 5))
 
 
-def _handle_executable_compiled_event(obj):
+def _handle_executable_built_event(obj):
     print("Executable compiled at %s." % obj['path'])
     size = obj['size']
     notifications.add(Notification("Executable size: %d." % size, 5))
@@ -51,7 +51,7 @@ def _handle_exported_event(obj):
     notifications.add(Notification("Exported.", 5))
 
 
-def _handle_library_compiled_event(obj):
+def _handle_library_built_event(obj):
     print("Library compiled at %s." % obj['path'])
     with instrumentation.update_state() as state:
         state.library.path = obj['path']
@@ -78,9 +78,9 @@ EVENT_HANDLERS = {
     'build-ended': _handle_build_ended_event,
     'build-started': _handle_build_started_event,
     'error': _handle_error_event,
-    'executable-compiled': _handle_executable_compiled_event,
+    'executable-built': _handle_executable_built_event,
     'exported': _handle_exported_event,
-    'library-compiled': _handle_library_compiled_event,
+    'library-built': _handle_library_built_event,
     'run': _handle_run_event,
     'shader-set-provided': _handle_shader_set_provided_event,
 }

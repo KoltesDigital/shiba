@@ -1,4 +1,5 @@
 use super::{none, oidos, AudioSynthesizer};
+use crate::build::BuildTarget;
 use crate::project_data::Project;
 use serde::Deserialize;
 
@@ -13,14 +14,25 @@ impl Settings {
 	pub fn instantiate<'a>(
 		&'a self,
 		project: &'a Project,
+		target: BuildTarget,
 	) -> Result<Box<(dyn AudioSynthesizer + 'a)>, String> {
-		let instance: Box<(dyn AudioSynthesizer + 'a)> = match self {
-			Settings::None(settings) => {
-				Box::new(none::NoneAudioSynthesizer::new(project, settings)?)
-			}
-			Settings::Oidos(settings) => {
-				Box::new(oidos::OidosAudioSynthesizer::new(project, settings)?)
-			}
+		lazy_static! {
+			static ref NONE_SETTINGS_DEFAULT: none::NoneSettings = none::NoneSettings::default();
+		}
+
+		let instance: Box<(dyn AudioSynthesizer + 'a)> = match target {
+			BuildTarget::Executable => match self {
+				Settings::None(settings) => {
+					Box::new(none::NoneAudioSynthesizer::new(project, settings)?)
+				}
+				Settings::Oidos(settings) => {
+					Box::new(oidos::OidosAudioSynthesizer::new(project, settings)?)
+				}
+			},
+			BuildTarget::Library => Box::new(none::NoneAudioSynthesizer::new(
+				project,
+				&*NONE_SETTINGS_DEFAULT,
+			)?),
 		};
 		Ok(instance)
 	}

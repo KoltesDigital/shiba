@@ -3,7 +3,6 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 pub type ConfigurationPaths = HashMap<String, PathBuf>;
 
@@ -31,7 +30,7 @@ impl<'a> Configuration {
 	pub fn get_path(&'a self, name: &'a str) -> PathBuf {
 		match self.paths.get(name) {
 			Some(path) => path.clone(),
-			None => PathBuf::from_str(name).unwrap(),
+			None => PathBuf::from(name),
 		}
 	}
 }

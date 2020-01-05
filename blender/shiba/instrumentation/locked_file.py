@@ -46,9 +46,13 @@ class LockedFile:
                 return False
             self.__copied = True
 
-        self.__on_opened(self.__opened_path)
-        self.__opened = True
+        try:
+            self.__on_opened(self.__opened_path)
+        except Exception as e:
+            print("Failed to open locked file: %s" % e)
+            return False
 
+        self.__opened = True
         return True
 
     def _close(self):
@@ -56,7 +60,12 @@ class LockedFile:
             return False
 
         if self.__opened:
-            self.__on_closed()
+            try:
+                self.__on_closed()
+            except Exception as e:
+                print("Failed to close locked file: %s" % e)
+                return False
+
             self.__opened = False
 
         try:

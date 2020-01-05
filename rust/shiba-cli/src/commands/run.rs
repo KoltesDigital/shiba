@@ -13,8 +13,8 @@ pub fn execute(options: &Options) -> Result<(), String> {
 	let mut executable_path = None;
 
 	let mut event_listener = |event: BuildEvent| {
-		if let BuildEvent::ExecutableCompiled(event) = event {
-			executable_path = Some(event.path);
+		if let BuildEvent::ExecutableBuilt(event) = event {
+			executable_path = Some(event.path.to_path_buf());
 		}
 	};
 

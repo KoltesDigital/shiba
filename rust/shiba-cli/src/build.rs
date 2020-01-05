@@ -1,19 +1,21 @@
-use crate::compilation_data::Compilation;
-use crate::compiler::{CompileOptions, CompilerKind};
+use crate::compilation_data::{Compilation, CompilationJobKind, Linking};
+use crate::compilers::CompileOptions;
+use crate::linkers::LinkOptions;
 use crate::project_data::Project;
 use crate::project_files::{self, ProjectFiles};
 use crate::shader_data::ShaderSet;
+use crate::target_code_generators::{self, GenerateTargetCodeOptions, TargetCodeGenerator};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 
-pub struct ExecutableCompiledEvent {
-	pub path: PathBuf,
+pub struct ExecutableBuiltEvent<'a> {
+	pub path: &'a Path,
 }
 
-impl ExecutableCompiledEvent {
+impl ExecutableBuiltEvent<'_> {
 	pub fn get_size(&self) -> Result<u64, String> {
 		let size = fs::metadata(&self.path)
 			.map_err(|err| err.to_string())?
@@ -22,8 +24,8 @@ impl ExecutableCompiledEvent {
 	}
 }
 
-pub struct LibraryCompiledEvent {
-	pub path: PathBuf,
+pub struct LibraryBuiltEvent<'a> {
+	pub path: &'a Path,
 }
 
 pub struct ShaderSetProvidedEvent<'a> {
@@ -35,13 +37,13 @@ pub struct StaticFilesProvidedEvent<'a> {
 }
 
 pub enum BuildEvent<'a> {
-	ExecutableCompiled(ExecutableCompiledEvent),
-	LibraryCompiled(LibraryCompiledEvent),
+	ExecutableBuilt(ExecutableBuiltEvent<'a>),
+	LibraryBuilt(LibraryBuiltEvent<'a>),
 	ShaderSetProvided(ShaderSetProvidedEvent<'a>),
 	StaticFilesProvided(StaticFilesProvidedEvent<'a>),
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum BuildTarget {
 	Executable,
@@ -74,7 +76,20 @@ pub fn build(
 		.project
 		.settings
 		.audio_synthesizer
-		.instantiate(&options.project)?;
+		.instantiate(&options.project, options.target)?;
+
+	let linker = match options.target {
+		BuildTarget::Executable => options
+			.project
+			.settings
+			.executable_linker
+			.instantiate(options.project)?,
+		BuildTarget::Library => options
+			.project
+			.settings
+			.library_linker
+			.instantiate(options.project)?,
+	};
 
 	let shader_minifier = options
 		.project
@@ -90,30 +105,69 @@ pub fn build(
 		.shader_provider
 		.instantiate(&options.project)?;
 
-	let compiler = match options.target {
-		BuildTarget::Executable => CompilerKind::Executable(
-			options
-				.project
-				.settings
-				.executable_compiler
-				.instantiate(options.project)?,
+	let target_code_generator: Box<(dyn TargetCodeGenerator)> = match options.target {
+		BuildTarget::Executable => Box::new(
+			target_code_generators::executable::ExecutableTargetCodeGenerator::new(
+				&options.project,
+			)?,
 		),
-		BuildTarget::Library => CompilerKind::Library(
-			options
-				.project
-				.settings
-				.library_compiler
-				.instantiate(options.project)?,
+		BuildTarget::Library => Box::new(
+			target_code_generators::library::LibraryTargetCodeGenerator::new(&options.project)?,
 		),
 	};
+
+	let mut possible_platforms = linker.get_possible_platforms().clone();
+
+	let asm_compiler = if audio_synthesizer.requires_asm_compiler()
+		|| target_code_generator.requires_asm_compiler()
+	{
+		let compiler = options
+			.project
+			.settings
+			.asm_compiler
+			.instantiate(&options.project)?;
+		possible_platforms = possible_platforms
+			.intersection(compiler.get_possible_platforms())
+			.cloned()
+			.collect();
+		Some(compiler)
+	} else {
+		None
+	};
+
+	let cpp_compiler = if audio_synthesizer.requires_cpp_compiler()
+		|| target_code_generator.requires_cpp_compiler()
+	{
+		let compiler = options
+			.project
+			.settings
+			.cpp_compiler
+			.instantiate(&options.project)?;
+		possible_platforms = possible_platforms
+			.intersection(compiler.get_possible_platforms())
+			.cloned()
+			.collect();
+		Some(compiler)
+	} else {
+		None
+	};
+
+	let platform = *possible_platforms
+		.iter()
+		.next()
+		.ok_or("Possible platforms do not intersect.")?;
 
 	let project_files = ProjectFiles::load(
 		&options.project.directory,
 		&project_files::LoadOptions {
-			compiler_paths: &[match compiler {
-				CompilerKind::Executable(ref compiler) => compiler.get_is_path_handled(),
-				CompilerKind::Library(ref compiler) => compiler.get_is_path_handled(),
-			}],
+			compiler_paths: &[Box::new(|path| {
+				if let Some(extension) = path.extension() {
+					if extension.to_string_lossy() == "cpp" {
+						return true;
+					}
+				}
+				false
+			})],
 			ignore_paths: &[
 				Box::new(|path| {
 					if let Some(file_name) = path.file_name() {
@@ -140,11 +194,9 @@ pub fn build(
 	let project_codes =
 		project_files.get_compiler_codes(options.project.development, options.target)?;
 
-	let compilation = Compilation::default();
+	let mut compilation = Compilation::default();
 
-	let integration_result = audio_synthesizer.integrate(options, &compilation)?;
-	let audio_codes = integration_result.codes;
-	let compilation = integration_result.compilation;
+	let audio_codes = audio_synthesizer.integrate(options, &mut compilation)?;
 
 	let mut shader_set = shader_provider.provide(options)?;
 
@@ -156,25 +208,62 @@ pub fn build(
 		shader_set: &shader_set,
 	}));
 
-	let compile_options = CompileOptions {
+	let generate_options = GenerateTargetCodeOptions {
 		audio_codes: &audio_codes,
-		compilation: &compilation,
+		platform,
 		project_codes: &project_codes,
 		shader_set: &shader_set,
 	};
+	target_code_generator.generate(options, &generate_options, &mut compilation)?;
 
-	match compiler {
-		CompilerKind::Executable(ref compiler) => {
-			let path = compiler.compile(options, &compile_options)?;
+	let mut linking = Linking {
+		common: compilation.common,
+		..Default::default()
+	};
 
-			event_listener(BuildEvent::ExecutableCompiled(ExecutableCompiledEvent {
-				path,
+	for mut compilation_job in compilation.jobs.into_iter() {
+		let mut include_paths = compilation.include_paths.clone();
+		include_paths.append(&mut compilation_job.include_paths);
+
+		let compile_options = CompileOptions {
+			audio_codes: &audio_codes,
+			include_paths: &include_paths,
+			path: &compilation_job.path,
+			platform,
+			project_codes: &project_codes,
+			shader_set: &shader_set,
+		};
+
+		match compilation_job.kind {
+			CompilationJobKind::Asm => {
+				asm_compiler
+					.as_ref()
+					.unwrap()
+					.compile(options, &compile_options, &mut linking)?
+			}
+			CompilationJobKind::Cpp => {
+				cpp_compiler
+					.as_ref()
+					.unwrap()
+					.compile(options, &compile_options, &mut linking)?
+			}
+		};
+	}
+
+	let link_options = LinkOptions {
+		linking: &linking,
+		platform,
+	};
+	let path = linker.link(&options, &link_options)?;
+
+	match options.target {
+		BuildTarget::Executable => {
+			event_listener(BuildEvent::ExecutableBuilt(ExecutableBuiltEvent {
+				path: &path,
 			}));
 		}
-		CompilerKind::Library(ref compiler) => {
-			let path = compiler.compile(options, &compile_options)?;
-
-			event_listener(BuildEvent::LibraryCompiled(LibraryCompiledEvent { path }));
+		BuildTarget::Library => {
+			event_listener(BuildEvent::LibraryBuilt(LibraryBuiltEvent { path: &path }));
 		}
 	};
 

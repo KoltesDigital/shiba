@@ -1,30 +1,60 @@
+use crate::asm_compilers;
 use crate::audio_synthesizers;
-use crate::executable_compilers;
-use crate::library_compilers;
+use crate::cpp_compilers;
+use crate::executable_linkers;
+use crate::library_linkers;
 use crate::shader_minifiers;
 use crate::shader_providers;
-use serde::Deserialize;
+use ordered_float::OrderedFloat;
+use serde::{Deserialize, Serialize};
 use std::fs;
-use std::hash::Hash;
 use std::path::Path;
+
+#[derive(Debug, Default, Deserialize, Hash, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Resolution {
+	pub width: Option<u32>,
+	pub height: Option<u32>,
+	pub scale: Option<OrderedFloat<f32>>,
+}
+
+#[derive(Debug, Default, Deserialize, Hash, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RuntimeSettings {
+	#[serde(default)]
+	pub close_when_finished: bool,
+	#[serde(default)]
+	pub duration: Option<OrderedFloat<f32>>,
+	#[serde(default)]
+	pub loading_black_screen: bool,
+	#[serde(default)]
+	pub resolution: Resolution,
+}
 
 #[derive(Debug, Default, Deserialize, Hash)]
 #[serde(rename_all = "kebab-case")]
 pub struct Settings {
-	#[serde(default)]
-	pub audio_synthesizer: audio_synthesizers::Settings,
+	pub shiba_version: Option<String>,
+
+	pub name: String,
 	pub development: Option<bool>,
 	#[serde(default)]
-	pub executable_compiler: executable_compilers::Settings,
+	pub runtime: RuntimeSettings,
+
 	#[serde(default)]
-	pub library_compiler: library_compilers::Settings,
+	pub asm_compiler: asm_compilers::Settings,
 	#[serde(default)]
-	pub name: String,
+	pub audio_synthesizer: audio_synthesizers::Settings,
+	#[serde(default)]
+	pub cpp_compiler: cpp_compilers::Settings,
+	#[serde(default)]
+	pub executable_linker: executable_linkers::Settings,
+	#[serde(default)]
+	pub library_linker: library_linkers::Settings,
 	#[serde(default)]
 	pub shader_minifier: Option<shader_minifiers::Settings>,
 	#[serde(default)]
 	pub shader_provider: shader_providers::Settings,
-	pub shiba_version: Option<String>,
 }
 
 impl Settings {
