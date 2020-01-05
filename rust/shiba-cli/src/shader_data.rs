@@ -2,12 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
-pub struct ShaderSource {
+pub struct ShaderProgram {
 	pub fragment: Option<String>,
 	pub vertex: Option<String>,
 }
 
-pub type ShaderSourceMap = BTreeMap<String, ShaderSource>;
+pub type ShaderProgramMap = BTreeMap<String, ShaderProgram>;
 
 #[derive(Debug, Default, Deserialize, Hash, PartialEq, Serialize)]
 pub struct ShaderSections {
@@ -79,7 +79,7 @@ pub struct ShaderUniformArray {
 pub struct ShaderSet {
 	pub glsl_version: Option<String>,
 	pub sections: ShaderSections,
-	pub specific_sources: ShaderSourceMap,
+	pub programs: ShaderProgramMap,
 
 	pub uniform_arrays: Vec<ShaderUniformArray>,
 	pub variables: Vec<ShaderVariable>,

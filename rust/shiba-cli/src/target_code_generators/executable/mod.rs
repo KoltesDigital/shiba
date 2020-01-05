@@ -9,7 +9,7 @@ use crate::paths::BUILD_ROOT_DIRECTORY;
 use crate::project_data::Project;
 use crate::project_files::CodeMap;
 use crate::settings::RuntimeSettings;
-use crate::shader_data::{ShaderSourceMap, ShaderUniformArray};
+use crate::shader_data::{ShaderProgramMap, ShaderUniformArray};
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::fs;
@@ -127,7 +127,7 @@ impl TargetCodeGenerator for ExecutableTargetCodeGenerator {
 			development: bool,
 			project_codes: &'a CodeMap,
 			runtime_settings: &'a RuntimeSettings,
-			shader_specific_sources: &'a ShaderSourceMap,
+			shader_programs: &'a ShaderProgramMap,
 			shader_uniform_arrays: &'a [ShaderUniformArray],
 			target: BuildTarget,
 		}
@@ -138,7 +138,7 @@ impl TargetCodeGenerator for ExecutableTargetCodeGenerator {
 			development: build_options.project.development,
 			project_codes: &options.project_codes,
 			runtime_settings: &build_options.project.settings.runtime,
-			shader_specific_sources: &options.shader_set.specific_sources,
+			shader_programs: &options.shader_set.programs,
 			shader_uniform_arrays: &options.shader_set.uniform_arrays,
 			target: build_options.target,
 		};

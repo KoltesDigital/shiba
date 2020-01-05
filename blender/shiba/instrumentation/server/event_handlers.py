@@ -64,13 +64,13 @@ def _handle_run_event(obj):
 
 def _handle_shader_set_provided_event(obj):
     print("Shader mapping for target '%s':" % obj['target'])
-    for i, shader_source in enumerate(obj['sources']):
-        print("  #%d: %s" % (i, shader_source['name']))
+    for i, shader_program in enumerate(obj['programs']):
+        print("  #%d: %s" % (i, shader_program['name']))
 
     if obj['target'] == 'library':
         with instrumentation.library.get_library_wrapper() as library_wrapper:
             if library_wrapper:
-                library_wrapper.set_shader_sources(obj['sources'])
+                library_wrapper.set_shader_programs(obj['programs'])
         uniforms.set_shader_variables(obj['variables'])
 
 

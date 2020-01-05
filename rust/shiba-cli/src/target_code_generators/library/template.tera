@@ -151,15 +151,15 @@ _SHIBA_EXPORT void _shibaViewportRender(int32_t shibaResolutionWidth, int32_t sh
 	_shibaCommonRender(shibaResolutionWidth, shibaResolutionHeight);
 }
 
-struct _ShibaShaderSources
+struct _ShibaPrograms
 {
 	const char *vertex;
 	const char *fragment;
 };
 
-_SHIBA_EXPORT void _shibaUpdateShaderSources(int count, _ShibaShaderSources *shader_specific_sources)
+_SHIBA_EXPORT void _shibaUpdatePrograms(int count, _ShibaPrograms *programs)
 {
-	if (count != {{ shader_specific_sources_length }})
+	if (count != {{ shader_program_count }})
 	{
 		return;
 	}
@@ -167,19 +167,19 @@ _SHIBA_EXPORT void _shibaUpdateShaderSources(int count, _ShibaShaderSources *sha
 	glUseProgram(0);
 	shibaCheckGlError();
 
-	for (int i = 0; i < {{ shader_specific_sources_length }}; ++i)
+	for (int i = 0; i < {{ shader_program_count }}; ++i)
 	{
-		auto &shader_source = shader_specific_sources[i];
+		auto &program = programs[i];
 
-		glShaderSource(_shibaVertexShaderIds[i], 1, shader_source.vertex != nullptr ? &shader_source.vertex : &_shibaShaderNullVertexCode, 0);
+		glShaderSource(_shibaVertexShaderIds[i], 1, program.vertex != nullptr ? &program.vertex : &_shibaShaderNullVertexCode, 0);
 		shibaCheckGlError();
 		glCompileShader(_shibaVertexShaderIds[i]);
 		shibaCheckGlError();
 		shibaCheckShaderInfoLog(_shibaVertexShaderIds[i]);
 
-		if (shader_source.fragment != nullptr)
+		if (program.fragment != nullptr)
 		{
-			glShaderSource(_shibaFragmentShaderIds[i], 1, &shader_source.fragment, 0);
+			glShaderSource(_shibaFragmentShaderIds[i], 1, &program.fragment, 0);
 			shibaCheckGlError();
 			glCompileShader(_shibaFragmentShaderIds[i]);
 			shibaCheckGlError();
@@ -187,7 +187,7 @@ _SHIBA_EXPORT void _shibaUpdateShaderSources(int count, _ShibaShaderSources *sha
 		}
 
 		auto programId =
-			{% if shader_specific_sources_length == 1 %}
+			{% if shader_program_count == 1 %}
 				shibaProgramId
 			{% else %}
 				shibaProgramIds[i]

@@ -124,7 +124,7 @@ impl TargetCodeGenerator for LibraryTargetCodeGenerator {
 			project_codes: &'a CodeMap,
 			runtime_settings: &'a RuntimeSettings,
 			shader_set: &'a ShaderSet,
-			shader_specific_sources_length: usize,
+			shader_program_count: usize,
 		}
 
 		let context = OwnContext {
@@ -132,7 +132,7 @@ impl TargetCodeGenerator for LibraryTargetCodeGenerator {
 			project_codes: &options.project_codes,
 			runtime_settings: &build_options.project.settings.runtime,
 			shader_set: &options.shader_set,
-			shader_specific_sources_length: options.shader_set.specific_sources.len(),
+			shader_program_count: options.shader_set.programs.len(),
 		};
 		let contents = self
 			.tera

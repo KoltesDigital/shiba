@@ -11,7 +11,7 @@ use crate::parsers::glsl;
 use crate::project_data::Project;
 use crate::project_files::{FileConsumer, IsPathHandled};
 use crate::shader_data::{
-	ShaderConstVariable, ShaderSet, ShaderSource, ShaderUniformArray, ShaderVariableKind,
+	ShaderConstVariable, ShaderProgram, ShaderSet, ShaderUniformArray, ShaderVariableKind,
 };
 use regex::Regex;
 use serde::Serialize;
@@ -74,11 +74,11 @@ impl<'a> ShibaShaderProvider<'a> {
 	}
 }
 
-fn get_specific_source<'a>(shader_set: &'a mut ShaderSet, name: &str) -> &'a mut ShaderSource {
+fn get_or_insert_program<'a>(shader_set: &'a mut ShaderSet, name: &str) -> &'a mut ShaderProgram {
 	shader_set
-		.specific_sources
+		.programs
 		.entry(name.to_string())
-		.or_insert_with(ShaderSource::default)
+		.or_insert_with(ShaderProgram::default)
 }
 
 fn parse(code: &str) -> Result<ShaderSet, String> {
@@ -115,7 +115,7 @@ fn parse(code: &str) -> Result<ShaderSet, String> {
 				Directive::Common => append(&mut shader_set.sections.common),
 
 				Directive::Fragment(name) => {
-					let source = get_specific_source(&mut shader_set, name);
+					let source = get_or_insert_program(&mut shader_set, name);
 					append(&mut source.fragment);
 				}
 
@@ -126,7 +126,7 @@ fn parse(code: &str) -> Result<ShaderSet, String> {
 				Directive::Varyings => append(&mut shader_set.sections.varyings),
 
 				Directive::Vertex(name) => {
-					let source = get_specific_source(&mut shader_set, name);
+					let source = get_or_insert_program(&mut shader_set, name);
 					append(&mut source.vertex);
 				}
 			}
@@ -179,7 +179,7 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 
 		let mut shader_set = parse(&contents)?;
 
-		if shader_set.specific_sources.is_empty() {
+		if shader_set.programs.is_empty() {
 			return Err("Shader set should define at least one shader.".to_string());
 		}
 
@@ -208,9 +208,10 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 					shader_set.sections.common =
 						shader_set.sections.common.as_ref().and_then(replace);
 
-					for (_name, shader_source) in shader_set.specific_sources.iter_mut() {
-						shader_source.vertex = shader_source.vertex.as_ref().and_then(replace);
-						shader_source.fragment = shader_source.fragment.as_ref().and_then(replace);
+					for (_name, shader_program) in shader_set.programs.iter_mut() {
+						shader_program.vertex = shader_program.vertex.as_ref().and_then(replace);
+						shader_program.fragment =
+							shader_program.fragment.as_ref().and_then(replace);
 					}
 
 					variable.active = false;
@@ -227,9 +228,9 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 
 					find(&shader_set.sections.common);
 
-					for (_name, shader_source) in shader_set.specific_sources.iter() {
-						find(&shader_source.vertex);
-						find(&shader_source.fragment);
+					for (_name, shader_program) in shader_set.programs.iter() {
+						find(&shader_program.vertex);
+						find(&shader_program.fragment);
 					}
 
 					if !referenced {
@@ -281,9 +282,9 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 
 				shader_set.sections.common = shader_set.sections.common.as_ref().and_then(replace);
 
-				for (_name, shader_source) in shader_set.specific_sources.iter_mut() {
-					shader_source.vertex = shader_source.vertex.as_ref().and_then(replace);
-					shader_source.fragment = shader_source.fragment.as_ref().and_then(replace);
+				for (_name, shader_program) in shader_set.programs.iter_mut() {
+					shader_program.vertex = shader_program.vertex.as_ref().and_then(replace);
+					shader_program.fragment = shader_program.fragment.as_ref().and_then(replace);
 				}
 			}
 		}
@@ -305,7 +306,7 @@ impl FileConsumer for ShibaShaderProvider<'_> {
 mod tests {
 	use super::*;
 	use crate::shader_data::{
-		ShaderSections, ShaderSourceMap, ShaderUniformVariable, ShaderVariable, ShaderVariableKind,
+		ShaderProgramMap, ShaderSections, ShaderUniformVariable, ShaderVariable, ShaderVariableKind,
 	};
 
 	#[test]
@@ -329,10 +330,10 @@ fragment code
 		)
 		.unwrap();
 
-		let mut expected_specific_sources = ShaderSourceMap::new();
-		expected_specific_sources.insert(
+		let mut expected_programs = ShaderProgramMap::new();
+		expected_programs.insert(
 			"shader".to_string(),
-			ShaderSource {
+			ShaderProgram {
 				vertex: Some("vertex code".to_string()),
 				fragment: Some("fragment code".to_string()),
 			},
@@ -346,7 +347,7 @@ fragment code
 					common: Some("common code".to_string()),
 					..Default::default()
 				},
-				specific_sources: expected_specific_sources,
+				programs: expected_programs,
 				variables: vec![
 					ShaderVariable {
 						active: true,

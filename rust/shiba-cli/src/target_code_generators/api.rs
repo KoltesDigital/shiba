@@ -3,7 +3,7 @@ use crate::configuration::Configuration;
 use crate::project_files::CodeMap;
 use crate::shader_codes::ShaderCodes;
 use crate::shader_data::{
-	ShaderSet, ShaderSource, ShaderSourceMap, ShaderUniformArray, ShaderVariable,
+	ShaderProgram, ShaderProgramMap, ShaderSet, ShaderUniformArray, ShaderVariable,
 	ShaderVariableKind,
 };
 use regex::Regex;
@@ -154,15 +154,15 @@ impl APIGenerator {
 		#[derive(Serialize)]
 		struct APIContext<'a> {
 			development: bool,
-			shader_specific_sources: &'a ShaderSourceMap,
-			shader_specific_sources_length: usize,
+			shader_programs: &'a ShaderProgramMap,
+			shader_program_count: usize,
 			target: BuildTarget,
 		}
 
 		let api_context = APIContext {
 			development,
-			shader_specific_sources: &shader_set.specific_sources,
-			shader_specific_sources_length: shader_set.specific_sources.len(),
+			shader_programs: &shader_set.programs,
+			shader_program_count: shader_set.programs.len(),
 			target,
 		};
 		let api = self.render_template(Template::API, &api_context)?;
@@ -196,14 +196,14 @@ impl APIGenerator {
 			&set_active_uniform_values_context,
 		)?;
 
-		let (_, shader_specific_source_0) = &shader_set.specific_sources.iter().next().unwrap();
+		let (_, shader_program_0) = &shader_set.programs.iter().next().unwrap();
 
 		#[derive(Serialize)]
 		struct ShaderDeclarationContext<'a> {
 			active_uniforms: &'a [ShaderUniform<'a>],
 			shader_codes: &'a ShaderCodes,
-			shader_specific_sources: &'a ShaderSourceMap,
-			shader_specific_sources_length: usize,
+			shader_programs: &'a ShaderProgramMap,
+			shader_program_count: usize,
 			shader_uniform_arrays: &'a [ShaderUniformArrayExt<'a>],
 			target: BuildTarget,
 		}
@@ -211,8 +211,8 @@ impl APIGenerator {
 		let shader_declarations_context = ShaderDeclarationContext {
 			active_uniforms: &active_uniforms,
 			shader_codes: &shader_codes,
-			shader_specific_sources: &shader_set.specific_sources,
-			shader_specific_sources_length: shader_set.specific_sources.len(),
+			shader_programs: &shader_set.programs,
+			shader_program_count: shader_set.programs.len(),
 			shader_uniform_arrays: &shader_uniform_arrays,
 			target,
 		};
@@ -223,9 +223,9 @@ impl APIGenerator {
 		struct ShaderLoadingContext<'a> {
 			development: bool,
 			shader_codes: &'a ShaderCodes,
-			shader_specific_source_0: &'a ShaderSource,
-			shader_specific_sources: &'a ShaderSourceMap,
-			shader_specific_sources_length: usize,
+			shader_program_0: &'a ShaderProgram,
+			shader_programs: &'a ShaderProgramMap,
+			shader_program_count: usize,
 			shader_uniform_arrays: &'a [ShaderUniformArrayExt<'a>],
 			target: BuildTarget,
 		}
@@ -233,9 +233,9 @@ impl APIGenerator {
 		let shader_loading_context = ShaderLoadingContext {
 			development,
 			shader_codes: &shader_codes,
-			shader_specific_source_0,
-			shader_specific_sources: &shader_set.specific_sources,
-			shader_specific_sources_length: shader_set.specific_sources.len(),
+			shader_program_0,
+			shader_programs: &shader_set.programs,
+			shader_program_count: shader_set.programs.len(),
 			shader_uniform_arrays: &shader_uniform_arrays,
 			target,
 		};

@@ -1,4 +1,4 @@
-{% if shader_specific_sources_length == 1 %}
+{% if shader_program_count == 1 %}
 
 	shibaLog() << "Loading lone shader.";
 
@@ -6,9 +6,9 @@
 		shibaProgramId = glCreateProgram();
 		shibaCheckGlError();
 
-		{% if shader_specific_source_0.vertex or target == "library" %}
+		{% if shader_program_0.vertex or target == "library" %}
 			const char *vertexShaderSources[] = {
-				{% if shader_specific_source_0.vertex %}
+				{% if shader_program_0.vertex %}
 					{% if shader_codes.before_stage_variables %}
 						_shibaShaderBeforeStageVariablesCode,
 					{% endif %}
@@ -38,7 +38,7 @@
 			{% endif %}
 		{% endif %}
 
-		{% if shader_specific_source_0.fragment %}
+		{% if shader_program_0.fragment %}
 			const char *fragmentShaderSources[] = {
 				{% if shader_codes.before_stage_variables %}
 					_shibaShaderBeforeStageVariablesCode,
@@ -96,7 +96,7 @@
 
 {% else %}
 
-	for (auto i = 0; i < {{ shader_specific_sources_length }}; ++i)
+	for (auto i = 0; i < {{ shader_program_count }}; ++i)
 	{
 		shibaLog() << "Loading shader #" << i << ".";
 

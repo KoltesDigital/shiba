@@ -86,7 +86,7 @@ class UniformValue(ctypes.Structure):
     ]
 
 
-class ShaderSource(ctypes.Structure):
+class ShaderProgram(ctypes.Structure):
     _fields_ = [
         ('vertex', ctypes.c_char_p),
         ('fragment', ctypes.c_char_p),

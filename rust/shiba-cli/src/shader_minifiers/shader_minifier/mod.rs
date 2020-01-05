@@ -9,7 +9,7 @@ use crate::parsers::glsl;
 use crate::paths::BUILD_ROOT_DIRECTORY;
 use crate::project_data::Project;
 use crate::shader_data::{
-	ShaderSections, ShaderSet, ShaderSource, ShaderSourceMap, ShaderVariable, ShaderVariableKind,
+	ShaderProgram, ShaderProgramMap, ShaderSections, ShaderSet, ShaderVariable, ShaderVariableKind,
 };
 use regex::Regex;
 use serde::Serialize;
@@ -76,11 +76,11 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 		}
 
 		let glsl_version = original_shader_set.glsl_version.clone();
-		let mut specific_sources = original_shader_set
-			.specific_sources
+		let mut programs = original_shader_set
+			.programs
 			.iter()
-			.map(|(name, _)| (name.clone(), ShaderSource::default()))
-			.collect::<ShaderSourceMap>();
+			.map(|(name, _)| (name.clone(), ShaderProgram::default()))
+			.collect::<ShaderProgramMap>();
 		let mut sections = ShaderSections::default();
 		let mut uniform_arrays = original_shader_set.uniform_arrays.clone();
 		let mut variables = original_shader_set.variables.clone();
@@ -177,7 +177,7 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 						Directive::Common => sections.common = code,
 
 						Directive::Fragment(name) => {
-							specific_sources.get_mut(name).unwrap().fragment = code;
+							programs.get_mut(name).unwrap().fragment = code;
 						}
 
 						Directive::Outputs => sections.outputs = code,
@@ -189,7 +189,7 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 						Directive::Varyings => sections.varyings = code,
 
 						Directive::Vertex(name) => {
-							specific_sources.get_mut(name).unwrap().vertex = code;
+							programs.get_mut(name).unwrap().vertex = code;
 						}
 					}
 				}
@@ -225,7 +225,7 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 
 		let shader_set = ShaderSet {
 			glsl_version,
-			specific_sources,
+			programs,
 			sections,
 			uniform_arrays,
 			variables,

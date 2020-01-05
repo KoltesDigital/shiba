@@ -34,14 +34,14 @@
 	{{ shader_set.sections.common }}
 {% endif %}
 
-{% for name, shader_source in shader_set.specific_sources %}
-	{% if shader_source.vertex %}
+{% for name, program in shader_set.programs %}
+	{% if program.vertex %}
 		#pragma shiba vertex {{ name }}
-		{{ shader_source.vertex }}
+		{{ program.vertex }}
 	{% endif %}
 
-	{% if shader_source.fragment %}
+	{% if program.fragment %}
 		#pragma shiba fragment {{ name }}
-		{{ shader_source.fragment }}
+		{{ program.fragment }}
 	{% endif %}
 {% endfor %}
