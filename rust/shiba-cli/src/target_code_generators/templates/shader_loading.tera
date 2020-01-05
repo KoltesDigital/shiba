@@ -87,6 +87,11 @@
 			{% endfor %}
 			shibaLog();
 		{% endif %}
+
+		{% if target == "executable" %}
+			glUseProgram(shibaProgramId);
+			shibaCheckGlError();
+		{% endif %}
 	}
 
 {% else %}
