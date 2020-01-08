@@ -17,9 +17,9 @@ def _project_directory_update(_self, _context):
 
 class Settings(bpy.types.PropertyGroup):
     build_executable_on_change: bpy.props.BoolProperty(
-        name="Build Executable On Change",
         description="Automatically build executable when a file is modified",
         default=True,
+        name="Build Executable On Change",
         update=_build_executable_on_change_update
     )
 
@@ -53,8 +53,9 @@ class Settings(bpy.types.PropertyGroup):
     )
 
     project_directory: bpy.props.StringProperty(
-        name="Project Directory",
         description="Path to a directory which contains shiba.yml",
+        default='//project',
+        name="Project Directory",
         subtype='DIR_PATH',
         update=_project_directory_update,
     )
@@ -64,8 +65,8 @@ class Settings(bpy.types.PropertyGroup):
     @classmethod
     def register(cls):
         bpy.types.Scene.shiba = bpy.props.PointerProperty(
-            name="Shiba Settings",
             description="Shiba settings",
+            name="Shiba Settings",
             type=cls,
         )
 
