@@ -8,6 +8,7 @@ use crate::hash_extra;
 use crate::msvc;
 use crate::paths::BUILD_ROOT_DIRECTORY;
 use crate::project_data::Project;
+use crate::{Error, Result};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,13 +21,8 @@ pub struct CrinklerLinker<'a> {
 }
 
 impl<'a> CrinklerLinker<'a> {
-	pub fn new(project: &'a Project, settings: &'a CrinklerSettings) -> Result<Self, String> {
-		let crinkler_path = project
-			.configuration
-			.paths
-			.get("crinkler")
-			.ok_or("Please set configuration key paths.crinkler.")?
-			.clone();
+	pub fn new(project: &'a Project, settings: &'a CrinklerSettings) -> Result<Self> {
+		let crinkler_path = project.configuration.get_path("crinkler");
 		let msvc_command_generator = msvc::CommandGenerator::new()?;
 
 		Ok(CrinklerLinker {
@@ -39,7 +35,7 @@ impl<'a> CrinklerLinker<'a> {
 }
 
 impl<'a> Linker for CrinklerLinker<'a> {
-	fn link(&self, build_options: &BuildOptions, options: &LinkOptions) -> Result<PathBuf, String> {
+	fn link(&self, build_options: &BuildOptions, options: &LinkOptions) -> Result<PathBuf> {
 		assert_eq!(build_options.target, BuildTarget::Executable);
 
 		const OUTPUT_FILENAME: &str = "crinkler.exe";
@@ -66,7 +62,8 @@ impl<'a> Linker for CrinklerLinker<'a> {
 		}
 
 		let build_directory = BUILD_ROOT_DIRECTORY.join("linkers").join("crinkler");
-		fs::create_dir_all(&build_directory).map_err(|err| err.to_string())?;
+		fs::create_dir_all(&build_directory)
+			.map_err(|err| Error::failed_to_create_directory(&build_directory, err))?;
 
 		let dependencies = &options.linking.common.link_dependencies;
 		let library_paths = &options.linking.common.link_library_paths;
@@ -105,15 +102,18 @@ impl<'a> Linker for CrinklerLinker<'a> {
 			)
 			.current_dir(&build_directory);
 
-		let mut linking = command.spawn().map_err(|err| err.to_string())?;
+		let mut linking = command
+			.spawn()
+			.map_err(|err| Error::failed_to_execute(&self.crinkler_path, err))?;
 
-		let status = linking.wait().map_err(|err| err.to_string())?;
+		let status = linking.wait().unwrap();
 		if !status.success() {
-			return Err("Failed to link.".to_string());
+			return Err(Error::execution_failed(&self.crinkler_path));
 		}
 
-		fs::copy(&build_directory.join(OUTPUT_FILENAME), &build_cache_path)
-			.map_err(|err| err.to_string())?;
+		let copy_from = build_directory.join(OUTPUT_FILENAME);
+		fs::copy(&copy_from, &build_cache_path)
+			.map_err(|err| Error::failed_to_copy(&copy_from, &build_cache_path, err))?;
 
 		Ok(build_cache_path)
 	}

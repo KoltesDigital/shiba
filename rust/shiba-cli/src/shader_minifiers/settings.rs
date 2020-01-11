@@ -1,5 +1,6 @@
 use super::{shader_minifier, ShaderMinifier};
 use crate::project_data::Project;
+use crate::Result;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Hash)]
@@ -12,7 +13,7 @@ impl Settings {
 	pub fn instantiate<'a>(
 		&'a self,
 		project: &'a Project,
-	) -> Result<Box<(dyn ShaderMinifier + 'a)>, String> {
+	) -> Result<Box<(dyn ShaderMinifier + 'a)>> {
 		let instance: Box<(dyn ShaderMinifier + 'a)> = match self {
 			Settings::ShaderMinifier => {
 				Box::new(shader_minifier::ShaderMinifierShaderMinifier::new(project)?)

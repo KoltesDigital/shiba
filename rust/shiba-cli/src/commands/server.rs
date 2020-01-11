@@ -4,6 +4,7 @@ use crate::project_data::Project;
 use crate::run::{self, RunOptions};
 use crate::shader_codes::ShaderCodes;
 use crate::shader_data::{ShaderProgram, ShaderSet, ShaderVariable};
+use crate::{Error, Result};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
@@ -117,9 +118,10 @@ impl State {
 	}
 }
 
-pub fn execute(options: &Options) -> Result<(), String> {
+pub fn execute(options: &Options) -> Result<()> {
 	let addr = SocketAddr::new(options.ip, options.port);
-	let listener = TcpListener::bind(addr).map_err(|_| "Failed to start server.")?;
+	let listener =
+		TcpListener::bind(&addr).map_err(|err| Error::failed_to_listen_tcp(&addr, err))?;
 	println!("Listening on {}.", addr);
 
 	let state = Arc::new(RwLock::new(State::default()));
@@ -184,7 +186,9 @@ pub fn execute(options: &Options) -> Result<(), String> {
 														command_state.write().unwrap();
 													command_state.broadcast(&Event {
 														id: &command_id,
-														kind: EventKind::Error { message: &err },
+														kind: EventKind::Error {
+															message: &err.to_string(),
+														},
 													});
 												}
 											}
@@ -267,7 +271,9 @@ pub fn execute(options: &Options) -> Result<(), String> {
 											let mut command_state = command_state.write().unwrap();
 											command_state.broadcast(&Event {
 												id: &command.id,
-												kind: EventKind::Error { message: &err },
+												kind: EventKind::Error {
+													message: &err.to_string(),
+												},
 											});
 											command_state.broadcast(&Event {
 												id: &command.id,
@@ -303,7 +309,9 @@ pub fn execute(options: &Options) -> Result<(), String> {
 									let mut command_state = command_state.write().unwrap();
 									command_state.broadcast(&Event {
 										id: &command.id,
-										kind: EventKind::Error { message: &err },
+										kind: EventKind::Error {
+											message: &err.to_string(),
+										},
 									});
 									command_state.broadcast(&Event {
 										id: &command.id,
@@ -347,7 +355,9 @@ pub fn execute(options: &Options) -> Result<(), String> {
 										let mut command_state = command_state.write().unwrap();
 										command_state.broadcast(&Event {
 											id: &command.id,
-											kind: EventKind::Error { message: &err },
+											kind: EventKind::Error {
+												message: &err.to_string(),
+											},
 										});
 									}
 								};
@@ -381,7 +391,9 @@ pub fn execute(options: &Options) -> Result<(), String> {
 										let mut command_state = command_state.write().unwrap();
 										command_state.broadcast(&Event {
 											id: &command.id,
-											kind: EventKind::Error { message: &err },
+											kind: EventKind::Error {
+												message: &err.to_string(),
+											},
 										});
 									}
 								};

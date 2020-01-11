@@ -4,6 +4,7 @@ pub mod msvc;
 use crate::build::BuildOptions;
 use crate::compilation::{Platform, PlatformDependent};
 use crate::compilation_data::Linking;
+use crate::Result;
 use std::path::PathBuf;
 
 #[derive(Hash)]
@@ -13,5 +14,5 @@ pub struct LinkOptions<'a> {
 }
 
 pub trait Linker: PlatformDependent {
-	fn link(&self, build_options: &BuildOptions, options: &LinkOptions) -> Result<PathBuf, String>;
+	fn link(&self, build_options: &BuildOptions, options: &LinkOptions) -> Result<PathBuf>;
 }

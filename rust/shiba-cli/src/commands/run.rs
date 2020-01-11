@@ -1,13 +1,14 @@
 use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
 use crate::project_data::Project;
 use crate::run::{self, RunOptions};
+use crate::Result;
 use std::path::Path;
 
 pub struct Options<'a> {
 	pub project_directory: &'a Path,
 }
 
-pub fn execute(options: &Options) -> Result<(), String> {
+pub fn execute(options: &Options) -> Result<()> {
 	let project = Project::load(options.project_directory, BuildTarget::Executable)?;
 
 	let mut executable_path = None;

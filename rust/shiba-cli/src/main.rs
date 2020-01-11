@@ -1,3 +1,5 @@
+#![feature(error_iter)]
+
 #[macro_use]
 extern crate lazy_static;
 
@@ -43,6 +45,7 @@ mod compilation_data;
 mod compilers;
 mod configuration;
 mod cpp_compilers;
+mod errors;
 mod executable_linkers;
 mod export;
 mod hash_extra;
@@ -62,7 +65,9 @@ mod shader_providers;
 mod target_code_generators;
 
 use crate::build::BuildTarget;
+pub use crate::errors::{Error, Result};
 use crate::export::ExportOutput;
+use std::error::Error as StdError;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -119,7 +124,7 @@ struct Args {
 	project_directory: PathBuf,
 }
 
-fn main() -> Result<(), String> {
+fn run() -> Result<()> {
 	let args = Args::from_args();
 
 	let command = args.command.unwrap_or_default();
@@ -162,5 +167,18 @@ fn main() -> Result<(), String> {
 			port,
 			project_directory: &args.project_directory,
 		}),
+	}
+}
+
+fn main() {
+	let result = run();
+	if let Err(err) = result {
+		println!("Error: {}", err);
+
+		for source in (&err as &(dyn StdError)).chain().skip(1) {
+			println!("Caused by: {}", source);
+		}
+
+		std::process::exit(1);
 	}
 }

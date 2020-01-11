@@ -1,4 +1,5 @@
 use crate::build::BuildTarget;
+use crate::{Error, Result};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -25,11 +26,12 @@ pub struct LoadOptions<'a> {
 }
 
 impl ProjectFiles {
-	pub fn load(project_directory: &Path, options: &LoadOptions) -> Result<Self, String> {
+	pub fn load(project_directory: &Path, options: &LoadOptions) -> Result<Self> {
 		let mut code_files = vec![];
 		let mut static_files = vec![];
 
-		let entries = fs::read_dir(&project_directory).map_err(|_| "Failed to read directory.")?;
+		let entries = fs::read_dir(&project_directory)
+			.map_err(|err| Error::failed_to_read_directory(&project_directory, err))?;
 
 		for entry in entries {
 			let entry = entry.unwrap();
@@ -52,11 +54,7 @@ impl ProjectFiles {
 		})
 	}
 
-	pub fn get_compiler_codes(
-		&self,
-		development: bool,
-		target: BuildTarget,
-	) -> Result<CodeMap, String> {
+	pub fn get_compiler_codes(&self, development: bool, target: BuildTarget) -> Result<CodeMap> {
 		#[derive(Serialize)]
 		struct OwnContext {
 			development: bool,
@@ -78,19 +76,20 @@ impl ProjectFiles {
 					.expect("Failed to convert path.")
 					.to_string();
 
-				let contents = fs::read_to_string(&path).map_err(|err| err.to_string())?;
+				let contents =
+					fs::read_to_string(&path).map_err(|err| Error::failed_to_read(&path, err))?;
 
 				let mut tera = Tera::default();
 
 				tera.add_raw_template(&name, &contents)
-					.map_err(|err| err.to_string())?;
+					.expect("Failed to add template.");
 
 				let contents = tera
 					.render(
 						&name,
-						&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+						&Context::from_serialize(&context).expect("Failed to create context."),
 					)
-					.map_err(|err| err.to_string())?;
+					.map_err(|err| Error::failed_to_render_template(&name, err))?;
 
 				Ok((name, contents))
 			})

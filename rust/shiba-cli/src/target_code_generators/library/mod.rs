@@ -10,6 +10,7 @@ use crate::project_data::Project;
 use crate::project_files::CodeMap;
 use crate::settings::RuntimeSettings;
 use crate::shader_data::ShaderSet;
+use crate::{Error, Result};
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::fs;
@@ -24,20 +25,15 @@ pub struct LibraryTargetCodeGenerator {
 }
 
 impl LibraryTargetCodeGenerator {
-	pub fn new(project: &Project) -> Result<Self, String> {
+	pub fn new(project: &Project) -> Result<Self> {
 		let api_generator = APIGenerator::new(&project.configuration)?;
-		let glew_path = project
-			.configuration
-			.paths
-			.get("glew")
-			.ok_or("Please set configuration key paths.glew.")?
-			.clone();
+		let glew_path = project.configuration.get_path("glew");
 		let msvc_command_generator = msvc::CommandGenerator::new()?;
 
 		let mut tera = Tera::default();
 
 		tera.add_raw_template("library", include_str!("template.tera"))
-			.map_err(|err| err.to_string())?;
+			.expect("Failed to add template.");
 
 		Ok(LibraryTargetCodeGenerator {
 			api_generator,
@@ -54,7 +50,7 @@ impl TargetCodeGenerator for LibraryTargetCodeGenerator {
 		build_options: &BuildOptions,
 		options: &GenerateTargetCodeOptions,
 		compilation: &mut Compilation,
-	) -> Result<(), String> {
+	) -> Result<()> {
 		const OUTPUT_FILENAME: &str = "library.cpp";
 
 		#[derive(Hash)]
@@ -138,20 +134,22 @@ impl TargetCodeGenerator for LibraryTargetCodeGenerator {
 			.tera
 			.render(
 				"library",
-				&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+				&Context::from_serialize(&context).expect("Failed to create context."),
 			)
-			.map_err(|err| format!("{:?}", err))?;
+			.map_err(|err| Error::failed_to_render_template("library", err))?;
 
 		let build_directory = BUILD_ROOT_DIRECTORY
 			.join("target-code-generators")
 			.join("library");
-		fs::create_dir_all(&build_directory).map_err(|err| err.to_string())?;
+		fs::create_dir_all(&build_directory)
+			.map_err(|err| Error::failed_to_create_directory(&build_directory, err))?;
 
 		let source_path = build_directory.join("library.cpp");
-		fs::write(&source_path, contents.as_bytes()).map_err(|_| "Failed to write to file.")?;
+		fs::write(&source_path, contents.as_bytes())
+			.map_err(|err| Error::failed_to_write(&source_path, err))?;
 
-		fs::copy(&build_directory.join("library.cpp"), &build_cache_path)
-			.map_err(|err| err.to_string())?;
+		fs::copy(&source_path, &build_cache_path)
+			.map_err(|err| Error::failed_to_copy(&source_path, &build_cache_path, err))?;
 
 		Ok(())
 	}

@@ -7,6 +7,7 @@ use crate::compilation::{CompilationJobEmitter, Platform};
 use crate::compilation_data::Compilation;
 use crate::project_files::CodeMap;
 use crate::shader_data::ShaderSet;
+use crate::Result;
 
 #[derive(Hash)]
 pub struct GenerateTargetCodeOptions<'a> {
@@ -22,5 +23,5 @@ pub trait TargetCodeGenerator: CompilationJobEmitter {
 		build_options: &BuildOptions,
 		options: &GenerateTargetCodeOptions,
 		compilation: &mut Compilation,
-	) -> Result<(), String>;
+	) -> Result<()>;
 }

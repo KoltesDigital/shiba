@@ -9,6 +9,7 @@ use crate::hash_extra;
 use crate::msvc;
 use crate::paths::BUILD_ROOT_DIRECTORY;
 use crate::project_data::Project;
+use crate::{Error, Result};
 use std::collections::BTreeSet;
 use std::fs;
 
@@ -20,7 +21,7 @@ pub struct MsvcCompiler<'a> {
 }
 
 impl<'a> MsvcCompiler<'a> {
-	pub fn new(project: &'a Project, settings: &'a MsvcSettings) -> Result<Self, String> {
+	pub fn new(project: &'a Project, settings: &'a MsvcSettings) -> Result<Self> {
 		let args = settings.args.clone().unwrap_or_else(|| {
 			if project.development {
 				vec!["/EHsc"]
@@ -56,17 +57,18 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 		build_options: &BuildOptions,
 		options: &CompileOptions,
 		linking: &mut Linking,
-	) -> Result<(), String> {
+	) -> Result<()> {
 		let output_filename = format!(
 			"{}.obj",
 			options
 				.path
 				.file_name()
-				.ok_or("Invalid filename.")?
+				.ok_or_else(|| Error::path_has_invalid_file_name(options.path))?
 				.to_string_lossy()
 		);
 
-		let contents = fs::read_to_string(options.path).map_err(|err| err.to_string())?;
+		let contents = fs::read_to_string(options.path)
+			.map_err(|err| Error::failed_to_read(options.path, err))?;
 
 		#[derive(Hash)]
 		struct Inputs<'a> {
@@ -92,7 +94,8 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 		}
 
 		let build_directory = BUILD_ROOT_DIRECTORY.join("cpp-compilers").join("msvc");
-		fs::create_dir_all(&build_directory).map_err(|err| err.to_string())?;
+		fs::create_dir_all(&build_directory)
+			.map_err(|err| Error::failed_to_create_directory(&build_directory, err))?;
 
 		let mut compilation = self
 			.msvc_command_generator
@@ -112,15 +115,16 @@ impl<'a> Compiler for MsvcCompiler<'a> {
 			.arg(options.path)
 			.current_dir(&build_directory)
 			.spawn()
-			.map_err(|err| err.to_string())?;
+			.map_err(|err| Error::failed_to_execute("cl", err))?;
 
-		let status = compilation.wait().map_err(|err| err.to_string())?;
+		let status = compilation.wait().unwrap();
 		if !status.success() {
-			return Err("Failed to compile.".to_string());
+			return Err(Error::execution_failed("cl"));
 		}
 
-		fs::copy(&build_directory.join("file.obj"), &build_cache_path)
-			.map_err(|err| err.to_string())?;
+		let copy_from = build_directory.join("file.obj");
+		fs::copy(&copy_from, &build_cache_path)
+			.map_err(|err| Error::failed_to_copy(&copy_from, &build_cache_path, err))?;
 
 		Ok(())
 	}

@@ -1,6 +1,7 @@
 use crate::build::BuildTarget;
 use crate::configuration::Configuration;
 use crate::settings::Settings;
+use crate::Result;
 use std::path::{Path, PathBuf};
 
 pub struct Project {
@@ -11,7 +12,7 @@ pub struct Project {
 }
 
 impl<'a> Project {
-	pub fn load(directory: &'a Path, target: BuildTarget) -> Result<Self, String> {
+	pub fn load(directory: &'a Path, target: BuildTarget) -> Result<Self> {
 		let configuration = Configuration::load()?;
 
 		let settings = Settings::load(directory)?;

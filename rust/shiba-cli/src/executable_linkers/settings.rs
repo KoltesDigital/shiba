@@ -1,5 +1,6 @@
 use crate::linkers::{crinkler, msvc, Linker};
 use crate::project_data::Project;
+use crate::Result;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Hash)]
@@ -10,10 +11,7 @@ pub enum Settings {
 }
 
 impl Settings {
-	pub fn instantiate<'a>(
-		&'a self,
-		project: &'a Project,
-	) -> Result<Box<(dyn Linker + 'a)>, String> {
+	pub fn instantiate<'a>(&'a self, project: &'a Project) -> Result<Box<(dyn Linker + 'a)>> {
 		let instance: Box<(dyn Linker + 'a)> = match self {
 			Settings::Crinkler(settings) => {
 				Box::new(crinkler::CrinklerLinker::new(project, settings)?)

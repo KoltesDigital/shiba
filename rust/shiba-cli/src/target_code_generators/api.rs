@@ -6,6 +6,7 @@ use crate::shader_data::{
 	ShaderProgram, ShaderProgramMap, ShaderSet, ShaderUniformArray, ShaderVariable,
 	ShaderVariableKind,
 };
+use crate::{Error, Result};
 use regex::Regex;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -36,22 +37,22 @@ pub struct API {
 
 #[derive(Hash)]
 pub struct APIGeneratorInputs<'a> {
-	pub glew_path: &'a Option<PathBuf>,
+	pub glew_path: &'a PathBuf,
 }
 
 pub struct APIGenerator {
-	glew_path: Option<PathBuf>,
+	glew_path: PathBuf,
 	tera: Tera,
 }
 
 impl APIGenerator {
-	pub fn new(configuration: &Configuration) -> Result<Self, String> {
-		let glew_path = configuration.paths.get("glew").cloned();
+	pub fn new(configuration: &Configuration) -> Result<Self> {
+		let glew_path = configuration.get_path("glew");
 
 		let mut tera = Tera::default();
 
 		tera.add_raw_templates(Template::as_array())
-			.map_err(|err| err.to_string())?;
+			.expect("Failed to add templates.");
 
 		tera.register_filter(
 			"string_literal",
@@ -88,7 +89,7 @@ impl APIGenerator {
 		shader_set: &ShaderSet,
 		development: bool,
 		target: BuildTarget,
-	) -> Result<API, String> {
+	) -> Result<API> {
 		let shader_codes = ShaderCodes::load(shader_set);
 
 		#[derive(Serialize)]
@@ -266,16 +267,14 @@ impl APIGenerator {
 
 			let glew_path = self
 				.glew_path
-				.as_ref()
-				.ok_or("Please set configuration key paths.glew.")?
 				.join("include")
 				.join("GL")
 				.join("glew.h")
 				.to_string_lossy()
 				.to_string();
 
-			let glew_contents =
-				fs::read_to_string(glew_path).map_err(|_| "Failed to read GLEW.".to_string())?;
+			let glew_contents = fs::read_to_string(&glew_path)
+				.map_err(|err| Error::failed_to_read(&glew_path, err))?;
 
 			{
 				let mut parse = |code| {
@@ -379,18 +378,14 @@ impl APIGenerator {
 		})
 	}
 
-	fn render_template<T: Serialize>(
-		&self,
-		template: Template,
-		context: &T,
-	) -> Result<String, String> {
+	fn render_template<T: Serialize>(&self, template: Template, context: &T) -> Result<String> {
 		let name = template.name();
 		self.tera
 			.render(
 				&name,
-				&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+				&Context::from_serialize(&context).expect("Failed to create context."),
 			)
-			.map_err(|err| format!("{:?}", err))
+			.map_err(|err| Error::failed_to_render_template(&name, err))
 	}
 }
 

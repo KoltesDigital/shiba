@@ -5,6 +5,7 @@ use crate::executable_linkers;
 use crate::library_linkers;
 use crate::shader_minifiers;
 use crate::shader_providers;
+use crate::{Error, Result};
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -58,16 +59,17 @@ pub struct Settings {
 }
 
 impl Settings {
-	pub fn load(project_directory: &Path) -> Result<Self, String> {
+	pub fn load(project_directory: &Path) -> Result<Self> {
 		let path = project_directory.join("shiba.yml");
 
 		if !path.exists() {
 			return Ok(Settings::default());
 		}
 
-		let contents = fs::read_to_string(path).map_err(|_| "Failed to open settings file.")?;
-		let project: Settings =
-			serde_yaml::from_str(&contents).map_err(|err| format!("Failed to parse: {}.", err))?;
+		let contents =
+			fs::read_to_string(&path).map_err(|err| Error::failed_to_read(&path, err))?;
+		let project: Settings = serde_yaml::from_str(&contents)
+			.map_err(|err| Error::failed_to_deserialize(&contents, err))?;
 		Ok(project)
 	}
 }

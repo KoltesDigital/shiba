@@ -7,6 +7,7 @@ use crate::compilation::CompilationJobEmitter;
 use crate::compilation_data::Compilation;
 use crate::project_data::Project;
 use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
+use crate::{Error, Result};
 use ordered_float::OrderedFloat;
 use serde::Serialize;
 use tera::{Context, Tera};
@@ -26,11 +27,11 @@ pub struct NoneAudioSynthesizer<'a> {
 }
 
 impl<'a> NoneAudioSynthesizer<'a> {
-	pub fn new(_project: &'a Project, settings: &'a NoneSettings) -> Result<Self, String> {
+	pub fn new(_project: &'a Project, settings: &'a NoneSettings) -> Result<Self> {
 		let mut tera = Tera::default();
 
 		tera.add_raw_templates(Template::as_array())
-			.map_err(|err| err.to_string())?;
+			.expect("Failed to add templates.");
 
 		Ok(NoneAudioSynthesizer { settings, tera })
 	}
@@ -41,7 +42,7 @@ impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 		&self,
 		_build_options: &BuildOptions,
 		_compilation: &mut Compilation,
-	) -> Result<CodeMap, String> {
+	) -> Result<CodeMap> {
 		#[derive(Serialize)]
 		struct OwnContext {
 			speed: Option<OrderedFloat<f32>>,
@@ -57,9 +58,9 @@ impl<'a> AudioSynthesizer for NoneAudioSynthesizer<'a> {
 				.tera
 				.render(
 					name,
-					&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+					&Context::from_serialize(&context).expect("Failed to create context."),
 				)
-				.map_err(|err| err.to_string())?;
+				.map_err(|err| Error::failed_to_render_template(&name, err))?;
 			codes.insert(name.to_string(), s);
 		}
 

@@ -3,6 +3,7 @@ use crate::compilation::{Platform, PlatformDependent};
 use crate::compilation_data::Linking;
 use crate::project_files::CodeMap;
 use crate::shader_data::ShaderSet;
+use crate::Result;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -22,5 +23,5 @@ pub trait Compiler: PlatformDependent {
 		build_options: &BuildOptions,
 		options: &CompileOptions,
 		linking: &mut Linking,
-	) -> Result<(), String>;
+	) -> Result<()>;
 }

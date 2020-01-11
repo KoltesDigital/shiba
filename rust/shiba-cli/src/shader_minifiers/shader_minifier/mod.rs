@@ -11,6 +11,7 @@ use crate::project_data::Project;
 use crate::shader_data::{
 	ShaderProgram, ShaderProgramMap, ShaderSections, ShaderSet, ShaderVariable, ShaderVariableKind,
 };
+use crate::{Error, Result};
 use regex::Regex;
 use serde::Serialize;
 use serde_json;
@@ -27,13 +28,8 @@ pub struct ShaderMinifierShaderMinifier {
 }
 
 impl ShaderMinifierShaderMinifier {
-	pub fn new(project: &Project) -> Result<Self, String> {
-		let exe_path = project
-			.configuration
-			.paths
-			.get("shader-minifier")
-			.ok_or("Please set configuration key paths.shader-minifier.")?
-			.clone();
+	pub fn new(project: &Project) -> Result<Self> {
+		let exe_path = project.configuration.get_path("shader-minifier");
 
 		let mut tera = Tera::default();
 
@@ -41,7 +37,7 @@ impl ShaderMinifierShaderMinifier {
 			"shader-minifier-shader-minifier",
 			include_str!("template.tera"),
 		)
-		.map_err(|err| err.to_string())?;
+		.expect("Failed to add template.");
 
 		Ok(ShaderMinifierShaderMinifier { exe_path, tera })
 	}
@@ -52,7 +48,7 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 		&self,
 		build_options: &BuildOptions,
 		original_shader_set: &ShaderSet,
-	) -> Result<ShaderSet, String> {
+	) -> Result<ShaderSet> {
 		const OUTPUT_FILENAME: &str = "shader-descriptor.json";
 
 		#[derive(Hash)]
@@ -69,9 +65,10 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
 
 		if !build_options.force && build_cache_path.exists() {
-			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
-			let shader_set =
-				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;
+			let json = fs::read_to_string(&build_cache_path)
+				.map_err(|err| Error::failed_to_read(&build_cache_path, err))?;
+			let shader_set = serde_json::from_str(&json)
+				.map_err(|err| Error::failed_to_deserialize(&json, err))?;
 			return Ok(shader_set);
 		}
 
@@ -111,19 +108,22 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 			.tera
 			.render(
 				"shader-minifier-shader-minifier",
-				&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+				&Context::from_serialize(&context).expect("Failed to create context."),
 			)
-			.map_err(|err| err.to_string())?;
+			.map_err(|err| {
+				Error::failed_to_render_template("shader-minifier-shader-minifier", err)
+			})?;
 
 		let build_directory = BUILD_ROOT_DIRECTORY
 			.join("shader-minifiers")
 			.join("shader-minifier");
-		fs::create_dir_all(&build_directory).map_err(|err| err.to_string())?;
+		fs::create_dir_all(&build_directory)
+			.map_err(|err| Error::failed_to_create_directory(&build_directory, err))?;
 
 		let input_path = build_directory.join("shader.glsl");
 		let output_path = build_directory.join("shader.min.glsl");
 
-		fs::write(&input_path, shader).map_err(|_| "Failed to write shader.")?;
+		fs::write(&input_path, shader).map_err(|err| Error::failed_to_write(&input_path, err))?;
 
 		let mut minification = Command::new(&self.exe_path)
 			.args(vec!["--field-names", "rgba", "--format", "none", "-o"])
@@ -134,19 +134,19 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 			.stdout(Stdio::inherit())
 			.stderr(Stdio::inherit())
 			.spawn()
-			.map_err(|err| err.to_string())?;
+			.map_err(|err| Error::failed_to_execute(&self.exe_path, err))?;
 
-		let status = minification.wait().map_err(|err| err.to_string())?;
+		let status = minification.wait().unwrap();
 		if !status.success() {
-			return Err("Failed to compile.".to_string());
+			return Err(Error::execution_failed(&self.exe_path));
 		}
 
 		let contents = fs::read_to_string(&output_path)
-			.map_err(|_| "Failed to read shader.".to_string())?
+			.map_err(|err| Error::failed_to_read(&output_path, err))?
 			.replace("\r", "");
 
 		let (input, contents) =
-			parsers::contents(&contents).map_err(|_| "Parsing error.".to_string())?;
+			parsers::contents(&contents).map_err(|_| Error::failed_to_parse(&contents))?;
 
 		let mut uniform_arrays_string = None;
 		let mut non_uniform_variables_string = None;
@@ -231,8 +231,9 @@ impl ShaderMinifier for ShaderMinifierShaderMinifier {
 			variables,
 		};
 
-		let json = serde_json::to_string(&shader_set).map_err(|_| "Failed to dump JSON.")?;
-		fs::write(build_cache_path, json).map_err(|err| err.to_string())?;
+		let json = serde_json::to_string(&shader_set).expect("Failed to dump JSON.");
+		fs::write(&build_cache_path, json)
+			.map_err(|err| Error::failed_to_write(&build_cache_path, err))?;
 
 		Ok(shader_set)
 	}

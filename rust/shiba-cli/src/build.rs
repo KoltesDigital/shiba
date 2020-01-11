@@ -5,6 +5,7 @@ use crate::project_data::Project;
 use crate::project_files::{self, ProjectFiles};
 use crate::shader_data::ShaderSet;
 use crate::target_code_generators::{self, GenerateTargetCodeOptions, TargetCodeGenerator};
+use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -16,9 +17,9 @@ pub struct ExecutableBuiltEvent<'a> {
 }
 
 impl ExecutableBuiltEvent<'_> {
-	pub fn get_size(&self) -> Result<u64, String> {
+	pub fn get_size(&self) -> Result<u64> {
 		let size = fs::metadata(&self.path)
-			.map_err(|err| err.to_string())?
+			.map_err(|err| Error::failed_to_get_metadata(&self.path, err))?
 			.len();
 		Ok(size)
 	}
@@ -51,13 +52,13 @@ pub enum BuildTarget {
 }
 
 impl FromStr for BuildTarget {
-	type Err = &'static str;
+	type Err = Error;
 
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
+	fn from_str(s: &str) -> Result<Self> {
 		match s {
 			"executable" => Ok(BuildTarget::Executable),
 			"library" => Ok(BuildTarget::Library),
-			_ => Err("Invalid target variant."),
+			_ => Err(Error::message("Invalid target variant.")),
 		}
 	}
 }
@@ -71,7 +72,7 @@ pub struct BuildOptions<'a> {
 pub fn build(
 	options: &BuildOptions,
 	event_listener: &mut dyn FnMut(BuildEvent) -> (),
-) -> Result<(), String> {
+) -> Result<()> {
 	let audio_synthesizer = options
 		.project
 		.settings
@@ -155,7 +156,7 @@ pub fn build(
 	let platform = *possible_platforms
 		.iter()
 		.next()
-		.ok_or("Possible platforms do not intersect.")?;
+		.ok_or("No possible platform.")?;
 
 	let project_files = ProjectFiles::load(
 		&options.project.directory,
@@ -273,7 +274,7 @@ pub fn build(
 pub fn build_duration(
 	options: &BuildOptions,
 	event_listener: &mut dyn FnMut(BuildEvent) -> (),
-) -> Result<Duration, String> {
+) -> Result<Duration> {
 	let start = Instant::now();
 
 	build(options, event_listener)?;

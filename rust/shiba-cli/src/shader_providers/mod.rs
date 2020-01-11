@@ -4,8 +4,9 @@ pub mod shiba;
 use crate::build::BuildOptions;
 use crate::project_files::FileConsumer;
 use crate::shader_data::ShaderSet;
+use crate::Result;
 pub use settings::Settings;
 
 pub trait ShaderProvider: FileConsumer {
-	fn provide(&self, build_options: &BuildOptions) -> Result<ShaderSet, String>;
+	fn provide(&self, build_options: &BuildOptions) -> Result<ShaderSet>;
 }

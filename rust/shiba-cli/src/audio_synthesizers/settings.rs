@@ -1,6 +1,7 @@
 use super::{none, oidos, AudioSynthesizer};
 use crate::build::BuildTarget;
 use crate::project_data::Project;
+use crate::Result;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Hash)]
@@ -15,7 +16,7 @@ impl Settings {
 		&'a self,
 		project: &'a Project,
 		target: BuildTarget,
-	) -> Result<Box<(dyn AudioSynthesizer + 'a)>, String> {
+	) -> Result<Box<(dyn AudioSynthesizer + 'a)>> {
 		lazy_static! {
 			static ref NONE_SETTINGS_DEFAULT: none::NoneSettings = none::NoneSettings::default();
 		}

@@ -8,6 +8,7 @@ use crate::hash_extra;
 use crate::msvc;
 use crate::paths::BUILD_ROOT_DIRECTORY;
 use crate::project_data::Project;
+use crate::{Error, Result};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
@@ -19,7 +20,7 @@ pub struct MsvcLinker<'a> {
 }
 
 impl<'a> MsvcLinker<'a> {
-	pub fn new(_project: &'a Project, settings: &'a MsvcSettings) -> Result<Self, String> {
+	pub fn new(_project: &'a Project, settings: &'a MsvcSettings) -> Result<Self> {
 		let msvc_command_generator = msvc::CommandGenerator::new()?;
 
 		Ok(MsvcLinker {
@@ -31,7 +32,7 @@ impl<'a> MsvcLinker<'a> {
 }
 
 impl<'a> Linker for MsvcLinker<'a> {
-	fn link(&self, build_options: &BuildOptions, options: &LinkOptions) -> Result<PathBuf, String> {
+	fn link(&self, build_options: &BuildOptions, options: &LinkOptions) -> Result<PathBuf> {
 		let output_filename = match build_options.target {
 			BuildTarget::Executable => "msvc.exe",
 			BuildTarget::Library => "msvc.dll",
@@ -59,7 +60,8 @@ impl<'a> Linker for MsvcLinker<'a> {
 		}
 
 		let build_directory = BUILD_ROOT_DIRECTORY.join("linkers").join("msvc");
-		fs::create_dir_all(&build_directory).map_err(|err| err.to_string())?;
+		fs::create_dir_all(&build_directory)
+			.map_err(|err| Error::failed_to_create_directory(&build_directory, err))?;
 
 		let dependencies = &options.linking.common.link_dependencies;
 		let library_paths = &options.linking.common.link_library_paths;
@@ -100,15 +102,18 @@ impl<'a> Linker for MsvcLinker<'a> {
 			)
 			.current_dir(&build_directory);
 
-		let mut linking = command.spawn().map_err(|err| err.to_string())?;
+		let mut linking = command
+			.spawn()
+			.map_err(|err| Error::failed_to_execute("link", err))?;
 
-		let status = linking.wait().map_err(|err| err.to_string())?;
+		let status = linking.wait().unwrap();
 		if !status.success() {
-			return Err("Failed to link.".to_string());
+			return Err(Error::execution_failed("link"));
 		}
 
-		fs::copy(&build_directory.join(output_filename), &build_cache_path)
-			.map_err(|err| err.to_string())?;
+		let copy_from = build_directory.join(output_filename);
+		fs::copy(&copy_from, &build_cache_path)
+			.map_err(|err| Error::failed_to_copy(&copy_from, &build_cache_path, err))?;
 
 		Ok(build_cache_path)
 	}

@@ -9,6 +9,7 @@ use crate::hash_extra;
 use crate::paths::BUILD_ROOT_DIRECTORY;
 use crate::project_data::Project;
 use crate::project_files::{CodeMap, FileConsumer, IsPathHandled};
+use crate::{Error, Result};
 use serde::Serialize;
 use serde_json;
 use std::borrow::Cow;
@@ -35,25 +36,15 @@ pub struct OidosAudioSynthesizer<'a> {
 }
 
 impl<'a> OidosAudioSynthesizer<'a> {
-	pub fn new(project: &'a Project, settings: &'a OidosSettings) -> Result<Self, String> {
-		let oidos_path = project
-			.configuration
-			.paths
-			.get("oidos")
-			.ok_or("Please set project.configuration key paths.oidos.")?
-			.clone();
+	pub fn new(project: &'a Project, settings: &'a OidosSettings) -> Result<Self> {
+		let oidos_path = project.configuration.get_path("oidos");
 
-		let python2_path = project
-			.configuration
-			.paths
-			.get("python2")
-			.cloned()
-			.unwrap_or_else(|| PathBuf::from("python"));
+		let python2_path = project.configuration.get_path("python2");
 
 		let mut tera = Tera::default();
 
 		tera.add_raw_templates(Template::as_array())
-			.map_err(|err| err.to_string())?;
+			.expect("Failed to add templates.");
 
 		Ok(OidosAudioSynthesizer {
 			settings,
@@ -70,7 +61,7 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 		&self,
 		build_options: &BuildOptions,
 		compilation: &mut Compilation,
-	) -> Result<CodeMap, String> {
+	) -> Result<CodeMap> {
 		const OUTPUT_FILENAME: &str = "codes.json";
 
 		let mut path = Cow::from(&self.settings.path);
@@ -78,7 +69,7 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 			path = Cow::from(build_options.project.directory.join(path));
 		}
 
-		let contents = fs::read(&path).map_err(|err| err.to_string())?;
+		let contents = fs::read(&path).map_err(|err| Error::failed_to_read(&path.as_ref(), err))?;
 
 		#[derive(Hash)]
 		struct Inputs<'a> {
@@ -121,15 +112,18 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 		}
 
 		if !build_options.force && build_cache_path.exists() {
-			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
-			let codes = serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;
+			let json = fs::read_to_string(&build_cache_path)
+				.map_err(|err| Error::failed_to_read(&build_cache_path, err))?;
+			let codes = serde_json::from_str(&json)
+				.map_err(|err| Error::failed_to_deserialize(&json, err))?;
 			return Ok(codes);
 		}
 
 		let build_directory = BUILD_ROOT_DIRECTORY
 			.join("audio-synthesizers")
 			.join("oidos");
-		fs::create_dir_all(&build_directory).map_err(|err| err.to_string())?;
+		fs::create_dir_all(&build_directory)
+			.map_err(|err| Error::failed_to_create_directory(&build_directory, err))?;
 
 		let mut conversion = Command::new(&self.python2_path)
 			.arg(
@@ -143,18 +137,17 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 			.arg("music.asm")
 			.current_dir(&build_directory)
 			.spawn()
-			.map_err(|err| err.to_string())?;
+			.map_err(|err| Error::failed_to_execute(&self.python2_path, err))?;
 
-		let status = conversion.wait().map_err(|err| err.to_string())?;
+		let status = conversion.wait().unwrap();
 		if !status.success() {
-			return Err("Failed to convert music.".to_string());
+			return Err(Error::execution_failed(&self.python2_path));
 		}
 
-		fs::copy(
-			&build_directory.join("music.asm"),
-			&build_cache_directory.join("music.asm"),
-		)
-		.map_err(|err| err.to_string())?;
+		let copy_from = build_directory.join("music.asm");
+		let copy_to = build_cache_directory.join("music.asm");
+		fs::copy(&copy_from, &copy_to)
+			.map_err(|err| Error::failed_to_copy(&copy_from, &copy_to, err))?;
 
 		#[derive(Serialize)]
 		struct OwnContext {}
@@ -166,15 +159,16 @@ impl<'a> AudioSynthesizer for OidosAudioSynthesizer<'a> {
 			let s = self
 				.tera
 				.render(
-					name,
-					&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+					&name,
+					&Context::from_serialize(&context).expect("Failed to create context."),
 				)
-				.map_err(|err| err.to_string())?;
+				.map_err(|err| Error::failed_to_render_template(&name, err))?;
 			codes.insert(name.to_string(), s);
 		}
 
-		let json = serde_json::to_string(&codes).map_err(|_| "Failed to dump JSON.")?;
-		fs::write(build_cache_path, json).map_err(|err| err.to_string())?;
+		let json = serde_json::to_string(&codes).expect("Failed to dump JSON.");
+		fs::write(&build_cache_path, json)
+			.map_err(|err| Error::failed_to_write(&build_cache_path, err))?;
 
 		Ok(codes)
 	}

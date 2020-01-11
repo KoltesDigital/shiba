@@ -13,6 +13,7 @@ use crate::project_files::{FileConsumer, IsPathHandled};
 use crate::shader_data::{
 	ShaderConstVariable, ShaderProgram, ShaderSet, ShaderUniformArray, ShaderVariableKind,
 };
+use crate::{Error, Result};
 use regex::Regex;
 use serde::Serialize;
 use serde_json;
@@ -35,15 +36,10 @@ pub struct ShibaShaderProvider<'a> {
 }
 
 impl<'a> ShibaShaderProvider<'a> {
-	pub fn new(project: &'a Project, settings: &'a ShibaSettings) -> Result<Self, String> {
+	pub fn new(project: &'a Project, settings: &'a ShibaSettings) -> Result<Self> {
 		let path = project.directory.join(&settings.filename);
-		let contents = fs::read_to_string(&path).map_err(|err| {
-			format!(
-				"Failed to read shader at {}: {}",
-				path.to_string_lossy(),
-				err
-			)
-		})?;
+		let contents =
+			fs::read_to_string(&path).map_err(|err| Error::failed_to_read(&path, err))?;
 
 		Ok(ShibaShaderProvider {
 			project,
@@ -52,11 +48,11 @@ impl<'a> ShibaShaderProvider<'a> {
 		})
 	}
 
-	fn render(&self, build_options: &BuildOptions, code: &str) -> Result<String, String> {
+	fn render(&self, build_options: &BuildOptions, code: &str) -> Result<String> {
 		let mut tera = Tera::default();
 
 		tera.add_raw_template("shader-provider-shiba", code)
-			.map_err(|err| err.to_string())?;
+			.expect("Failed to add template.");
 
 		let context = OwnContext {
 			development: self.project.development,
@@ -66,9 +62,9 @@ impl<'a> ShibaShaderProvider<'a> {
 		let code = tera
 			.render(
 				"shader-provider-shiba",
-				&Context::from_serialize(&context).map_err(|err| err.to_string())?,
+				&Context::from_serialize(&context).expect("Failed to create context."),
 			)
-			.map_err(|err| err.to_string())?;
+			.map_err(|err| Error::failed_to_render_template("shader-provider-shiba", err))?;
 
 		Ok(code)
 	}
@@ -81,9 +77,9 @@ fn get_or_insert_program<'a>(shader_set: &'a mut ShaderSet, name: &str) -> &'a m
 		.or_insert_with(ShaderProgram::default)
 }
 
-fn parse(code: &str) -> Result<ShaderSet, String> {
+fn parse(code: &str) -> Result<ShaderSet> {
 	let (input, (glsl_version, sections)) =
-		parsers::contents(code).map_err(|_| "Parsing error.".to_string())?;
+		parsers::contents(code).map_err(|_| Error::failed_to_parse(code))?;
 
 	let mut shader_set = ShaderSet {
 		glsl_version: glsl_version.map(|s| s.to_owned()),
@@ -142,7 +138,7 @@ fn parse(code: &str) -> Result<ShaderSet, String> {
 
 	if let Some(prolog_code) = &prolog_code {
 		let (_, variables) =
-			glsl::variables(prolog_code).map_err(|_| "Parsing error.".to_string())?;
+			glsl::variables(prolog_code).map_err(|_| Error::failed_to_parse(prolog_code))?;
 		shader_set.variables = variables;
 	}
 
@@ -150,7 +146,7 @@ fn parse(code: &str) -> Result<ShaderSet, String> {
 }
 
 impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
-	fn provide(&self, build_options: &BuildOptions) -> Result<ShaderSet, String> {
+	fn provide(&self, build_options: &BuildOptions) -> Result<ShaderSet> {
 		const OUTPUT_FILENAME: &str = "shader-descriptor.json";
 
 		#[derive(Hash)]
@@ -169,9 +165,10 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 		let build_cache_path = build_cache_directory.join(OUTPUT_FILENAME);
 
 		if !build_options.force && build_cache_path.exists() {
-			let json = fs::read_to_string(build_cache_path).map_err(|err| err.to_string())?;
-			let shader_set =
-				serde_json::from_str(json.as_str()).map_err(|_| "Failed to parse JSON.")?;
+			let json = fs::read_to_string(&build_cache_path)
+				.map_err(|err| Error::failed_to_read(&build_cache_path, err))?;
+			let shader_set = serde_json::from_str(&json)
+				.map_err(|err| Error::failed_to_deserialize(&json, err))?;
 			return Ok(shader_set);
 		}
 
@@ -180,7 +177,7 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 		let mut shader_set = parse(&contents)?;
 
 		if shader_set.programs.is_empty() {
-			return Err("Shader set should define at least one shader.".to_string());
+			return Err("Shader set has no programs.".into());
 		}
 
 		// Replace constants by their value.
@@ -289,8 +286,9 @@ impl<'a> ShaderProvider for ShibaShaderProvider<'a> {
 			}
 		}
 
-		let json = serde_json::to_string(&shader_set).map_err(|_| "Failed to dump JSON.")?;
-		fs::write(build_cache_path, json).map_err(|err| err.to_string())?;
+		let json = serde_json::to_string(&shader_set).expect("Failed to dump JSON.");
+		fs::write(&build_cache_path, json)
+			.map_err(|err| Error::failed_to_write(&build_cache_path, err))?;
 
 		Ok(shader_set)
 	}

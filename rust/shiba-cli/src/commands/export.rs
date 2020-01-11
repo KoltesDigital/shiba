@@ -1,6 +1,7 @@
 use crate::build::{self, BuildEvent, BuildOptions, BuildTarget};
 use crate::export::{self, ExportOptions, ExportOutput};
 use crate::project_data::Project;
+use crate::Result;
 use std::path::Path;
 
 pub struct Options<'a> {
@@ -11,7 +12,7 @@ pub struct Options<'a> {
 	pub target: BuildTarget,
 }
 
-pub fn execute(options: &Options) -> Result<(), String> {
+pub fn execute(options: &Options) -> Result<()> {
 	let project = Project::load(options.project_directory, options.target)?;
 
 	let mut build_path = None;
